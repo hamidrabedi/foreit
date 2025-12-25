@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.model.Name}} - Admin</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .admin-header { background: #2c3e50; color: white; padding: 1rem 2rem; }
+        .admin-header h1 { font-size: 1.5rem; }
+        .admin-content { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        .admin-toolbar { background: white; padding: 1rem; margin-bottom: 1rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .admin-toolbar .search { flex: 1; max-width: 400px; }
+        .admin-toolbar input { width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .admin-toolbar .actions { display: flex; gap: 0.5rem; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .admin-table { background: white; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #ecf0f1; padding: 1rem; text-align: left; font-weight: 600; border-bottom: 2px solid #bdc3c7; }
+        td { padding: 1rem; border-bottom: 1px solid #ecf0f1; }
+        tr:hover { background: #f8f9fa; }
+        .admin-pagination { margin-top: 1rem; display: flex; justify-content: center; gap: 0.5rem; }
+        .admin-pagination a { padding: 0.5rem 1rem; background: white; border: 1px solid #ddd; border-radius: 4px; text-decoration: none; color: #2c3e50; }
+        .admin-pagination a:hover { background: #ecf0f1; }
+        .admin-pagination .current { background: #3498db; color: white; border-color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h1>{{.model.Name}} Administration</h1>
+    </div>
+    
+    <div class="admin-content">
+        <div class="admin-toolbar">
+            <div class="search">
+                <form hx-get="/admin/ui/{{.model.Name}}" hx-target="body" hx-push-url="true">
+                    <input type="search" name="search" placeholder="Search..." value="{{.search}}" />
+                </form>
+            </div>
+            <div class="actions">
+                <a href="/admin/ui/{{.model.Name}}/new" class="btn btn-primary">Add {{.model.Name}}</a>
+            </div>
+        </div>
+
+        <div class="admin-table">
+            <table>
+                <thead>
+                    <tr>
+                        {{range .model.Fields}}
+                        {{if eq .Name "ID"}}
+                        <th>ID</th>
+                        {{else if not .ReadOnly}}
+                        <th>{{.Label}}</th>
+                        {{end}}
+                        {{end}}
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{range .objects}}
+                    <tr>
+                        {{range $.model.Fields}}
+                        {{if eq .Name "ID"}}
+                        <td><a href="/admin/ui/{{$.model.Name}}/{{index $ "ID"}}">{{index $ "ID"}}</a></td>
+                        {{else if not .ReadOnly}}
+                        <td>{{index $ .Name}}</td>
+                        {{end}}
+                        {{end}}
+                        <td>
+                            <a href="/admin/ui/{{$.model.Name}}/{{index $ "ID"}}">View</a> |
+                            <a href="/admin/ui/{{$.model.Name}}/{{index $ "ID"}}/edit">Edit</a>
+                        </td>
+                    </tr>
+                    {{else}}
+                    <tr>
+                        <td colspan="100%">No {{$.model.Name}} found.</td>
+                    </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+
+        {{if gt .total 0}}
+        <div class="admin-pagination">
+            {{if gt .page 1}}
+            <a href="/admin/ui/{{.model.Name}}?page={{sub .page 1}}">Previous</a>
+            {{end}}
+            <span class="current">Page {{.page}} of {{if gt .pageSize 0}}{{div (int .total) .pageSize | add 1}}{{else}}1{{end}}</span>
+            {{if lt (mul .page .pageSize) .total}}
+            <a href="/admin/ui/{{.model.Name}}?page={{add .page 1}}">Next</a>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+</body>
+</html>
+

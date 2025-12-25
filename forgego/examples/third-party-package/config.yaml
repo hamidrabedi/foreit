@@ -1,0 +1,30 @@
+# Framework settings
+database:
+  url: postgres://localhost/mydb
+  driver: postgres
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+security:
+  secret_key: your-secret-key-here
+  debug: false
+
+admin:
+  enable: true
+  path: /admin
+
+workers:
+  enable: true
+  redis_addr: localhost:6379
+
+api:
+  path: /api/v1
+
+# Third-party package settings
+mypackage:
+  enable: true
+  path: /mypackage
+  api_key: third-party-api-key
+

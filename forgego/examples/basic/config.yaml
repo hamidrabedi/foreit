@@ -1,0 +1,47 @@
+# Framework settings
+database:
+  url: postgres://localhost/mydb
+  driver: postgres
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+security:
+  secret_key: your-secret-key-here
+  debug: false
+
+logging:
+  level: info
+  format: json
+
+static:
+  enable: true
+  path: /static
+  root: ./public
+
+i18n:
+  enable: false
+  locales_path: ./locales
+  default_locale: en
+
+admin:
+  enable: true
+  path: /admin
+  template_path: ./templates/admin
+
+workers:
+  enable: true
+  redis_addr: localhost:6379
+  redis_password: ""
+  redis_db: 0
+  concurrency: 10
+
+api:
+  path: /api/v1
+
+# Custom application settings
+myapp:
+  api_key: your-api-key-here
+  max_users: 200
+  enable_feature: true

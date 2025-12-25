@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.model.Name}} Detail - Admin</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+        .admin-header { background: #2c3e50; color: white; padding: 1rem 2rem; }
+        .admin-header h1 { font-size: 1.5rem; }
+        .admin-content { padding: 2rem; max-width: 800px; margin: 0 auto; }
+        .admin-detail { background: white; padding: 2rem; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .detail-row { display: flex; padding: 1rem 0; border-bottom: 1px solid #ecf0f1; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-label { font-weight: 600; color: #2c3e50; width: 200px; flex-shrink: 0; }
+        .detail-value { flex: 1; color: #34495e; }
+        .detail-actions { margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #ecf0f1; display: flex; gap: 1rem; }
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; display: inline-block; font-size: 1rem; }
+        .btn-primary { background: #3498db; color: white; }
+        .btn-primary:hover { background: #2980b9; }
+        .btn-danger { background: #e74c3c; color: white; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-secondary { background: #95a5a6; color: white; }
+        .btn-secondary:hover { background: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="admin-header">
+        <h1>{{.model.Name}} Detail</h1>
+    </div>
+    
+    <div class="admin-content">
+        <div class="admin-detail">
+            {{range .fields}}
+            <div class="detail-row">
+                <div class="detail-label">{{.meta.Label}}</div>
+                <div class="detail-value">{{.value}}</div>
+            </div>
+            {{end}}
+            
+            <div class="detail-actions">
+                <a href="/admin/ui/{{.model.Name}}/{{index .object "ID"}}/edit" class="btn btn-primary">Edit</a>
+                <form method="POST" action="/admin/api/{{.model.Name}}/{{index .object "ID"}}" 
+                      hx-delete="/admin/api/{{.model.Name}}/{{index .object "ID"}}"
+                      hx-confirm="Are you sure you want to delete this {{.model.Name}}?"
+                      hx-target="body" hx-push-url="/admin/ui/{{.model.Name}}" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+                <a href="/admin/ui/{{.model.Name}}" class="btn btn-secondary">Back to List</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+

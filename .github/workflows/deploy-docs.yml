@@ -1,11 +1,11 @@
-name: Deploy to GitHub Pages
+name: Deploy Documentation to GitHub Pages
 
 on:
   push:
     branches:
-      - main
+      - master
     paths:
-      - 'docs-site/**'
+      - "docs-site/**"
   workflow_dispatch:
 
 permissions:
@@ -25,26 +25,26 @@ jobs:
         with:
           fetch-depth: 0
           submodules: recursive
-      
+
       - uses: actions/setup-node@v4
         with:
           node-version: 18
-          cache: 'npm'
+          cache: "npm"
           cache-dependency-path: docs-site/package-lock.json
-      
+
       - name: Install dependencies
         working-directory: docs-site
         run: npm ci
-      
+
       - name: Build website
         working-directory: docs-site
         run: npm run build
         env:
           NODE_ENV: production
-      
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-      
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -60,4 +60,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-

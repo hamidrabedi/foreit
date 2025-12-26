@@ -132,7 +132,7 @@ Returns paginated list of users.
 }
 ```
 
-### Detail (GET /api/v1/users/{id}/)
+### Detail (GET /api/v1/users/\{id\}/)
 
 Returns a single user.
 
@@ -169,7 +169,7 @@ Creates a new user.
 }
 ```
 
-### Update (PUT /api/v1/users/{id}/)
+### Update (PUT /api/v1/users/\{id\}/)
 
 Updates a user (full update).
 
@@ -182,7 +182,7 @@ Updates a user (full update).
 }
 ```
 
-### Partial Update (PATCH /api/v1/users/{id}/)
+### Partial Update (PATCH /api/v1/users/\{id\}/)
 
 Partially updates a user.
 
@@ -193,7 +193,7 @@ Partially updates a user.
 }
 ```
 
-### Delete (DELETE /api/v1/users/{id}/)
+### Delete (DELETE /api/v1/users/\{id\}/)
 
 Deletes a user.
 

@@ -11,14 +11,14 @@ const config = {
   favicon: 'img/favicon.ico',
 
   // Set the production url of your site here
-  url: 'https://forgego.github.io',
+  url: 'https://hamidrabedi.github.io',
   // Set the /<baseUrl>/ pathname under which your site is served
   // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/forge/',
+  baseUrl: '/foreit/',
 
   // GitHub pages deployment config.
-  organizationName: 'forgego',
-  projectName: 'forge',
+  organizationName: 'hamidrabedi',
+  projectName: 'foreit',
 
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',

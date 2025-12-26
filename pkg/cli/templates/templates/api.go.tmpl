@@ -1,0 +1,47 @@
+package {{.AppName}}
+
+import (
+	"github.com/forgego/forge/pkg/api"
+	httplib "github.com/forgego/forge/pkg/http"
+)
+
+func init() {
+	// Auto-register API routes
+	// Example:
+	// Register{{.ResourceName}}API(router)
+}
+
+// Register{{.ResourceName}}API registers the {{.ResourceName}} API endpoints
+func Register{{.ResourceName}}API(router *httplib.Router) {
+	// Create viewset
+	viewset := api.NewBaseViewSet(
+		func() api.Serializer {
+			return New{{.ModelName}}Serializer()
+		},
+		{{.ModelName}}.Objects.Filter(),
+		&{{.ModelName}}{},
+	)
+
+	// Register routes
+	apiRouter := api.NewRouter("/api/v1")
+	apiRouter.Register("{{.ResourceName}}", viewset)
+	apiRouter.RegisterRoutes(router)
+}
+
+// {{.ModelName}}Serializer serializes {{.ModelName}} model
+type {{.ModelName}}Serializer struct {
+	*api.BaseSerializer
+}
+
+// New{{.ModelName}}Serializer creates a new serializer
+func New{{.ModelName}}Serializer() api.Serializer {
+	return &{{.ModelName}}Serializer{
+		BaseSerializer: api.NewBaseSerializer(),
+	}
+}
+
+// Fields returns the fields to serialize
+func (s *{{.ModelName}}Serializer) Fields() []string {
+	return []string{"id"} // Add your fields here
+}
+

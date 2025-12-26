@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - FORGE_DATABASE_HOST=db
+      - FORGE_DATABASE_USER=postgres
+      - FORGE_DATABASE_PASSWORD=postgres
+      - FORGE_DATABASE_NAME={{.ProjectName}}_db
+    depends_on:
+      - db
+    volumes:
+      - ./config:/root/config
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB={{.ProjectName}}_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+

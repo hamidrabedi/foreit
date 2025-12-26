@@ -1,0 +1,21 @@
+package {{.AppName}}
+
+import (
+	"net/http"
+
+	httplib "github.com/forgego/forge/pkg/http"
+)
+
+// {{.HandlerName}} handles {{.HandlerPath}} requests
+func {{.HandlerName}}(w http.ResponseWriter, r *http.Request) {
+	// Implement your handler logic here
+	httplib.SendJSON(w, http.StatusOK, map[string]string{
+		"message": "{{.HandlerName}} handler",
+	})
+}
+
+// Register{{.HandlerName}}Routes registers routes for {{.HandlerName}}
+func Register{{.HandlerName}}Routes(router *httplib.Router) {
+	router.{{.Method}}("{{.Path}}", {{.HandlerName}})
+}
+

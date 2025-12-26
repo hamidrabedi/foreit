@@ -1,0 +1,8 @@
+database:
+  driver: postgres
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: ecommerce_test
+  sslmode: disable

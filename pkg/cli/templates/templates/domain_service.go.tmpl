@@ -1,0 +1,17 @@
+package {{.DomainName}}
+
+// {{.ServiceName}} provides business logic for {{.DomainName}}
+type {{.ServiceName}} interface {
+	// Define your service methods here
+}
+
+// {{.ServiceName}}Impl implements {{.ServiceName}}
+type {{.ServiceName}}Impl struct {
+	// Add dependencies here
+}
+
+// New{{.ServiceName}} creates a new {{.ServiceName}} instance
+func New{{.ServiceName}}() {{.ServiceName}} {
+	return &{{.ServiceName}}Impl{}
+}
+

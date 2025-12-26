@@ -1,0 +1,30 @@
+package {{.InfraName}}
+
+import (
+	"github.com/forgego/forge/pkg/config"
+)
+
+// {{.ClientName}} provides {{.InfraName}} client functionality
+type {{.ClientName}} struct {
+	cfg *config.Config
+}
+
+// New{{.ClientName}} creates a new {{.ClientName}} instance
+func New{{.ClientName}}(cfg *config.Config) *{{.ClientName}} {
+	return &{{.ClientName}}{
+		cfg: cfg,
+	}
+}
+
+// Connect establishes connection to {{.InfraName}}
+func (c *{{.ClientName}}) Connect() error {
+	// Implement connection logic
+	return nil
+}
+
+// Close closes the connection
+func (c *{{.ClientName}}) Close() error {
+	// Implement close logic
+	return nil
+}
+

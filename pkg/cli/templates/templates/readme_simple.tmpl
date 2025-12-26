@@ -1,0 +1,42 @@
+# {{.ProjectName}}
+
+A Forge application using the simple app-based structure.
+
+## Getting Started
+
+1. Set up your database connection in `config/config.yaml`
+
+2. Generate code from your models:
+   ```bash
+   forge generate
+   ```
+
+3. Run migrations:
+   ```bash
+   forge migrate
+   ```
+
+4. Start the development server:
+   ```bash
+   forge runserver
+   ```
+
+5. Visit http://localhost:8000/admin/ to access the admin interface
+
+## Project Structure
+
+- `app/` - Your Django-style apps (models.go, admin.go, api.go)
+- `migrations/` - Database migrations
+- `config/` - Configuration files
+- `static/` - Static files (CSS, JS, images)
+- `templates/` - HTML templates
+- `cmd/server/main.go` - Application entry point
+
+## Adding Apps
+
+```bash
+forge add app <appname>
+```
+
+This creates a new app with `models.go`, `admin.go`, and `api.go` files.
+

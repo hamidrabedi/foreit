@@ -1,0 +1,57 @@
+# {{.ProjectName}}
+
+A Forge application using the advanced hybrid structure with domain-driven design.
+
+## Getting Started
+
+1. Set up your database connection in `config/config.yaml`
+
+2. Generate code from your models:
+   ```bash
+   forge generate
+   ```
+
+3. Run migrations:
+   ```bash
+   forge migrate
+   ```
+
+4. Start the development server:
+   ```bash
+   forge runserver
+   ```
+
+5. Visit http://localhost:8000/admin/ to access the admin interface
+
+## Project Structure
+
+- `app/` - Your Django-style apps (models.go, admin.go, api.go)
+- `domain/` - Pure business logic (entities, services, policies)
+- `infra/` - Infrastructure layer (database, cache, email, etc.)
+- `pkg/` - Shared utilities across apps
+- `migrations/` - Database migrations
+- `config/` - Configuration files
+- `static/` - Static files (CSS, JS, images)
+- `templates/` - HTML templates
+- `cmd/server/main.go` - Application entry point
+
+## Architecture
+
+This project uses a hybrid architecture:
+- **App layer**: Django-style apps for rapid development
+- **Domain layer**: Clean architecture for business logic
+- **Infrastructure layer**: External services and side effects
+
+## Adding Components
+
+```bash
+# Add an app
+forge add app <appname>
+
+# Add a domain service
+forge add service --domain <domainname> --name <ServiceName>
+
+# Add infrastructure client
+forge add infra <clientname>
+```
+

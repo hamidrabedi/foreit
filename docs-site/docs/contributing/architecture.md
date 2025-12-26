@@ -205,6 +205,6 @@ Customize code generation templates (advanced)
 
 ## See Also
 
-- [Development Guide](development) - Contributing guide
-- [Roadmap](roadmap) - Development roadmap
+- [Development Guide](/docs/contributing/development) - Contributing guide
+- [Roadmap](/docs/contributing/roadmap) - Development roadmap
 

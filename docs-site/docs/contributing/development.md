@@ -319,6 +319,6 @@ go http.ListenAndServe(":6060", nil)
 
 ## See Also
 
-- [Architecture](architecture) - Framework architecture
-- [Roadmap](roadmap) - Development roadmap
+- [Architecture](/docs/contributing/architecture) - Framework architecture
+- [Roadmap](/docs/contributing/roadmap) - Development roadmap
 

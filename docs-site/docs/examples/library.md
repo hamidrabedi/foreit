@@ -199,7 +199,7 @@ CGO_ENABLED=1 go build
 
 ## See Also
 
-- [Models Guide](../guides/models) - Model definitions
-- [Queries Guide](../guides/queries) - Query examples
-- [E-commerce Example](ecommerce) - More complex example
+- [Models Guide](/docs/guides/models) - Model definitions
+- [Queries Guide](/docs/guides/queries) - Query examples
+- [E-commerce Example](/docs/examples/ecommerce) - More complex example
 

@@ -342,7 +342,7 @@ Always use HTTPS in production. Set up SSL certificates.
 
 ### Security Headers
 
-Add security headers (see [Security Guide](security)).
+Add security headers (see [Security Guide](/docs/guides/security)).
 
 ### Firewall
 
@@ -408,6 +408,6 @@ psql -h $DB_HOST -U $DB_USER -d $DB_NAME -c "SELECT 1"
 
 ## Next Steps
 
-- [Security Guide](security) - Secure your deployment
-- [Performance Guide](../advanced/performance) - Optimize performance
+- [Security Guide](/docs/guides/security) - Secure your deployment
+- [Performance Guide](/docs/advanced/performance) - Optimize performance
 

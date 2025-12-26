@@ -269,9 +269,9 @@ err := models.Post.Objects.Delete(ctx, post)
 
 Congratulations! You've created your first forge application. Now you can:
 
-- [Learn about Models](guides/models) - Deep dive into model definitions
-- [Explore Queries](guides/queries) - Learn about QuerySet and filtering
-- [Customize Admin](guides/admin) - Customize the admin interface
-- [Build REST APIs](guides/rest-api) - Create APIs for your frontend
-- [Check out Examples](examples/blog) - See complete example applications
+- [Learn about Models](/docs/guides/models) - Deep dive into model definitions
+- [Explore Queries](/docs/guides/queries) - Learn about QuerySet and filtering
+- [Customize Admin](/docs/guides/admin) - Customize the admin interface
+- [Build REST APIs](/docs/guides/rest-api) - Create APIs for your frontend
+- [Check out Examples](/docs/examples/blog) - See complete example applications
 

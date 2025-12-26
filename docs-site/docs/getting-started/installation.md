@@ -94,8 +94,8 @@ myapp/
 
 Now that you have forge installed:
 
-1. [Create your first project](quickstart)
-2. [Learn about models](guides/models)
+1. [Create your first project](/docs/getting-started/quickstart)
+2. [Learn about models](/docs/guides/models)
 3. [Explore the examples](../examples/blog)
 
 ## Troubleshooting
@@ -143,5 +143,5 @@ Recommended tools for forge development:
 
 ## What's Next?
 
-Ready to create your first application? Head over to the [Quick Start Guide](quickstart)!
+Ready to create your first application? Head over to the [Quick Start Guide](/docs/getting-started/quickstart)!
 

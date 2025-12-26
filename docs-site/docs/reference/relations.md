@@ -193,6 +193,6 @@ func (Post) Relations() []schema.Relation {
 
 ## See Also
 
-- [Models Guide](../guides/models) - Model usage guide
-- [Queries Guide](../guides/queries) - Querying relations
+- [Models Guide](/docs/guides/models) - Model usage guide
+- [Queries Guide](/docs/guides/queries) - Querying relations
 

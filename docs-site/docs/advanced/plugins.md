@@ -175,6 +175,6 @@ func (p *MyPlugin) Initialize(app *registry.Application) error {
 
 ## See Also
 
-- [Code Generation](code-generation) - Code generation system
-- [Custom Fields](custom-fields) - Create custom field types
+- [Code Generation](/docs/advanced/code-generation) - Code generation system
+- [Custom Fields](/docs/advanced/custom-fields) - Create custom field types
 

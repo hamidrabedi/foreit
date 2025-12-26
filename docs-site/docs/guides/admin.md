@@ -315,7 +315,7 @@ admin.RegisterModelWithOptions(
 
 ## Next Steps
 
-- [REST API Guide](rest-api) - Build APIs for your frontend
-- [Security Guide](security) - Secure your admin interface
-- [Advanced Topics](../advanced/plugins) - Extend the admin with plugins
+- [REST API Guide](/docs/guides/rest-api) - Build APIs for your frontend
+- [Security Guide](/docs/guides/security) - Secure your admin interface
+- [Advanced Topics](/docs/advanced/plugins) - Extend the admin with plugins
 

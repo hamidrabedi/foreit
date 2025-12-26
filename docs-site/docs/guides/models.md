@@ -346,7 +346,7 @@ func (User) Hooks() *schema.ModelHooks {
 
 ## Next Steps
 
-- [Learn about Queries](queries) - Query your models
-- [Explore Relations](reference/relations) - Deep dive into relationships
-- [Check Field Reference](reference/fields) - Complete field type reference
+- [Learn about Queries](/docs/guides/queries) - Query your models
+- [Explore Relations](/docs/reference/relations) - Deep dive into relationships
+- [Check Field Reference](/docs/reference/fields) - Complete field type reference
 

@@ -282,7 +282,7 @@ available := inventory.Quantity - inventory.Reserved
 
 ## See Also
 
-- [Models Guide](../guides/models) - Model definitions
-- [Relations Reference](../reference/relations) - Relationship types
-- [Library Example](library) - Another complex example
+- [Models Guide](/docs/guides/models) - Model definitions
+- [Relations Reference](/docs/reference/relations) - Relationship types
+- [Library Example](/docs/examples/library) - Another complex example
 

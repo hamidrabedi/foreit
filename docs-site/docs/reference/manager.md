@@ -81,6 +81,6 @@ err := user.Delete(ctx)
 
 ## See Also
 
-- [QuerySet Reference](queryset) - QuerySet methods
-- [Queries Guide](../guides/queries) - Query usage guide
+- [QuerySet Reference](/docs/reference/queryset) - QuerySet methods
+- [Queries Guide](/docs/guides/queries) - Query usage guide
 

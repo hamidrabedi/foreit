@@ -214,6 +214,6 @@ var queryDuration = prometheus.NewHistogramVec(
 
 ## See Also
 
-- [Queries Guide](../guides/queries) - Query optimization
-- [Deployment Guide](../guides/deployment) - Production deployment
+- [Queries Guide](/docs/guides/queries) - Query optimization
+- [Deployment Guide](/docs/guides/deployment) - Production deployment
 

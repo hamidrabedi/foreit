@@ -407,7 +407,7 @@ func main() {
 
 ## Next Steps
 
-- [Queries Guide](queries) - Learn about QuerySet filtering
-- [Security Guide](security) - Secure your API
-- [Advanced Topics](../advanced/plugins) - Extend the API system
+- [Queries Guide](/docs/guides/queries) - Learn about QuerySet filtering
+- [Security Guide](/docs/guides/security) - Secure your API
+- [Advanced Topics](/docs/advanced/plugins) - Extend the API system
 

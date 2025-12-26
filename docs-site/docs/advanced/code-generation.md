@@ -160,6 +160,6 @@ forge generate --output ./generated
 
 ## See Also
 
-- [Models Guide](../guides/models) - Model definitions
-- [Plugins](plugins) - Extend code generation
+- [Models Guide](/docs/guides/models) - Model definitions
+- [Plugins](/docs/advanced/plugins) - Extend code generation
 

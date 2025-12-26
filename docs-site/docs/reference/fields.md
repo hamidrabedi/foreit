@@ -359,6 +359,6 @@ schema.Int64("id").
 
 ## See Also
 
-- [Schema Reference](schema) - Model definition
-- [Models Guide](../guides/models) - Model usage guide
+- [Schema Reference](/docs/reference/schema) - Model definition
+- [Models Guide](/docs/guides/models) - Model usage guide
 

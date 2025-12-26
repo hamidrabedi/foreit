@@ -324,7 +324,7 @@ forge migrate up
 
 ## Next Steps
 
-- [Models Guide](models) - Learn about model definitions
-- [Database Guide](../reference/schema) - Database schema reference
-- [Deployment Guide](deployment) - Deploy with migrations
+- [Models Guide](/docs/guides/models) - Learn about model definitions
+- [Database Guide](/docs/reference/schema) - Database schema reference
+- [Deployment Guide](/docs/guides/deployment) - Deploy with migrations
 

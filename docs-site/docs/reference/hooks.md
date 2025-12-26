@@ -238,6 +238,6 @@ func (User) Hooks() *schema.ModelHooks {
 
 ## See Also
 
-- [Models Guide](../guides/models) - Model usage guide
-- [Schema Reference](schema) - Model definition
+- [Models Guide](/docs/guides/models) - Model usage guide
+- [Schema Reference](/docs/reference/schema) - Model definition
 

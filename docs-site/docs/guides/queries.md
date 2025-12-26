@@ -387,7 +387,7 @@ func SearchUsers(query string) ([]*User, error) {
 
 ## Next Steps
 
-- [API Reference](reference/queryset) - Complete QuerySet API
-- [Manager Reference](reference/manager) - Manager methods
-- [Field Reference](reference/fields) - Field expression methods
+- [API Reference](/docs/reference/queryset) - Complete QuerySet API
+- [Manager Reference](/docs/reference/manager) - Manager methods
+- [Field Reference](/docs/reference/fields) - Field expression methods
 

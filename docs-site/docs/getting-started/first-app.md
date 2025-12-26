@@ -275,7 +275,9 @@ import (
     "context"
     "encoding/json"
     "net/http"
+    "strconv"
     "myblog/models"
+    "github.com/go-chi/chi/v5"
 )
 
 func ListPosts(w http.ResponseWriter, r *http.Request) {
@@ -296,9 +298,31 @@ func ListPosts(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetPost(w http.ResponseWriter, r *http.Request) {
-    // Extract ID from URL
-    // Get post by ID
-    // Return JSON
+    ctx := context.Background()
+    
+    // Extract ID from URL (you'll need to implement URL parameter extraction)
+    // For example, using chi router: chi.URLParam(r, "id")
+    idStr := chi.URLParam(r, "id")
+    id, err := strconv.ParseInt(idStr, 10, 64)
+    if err != nil {
+        http.Error(w, "Invalid ID", http.StatusBadRequest)
+        return
+    }
+    
+    post, err := models.Post.Objects.
+        Filter(models.Post.Fields.ID.Equals(id)).
+        Filter(models.Post.Fields.Published.Equals(true)).
+        SelectRelated("author").
+        PrefetchRelated("categories").
+        Get(ctx)
+    
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusNotFound)
+        return
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(post)
 }
 ```
 
@@ -311,7 +335,7 @@ server.RegisterRoutes(func(router *httplib.Router) {
     })
     
     router.Get("/api/posts", views.ListPosts)
-    router.Get("/api/posts/{id}", views.GetPost)
+    router.Get("/api/posts/\\{id\\}", views.GetPost)
     
     if settings.Admin.Enabled {
         admin.RegisterAdminRoutes(router, settings.Admin.Path)
@@ -360,9 +384,9 @@ err := models.Post.Objects.Create(ctx, post)
 
 You now have a working blog application! Next, you can:
 
-- [Learn about Models](guides/models) - Deep dive into model definitions
-- [Explore Queries](guides/queries) - Advanced querying techniques
-- [Customize Admin](guides/admin) - Customize the admin interface
-- [Build REST APIs](guides/rest-api) - Use the REST API system
-- [Check Examples](examples/blog) - See more complete examples
+- [Learn about Models](/docs/guides/models) - Deep dive into model definitions
+- [Explore Queries](/docs/guides/queries) - Advanced querying techniques
+- [Customize Admin](/docs/guides/admin) - Customize the admin interface
+- [Build REST APIs](/docs/guides/rest-api) - Use the REST API system
+- [Check Examples](/docs/examples/blog) - See more complete examples
 

@@ -179,7 +179,7 @@ type ModelHooks struct {
 
 ## See Also
 
-- [Fields Reference](fields) - Complete field type reference
-- [Relations Reference](relations) - Relationship types
-- [Hooks Reference](hooks) - Lifecycle hooks
+- [Fields Reference](/docs/reference/fields) - Complete field type reference
+- [Relations Reference](/docs/reference/relations) - Relationship types
+- [Hooks Reference](/docs/reference/hooks) - Lifecycle hooks
 

@@ -230,7 +230,7 @@ posts, err := models.Post.Objects.
 
 ## See Also
 
-- [Models Guide](../guides/models) - Learn about models
-- [Queries Guide](../guides/queries) - Query examples
-- [Admin Guide](../guides/admin) - Admin customization
+- [Models Guide](/docs/guides/models) - Learn about models
+- [Queries Guide](/docs/guides/queries) - Query examples
+- [Admin Guide](/docs/guides/admin) - Admin customization
 

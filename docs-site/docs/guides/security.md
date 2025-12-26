@@ -273,6 +273,6 @@ Before deploying to production:
 
 ## Next Steps
 
-- [Deployment Guide](deployment) - Secure deployment practices
-- [API Reference](../reference/schema) - Security-related APIs
+- [Deployment Guide](/docs/guides/deployment) - Secure deployment practices
+- [API Reference](/docs/reference/schema) - Security-related APIs
 

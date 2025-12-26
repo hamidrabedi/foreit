@@ -186,6 +186,6 @@ forge aims to be the **Django of Go** - a full-featured, type-safe web framework
 
 ## See Also
 
-- [Development Guide](development) - Contributing guide
-- [Architecture](architecture) - Framework architecture
+- [Development Guide](/docs/contributing/development) - Contributing guide
+- [Architecture](/docs/contributing/architecture) - Framework architecture
 

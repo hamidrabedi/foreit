@@ -261,6 +261,6 @@ User.Fields.IsActive.Equals(true).Not()
 
 ## See Also
 
-- [Manager Reference](manager) - Manager methods
-- [Queries Guide](../guides/queries) - Query usage guide
+- [Manager Reference](/docs/reference/manager) - Manager methods
+- [Queries Guide](/docs/guides/queries) - Query usage guide
 

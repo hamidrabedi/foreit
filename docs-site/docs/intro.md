@@ -59,7 +59,7 @@ posts, err := Post.Objects.
 
 ## Getting Started
 
-Ready to build your first forge application? Check out our [Installation Guide](getting-started/installation) and [Quick Start Tutorial](getting-started/quickstart).
+Ready to build your first forge application? Check out our [Installation Guide](/docs/getting-started/installation) and [Quick Start Tutorial](/docs/getting-started/quickstart).
 
 ## Key Features
 
@@ -108,8 +108,8 @@ viewset := api.NewBaseViewSet(
 
 ## What's Next?
 
-- [Install forge](getting-started/installation)
-- [Follow the Quick Start](getting-started/quickstart)
-- [Read the Guides](guides/models)
-- [Check out Examples](examples/blog)
+- [Install forge](/docs/getting-started/installation)
+- [Follow the Quick Start](/docs/getting-started/quickstart)
+- [Read the Guides](/docs/guides/models)
+- [Check out Examples](/docs/examples/blog)
 

@@ -1,6 +1,6 @@
-# Enterprise Ecommerce Models
+# Enterprise Ecommerce Application
 
-This directory contains a comprehensive set of ecommerce models designed to test all PostgreSQL data types and complex nested relations supported by the ForgeGo ORM.
+This directory contains a complete ecommerce application demonstrating all features of the forge framework, including models, admin interface, REST API, and business logic hooks.
 
 ## Models Overview
 
@@ -117,6 +117,36 @@ Each model includes appropriate indexes for:
 - **CASCADE**: Delete related records when parent is deleted
 - **SET_NULL**: Set foreign key to NULL when parent is deleted
 - **PROTECT**: Prevent deletion if related records exist
+
+## Application Structure
+
+```
+ecommerce/
+├── cmd/
+│   └── server/
+│       └── main.go          # Main application entry point
+├── api/
+│   ├── serializers.go       # REST API serializers
+│   └── viewsets.go          # REST API viewsets
+├── models/                  # Model definitions
+│   ├── *.go                 # Schema definitions
+│   └── *.gen.go             # Generated code (after forge generate)
+├── migrations/              # Database migrations
+├── config/
+│   └── config.yaml          # Configuration
+└── README.md
+
+```
+
+## Quick Start
+
+1. **Generate Code**: `forge generate`
+2. **Run Migrations**: `forge migrate`
+3. **Start Server**: `go run cmd/server/main.go`
+4. **Access Admin**: http://localhost:8000/admin/
+5. **Access API**: http://localhost:8000/api/v1/
+
+See [SETUP.md](SETUP.md) for detailed setup instructions.
 
 ## Usage
 

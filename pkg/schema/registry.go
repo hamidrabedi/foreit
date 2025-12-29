@@ -18,7 +18,7 @@ var (
 //
 // Example:
 //   RegisterFieldType("custom_type", func(name string) interface{} {
-//       return &CustomFieldBuilder{BaseFieldBuilder: &BaseFieldBuilder{field: Field{Name: name, Type: TypeString}}}
+//       return &CustomFieldBuilder{UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeString)}}
 //   })
 func RegisterFieldType(typeName string, factory FieldBuilderFactory) error {
 	registryMutex.Lock()

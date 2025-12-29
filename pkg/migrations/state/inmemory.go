@@ -38,9 +38,15 @@ func (s *InMemoryState) Apply(changes []core.Change) error {
 			delete(s.state.Tables, c.Table)
 		case *core.RenameTable:
 			if table, exists := s.state.Tables[c.OldName]; exists {
+				// If new name already exists, delete it first (rename overwrites)
+				if c.OldName != c.NewName {
+					delete(s.state.Tables, c.NewName)
+				}
 				table.Name = c.NewName
 				s.state.Tables[c.NewName] = table
-				delete(s.state.Tables, c.OldName)
+				if c.OldName != c.NewName {
+					delete(s.state.Tables, c.OldName)
+				}
 			}
 		case *core.AddColumn:
 			if err := s.applyAddColumn(c); err != nil {
@@ -183,6 +189,11 @@ func (s *InMemoryState) applyModifyColumn(c *core.ModifyColumn) error {
 		return fmt.Errorf("table %s does not exist", c.Table)
 	}
 
+	// Delete old column if name changed
+	if c.OldColumn.Name != c.NewColumn.Name {
+		delete(table.Columns, c.OldColumn.Name)
+	}
+
 	colState := &ColumnState{
 		Name:          c.NewColumn.Name,
 		Type:          c.NewColumn.Type,
@@ -265,15 +276,15 @@ func (s *InMemoryState) applyAddConstraint(c *core.AddConstraint) error {
 // mapCascadeType maps cascade type strings to SQL
 func mapCascadeType(cascade string) string {
 	switch cascade {
-	case "CASCADE", "CascadeCASCADE":
+	case "CASCADE":
 		return "CASCADE"
-	case "SET_NULL", "CascadeSET_NULL":
+	case "SET_NULL", "SET NULL":
 		return "SET NULL"
-	case "PROTECT", "CascadePROTECT":
+	case "PROTECT":
 		return "RESTRICT"
-	case "SET_DEFAULT", "CascadeSET_DEFAULT":
+	case "SET_DEFAULT", "SET DEFAULT":
 		return "SET DEFAULT"
-	case "DO_NOTHING", "CascadeDO_NOTHING":
+	case "DO_NOTHING", "NO ACTION":
 		return "NO ACTION"
 	default:
 		return "NO ACTION"

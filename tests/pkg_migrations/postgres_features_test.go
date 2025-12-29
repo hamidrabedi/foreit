@@ -1,10 +1,9 @@
 package migrations
 
 import (
+	"fmt"
 	"context"
-	"database/sql"
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 
@@ -15,15 +14,19 @@ import (
 
 // TestGINIndexCreation tests creating GIN indexes for JSONB columns
 func TestGINIndexCreation(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -48,18 +51,25 @@ func TestGINIndexCreation(t *testing.T) {
 
 // TestGiSTIndexCreation tests creating GiST indexes
 func TestGiSTIndexCreation(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"documents"})
 
 	// Create table with geometric or full-text search column
 	// For this test, we'll use a text column with GiST (though typically used for geometric types)
@@ -83,18 +93,25 @@ func TestGiSTIndexCreation(t *testing.T) {
 
 // TestJSONBColumnOperations tests JSONB column operations
 func TestJSONBColumnOperations(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"products"})
 
 	// Create table with JSONB column
 	createTableSQL := `
@@ -120,13 +137,15 @@ func TestJSONBColumnOperations(t *testing.T) {
 	jsonBytes, err := json.Marshal(testData)
 	require.NoError(t, err)
 
-	insertSQL := `INSERT INTO products (name, attributes) VALUES ($1, $2)`
-	_, err = postgresDB.ExecContext(ctx, insertSQL, "Test Product", string(jsonBytes))
+	insertSQL := `INSERT INTO products (name, attributes) VALUES ($1, $2) RETURNING id`
+	var insertedID int64
+	err = postgresDB.QueryRowContext(ctx, insertSQL, "Test Product", string(jsonBytes)).Scan(&insertedID)
 	require.NoError(t, err)
+	require.Greater(t, insertedID, int64(0), "inserted ID should be greater than 0")
 
 	// Query JSONB data
 	var retrievedJSON string
-	err = postgresDB.QueryRowContext(ctx, `SELECT attributes FROM products WHERE id = 1`).Scan(&retrievedJSON)
+	err = postgresDB.QueryRowContext(ctx, `SELECT attributes FROM products WHERE id = $1`, insertedID).Scan(&retrievedJSON)
 	require.NoError(t, err)
 
 	var retrievedData map[string]interface{}
@@ -146,18 +165,25 @@ func TestJSONBColumnOperations(t *testing.T) {
 
 // TestArrayColumnTypes tests PostgreSQL array column types
 func TestArrayColumnTypes(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"products"})
 
 	// Create table with array columns
 	createTableSQL := `
@@ -177,34 +203,40 @@ func TestArrayColumnTypes(t *testing.T) {
 	testhelpers.AssertArrayColumn(ctx, t, postgresDB, "products", "prices", "numeric")
 
 	// Insert array data using PostgreSQL array syntax
+	// Use array literal syntax directly in SQL for proper type handling
 	insertSQL := `
 		INSERT INTO products (name, tags, category_ids, prices)
-		VALUES ($1, ARRAY[$2, $3, $4], ARRAY[$5, $6, $7], ARRAY[$8, $9, $10])
+		VALUES ($1, ARRAY['electronics', 'gadgets', 'new']::text[], ARRAY[1, 2, 3]::integer[], ARRAY[99.99, 149.99, 199.99]::numeric[])
 	`
-	_, err = postgresDB.ExecContext(ctx, insertSQL, "Test Product",
-		"electronics", "gadgets", "new",
-		1, 2, 3,
-		99.99, 149.99, 199.99)
+	_, err = postgresDB.ExecContext(ctx, insertSQL, "Test Product")
 	require.NoError(t, err)
 
-	// Query array data
-	var retrievedTags []string
-	err = postgresDB.QueryRowContext(ctx, `SELECT tags FROM products WHERE id = 1`).Scan(&retrievedTags)
+	// Query array data - use pq.Array for proper scanning
+	// Since we don't have pq imported, use a workaround: scan as string and parse
+	var retrievedTagsStr string
+	err = postgresDB.QueryRowContext(ctx, `SELECT tags::text FROM products WHERE name = $1`, "Test Product").Scan(&retrievedTagsStr)
 	require.NoError(t, err)
-	require.Len(t, retrievedTags, 3)
+	// Parse the array string format: {electronics,gadgets,new}
+	require.Contains(t, retrievedTagsStr, "electronics")
+	require.Contains(t, retrievedTagsStr, "gadgets")
+	require.Contains(t, retrievedTagsStr, "new")
 }
 
 // TestCustomPostgreSQLTypes tests custom PostgreSQL types
 func TestCustomPostgreSQLTypes(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -240,18 +272,25 @@ func TestCustomPostgreSQLTypes(t *testing.T) {
 
 // TestPartialIndex tests partial indexes with WHERE clauses
 func TestPartialIndex(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"products"})
 
 	// Create table
 	createTableSQL := `
@@ -274,18 +313,25 @@ func TestPartialIndex(t *testing.T) {
 
 // TestFunctionalIndex tests functional indexes
 func TestFunctionalIndex(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users"})
 
 	// Create table
 	createTableSQL := `
@@ -307,18 +353,25 @@ func TestFunctionalIndex(t *testing.T) {
 
 // TestCoveringIndex tests covering indexes with INCLUDE columns
 func TestCoveringIndex(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"orders"})
 
 	// Create table
 	createTableSQL := `
@@ -341,15 +394,19 @@ func TestCoveringIndex(t *testing.T) {
 
 // TestUUIDType tests UUID column type
 func TestUUIDType(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -386,18 +443,25 @@ func TestUUIDType(t *testing.T) {
 
 // TestNumericPrecision tests NUMERIC type with precision and scale
 func TestNumericPrecision(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"products"})
 
 	// Create table with NUMERIC columns
 	createTableSQL := `
@@ -429,18 +493,25 @@ func TestNumericPrecision(t *testing.T) {
 
 // TestTimestampWithTimeZone tests TIMESTAMP WITH TIME ZONE
 func TestTimestampWithTimeZone(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"events"})
 
 	// Create table with TIMESTAMP WITH TIME ZONE
 	createTableSQL := `

@@ -104,12 +104,16 @@ func (User) Hooks() *schema.ModelHooks {
 	adminCode := `package auth
 
 import (
-	"github.com/forgego/forge/pkg/admin"
+	adminv2 "github.com/forgego/forge/pkg/admin"
+	"github.com/forgego/forge/pkg/query"
 )
 
 func init() {
-	// Register User model for admin
-	admin.RegisterModel(&User{})
+	// Register User model for admin (using v2 admin system)
+	// After code generation, uncomment and use:
+	// manager := &query.Manager[*User]{}
+	// config := &adminv2.Config[*User]{}
+	// adminv2.Register(&User{}, manager, config)
 }
 `
 

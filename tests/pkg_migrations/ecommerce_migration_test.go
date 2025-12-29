@@ -3,6 +3,7 @@ package migrations
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -16,14 +17,17 @@ import (
 
 // TestFullEcommerceSchemaMigration tests creating all 15 ecommerce models in a single migration
 func TestFullEcommerceSchemaMigration(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
@@ -31,8 +35,9 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 
 	t.Logf("Connected to Postgres: %s", dsn)
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "ecommerce_full_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 
@@ -166,12 +171,12 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 
 	// Get an address ID (create one if needed)
 	insertAddressSQL := `
-		INSERT INTO addresses (street, city, state, zip_code, country)
-		VALUES ('123 Main St', 'City', 'State', '12345', 'US')
+		INSERT INTO addresses (address_line1, city, state, postal_code, country, customer_id, type, first_name, last_name)
+		VALUES ('123 Main St', 'City', 'State', '12345', 'US', $1, 'billing', 'John', 'Doe')
 		RETURNING id
 	`
 	var addressID int64
-	err = postgresDB.QueryRowContext(ctx, insertAddressSQL).Scan(&addressID)
+	err = postgresDB.QueryRowContext(ctx, insertAddressSQL, customerID).Scan(&addressID)
 	require.NoError(t, err)
 
 	insertOrderSQL := `
@@ -185,8 +190,8 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	insertOrderItemSQL := `
-		INSERT INTO order_items (order_id, product_id, quantity, unit_price, total_price)
-		VALUES ($1, $2, 1, 99.99, 99.99)
+		INSERT INTO order_items (order_id, product_id, product_name, product_sku, quantity, unit_price, total_price)
+		VALUES ($1, $2, 'Test Product', 'TEST-SKU-001', 1, 99.99, 99.99)
 		RETURNING id
 	`
 	var orderItemID int64
@@ -203,6 +208,17 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 	err = postgresDB.QueryRowContext(ctx, "SELECT COUNT(*) FROM order_items WHERE id = $1", orderItemID).Scan(&count)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), count, "order_item should be deleted when order is deleted (CASCADE)")
+
+	// Create a new order to test PROTECT constraint
+	insertOrderSQL2 := `
+		INSERT INTO orders (order_number, customer_id, subtotal, total_amount, currency, 
+			billing_address_id, shipping_address_id, status, payment_status, shipping_status)
+		VALUES (gen_random_uuid(), $1, 199.99, 199.99, 'USD', $2, $2, 'pending', 'pending', 'pending')
+		RETURNING id
+	`
+	var orderID2 int64
+	err = postgresDB.QueryRowContext(ctx, insertOrderSQL2, customerID, addressID).Scan(&orderID2)
+	require.NoError(t, err)
 
 	// Verify PROTECT: cannot delete customer with orders
 	deleteCustomerSQL := `DELETE FROM customers WHERE id = $1`

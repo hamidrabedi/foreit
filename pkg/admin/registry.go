@@ -4,178 +4,77 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
-
-	"github.com/forgego/forge/pkg/registry"
-	"github.com/forgego/forge/pkg/schema"
 )
 
-// AdminRegistry maintains a registry of models for admin auto-generation
-type AdminRegistry struct {
-	models map[string]*AdminModel
+// Registry maintains a registry of admin instances
+type Registry struct {
+	admins map[string]AdminInterface
 	mu     sync.RWMutex
 }
 
-// AdminModel contains admin configuration for a model
-// Auto-generated from model metadata (Django-style)
-type AdminModel struct {
-	Name          string
-	Model         interface{}
-	Manager       interface{} // Manager instance for CRUD operations (typically *query.Manager[T])
-	
-	// Auto-generated from Meta and field definitions
-	ListDisplay   []interface{} // Supports both string and FieldExpr
-	ListFilter    []interface{}
-	SearchFields  []interface{}
-	ReadOnlyFields []interface{}
-	
-	// Extended configuration (Django ModelAdmin features)
-	ExtendedConfig map[string]interface{} // Stores ModelAdminConfig values
-	
-	// Extensibility
-	CustomAdmin CustomAdmin
+var globalRegistry = &Registry{
+	admins: make(map[string]AdminInterface),
 }
 
-// CustomAdmin is the interface for custom admin classes
-type CustomAdmin interface {
-	GetListDisplay() []interface{}
-	GetListFilter() []interface{}
-	GetSearchFields() []interface{}
-	GetReadOnlyFields() []interface{}
+// AdminInterface is the interface for dynamic access to admin instances
+type AdminInterface interface {
+	ModelName() string
+	ModelType() reflect.Type
+	ManagerInterface() interface{}
+	ConfigInterface() interface{}
 }
 
-var globalAdminRegistry = &AdminRegistry{
-	models: make(map[string]*AdminModel),
+// register registers an admin instance
+func (r *Registry) register(admin AdminInterface) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	name := admin.ModelName()
+	r.admins[name] = admin
 }
 
-// RegisterModel registers a model for admin auto-generation
-// This is the simple Django-style registration
-func RegisterModel(model interface{}) error {
-	return RegisterModelWithOptions(model)
+// Get retrieves an admin instance by name
+func (r *Registry) Get(name string) (AdminInterface, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	admin, ok := r.admins[name]
+	if !ok {
+		return nil, fmt.Errorf("admin %s is not registered", name)
+	}
+
+	return admin, nil
 }
 
-// RegisterModelWithOptions registers a model with custom admin options
-func RegisterModelWithOptions(model interface{}, options ...AdminOption) error {
-	globalAdminRegistry.mu.Lock()
-	defer globalAdminRegistry.mu.Unlock()
-	
-	// Get model name using type assertion or reflection as fallback
-	var modelName string
-	if named, ok := model.(interface{ Name() string }); ok {
-		modelName = named.Name()
-	} else {
-		// Fallback to reflection for model name
-		modelType := reflect.TypeOf(model)
-		if modelType.Kind() == reflect.Ptr {
-			modelType = modelType.Elem()
-		}
-		modelName = modelType.Name()
-	}
-	
-	// Get model info from registry (optional - model might not be registered yet)
-	_, err := registry.GetModel(modelName)
-	if err != nil {
-		// Model not in registry yet - that's okay, we'll register it
-		if err := registry.RegisterModel(model); err != nil {
-			// Ignore if already registered
-		}
-	}
-	
-	// Auto-generate admin config from model metadata
-	adminModel := &AdminModel{
-		Name:  modelName,
-		Model: model,
-	}
-	
-	// Auto-generate from schema if available
-	// Check if model implements schema.Schema interface
-	if schemaModel, ok := model.(schema.Schema); ok {
-		adminModel = autoGenerateAdminFromSchema(adminModel, schemaModel)
-	}
-	
-	// Apply custom options
-	for _, opt := range options {
-		opt(adminModel)
-	}
-	
-	globalAdminRegistry.models[modelName] = adminModel
-	return nil
-}
+// GetAll returns all registered admin instances
+func (r *Registry) GetAll() map[string]AdminInterface {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
-// autoGenerateAdminFromSchema is now in auto_generate.go
-
-// GetModel retrieves an admin model
-func GetModel(name string) (*AdminModel, error) {
-	globalAdminRegistry.mu.RLock()
-	defer globalAdminRegistry.mu.RUnlock()
-	
-	model, exists := globalAdminRegistry.models[name]
-	if !exists {
-		return nil, fmt.Errorf("admin model %s is not registered", name)
-	}
-	
-	return model, nil
-}
-
-// GetAllModels returns all registered admin models
-func GetAllModels() map[string]*AdminModel {
-	globalAdminRegistry.mu.RLock()
-	defer globalAdminRegistry.mu.RUnlock()
-	
-	result := make(map[string]*AdminModel)
-	for k, v := range globalAdminRegistry.models {
+	result := make(map[string]AdminInterface)
+	for k, v := range r.admins {
 		result[k] = v
 	}
-	
+
 	return result
 }
 
-// AdminOption is a function that configures an admin model
-type AdminOption func(*AdminModel)
-
-// WithListDisplay sets the list display fields
-func WithListDisplay(fields ...interface{}) AdminOption {
-	return func(m *AdminModel) {
-		m.ListDisplay = fields
+// ModelType returns the model type
+func (a *Admin[T]) ModelType() reflect.Type {
+	var zero T
+	typ := reflect.TypeOf(zero)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
 	}
+	return typ
 }
 
-// WithListFilter sets the list filter fields
-func WithListFilter(fields ...interface{}) AdminOption {
-	return func(m *AdminModel) {
-		m.ListFilter = fields
-	}
+// ManagerInterface returns the manager as interface{} for dynamic access
+func (a *Admin[T]) ManagerInterface() interface{} {
+	return a.manager
 }
 
-// WithSearchFields sets the search fields
-func WithSearchFields(fields ...interface{}) AdminOption {
-	return func(m *AdminModel) {
-		m.SearchFields = fields
-	}
+// ConfigInterface returns the config as interface{} for dynamic access
+func (a *Admin[T]) ConfigInterface() interface{} {
+	return a.config
 }
-
-// WithReadOnlyFields sets the read-only fields
-func WithReadOnlyFields(fields ...interface{}) AdminOption {
-	return func(m *AdminModel) {
-		m.ReadOnlyFields = fields
-	}
-}
-
-// WithCustomAdmin sets a custom admin class
-func WithCustomAdmin(custom CustomAdmin) AdminOption {
-	return func(m *AdminModel) {
-		m.CustomAdmin = custom
-	}
-}
-
-// WithManager sets the manager for the model
-func WithManager(manager interface{}) AdminOption {
-	return func(m *AdminModel) {
-		m.Manager = manager
-	}
-}
-
-// RegisterModelWithManager registers a model with its manager
-func RegisterModelWithManager(model interface{}, manager interface{}) error {
-	return RegisterModelWithOptions(model, WithManager(manager))
-}
-

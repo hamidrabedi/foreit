@@ -30,7 +30,7 @@ go build ./cmd/forge
 forge/
 ├── cmd/
 │   └── forge/              # CLI tool
-├── internal/
+├── pkg/
 │   ├── schema/             # Schema definitions
 │   ├── generator/          # Code generation
 │   ├── query/              # Query builder
@@ -78,7 +78,7 @@ go test ./...
 go test -cover ./...
 
 # Run specific package
-go test ./internal/query
+go test ./pkg/query
 ```
 
 ## Code Style
@@ -291,6 +291,8 @@ go http.ListenAndServe(":6060", nil)
 - Patch: Bug fixes
 
 ### Release Checklist
+
+Use this checklist when preparing a new release:
 
 - [ ] All tests passing
 - [ ] Documentation updated

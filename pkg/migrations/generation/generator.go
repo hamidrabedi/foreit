@@ -59,7 +59,9 @@ func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string) (*Migrat
 	if err != nil {
 		return nil, fmt.Errorf("failed to create SQL builder: %w", err)
 	}
-	stateManager := state.NewInMemoryState()
+	// Use FileStateLoader to load state from existing migration files
+	// This ensures incremental migrations work correctly
+	stateManager := state.NewFileStateLoader(migrationsDir)
 
 	return NewMigrationGenerator(modelsDir, migrationsDir, detector, sqlBuilder, stateManager)
 }
@@ -85,7 +87,9 @@ func (g *MigrationGenerator) GenerateMigrations(name string) error {
 		)
 	}
 
-	// Load previous state
+	// Load previous state from state manager
+	// If stateManager is a FileStateLoader, it will load from migration files
+	// Otherwise, it will use in-memory state
 	schemaState, err := g.stateManager.Load()
 	if err != nil {
 		return core.NewMigrationError(
@@ -93,6 +97,13 @@ func (g *MigrationGenerator) GenerateMigrations(name string) error {
 			"failed to load state",
 			err,
 		)
+	}
+
+	// If state is nil or empty, create a new one
+	if schemaState == nil {
+		schemaState = &state.SchemaState{
+			Tables: make(map[string]*state.TableState),
+		}
 	}
 
 	// Convert state to model definitions for comparison
@@ -176,6 +187,8 @@ func (g *MigrationGenerator) GenerateMigrations(name string) error {
 
 	// Create migration files
 	// Note: Dependencies can be added manually to migration files as comments
+	// TODO: Auto-detect dependencies from foreign key relationships
+	// TODO: Support dependency inference from table references in SQL
 	// Format: -- DEPENDS: version or -- DEPENDS: app:version
 	migrationName := fmt.Sprintf("%s_%s", version, name)
 	upPath := filepath.Join(g.migrationsDir, fmt.Sprintf("%s.up.sql", migrationName))
@@ -370,4 +383,3 @@ func toSnakeCaseFromDef(s string) string {
 	}
 	return string(result)
 }
-

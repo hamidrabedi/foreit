@@ -3,31 +3,35 @@ package migrations
 import (
 	"context"
 	"database/sql"
-	"os"
-	"path/filepath"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
 // TestColumnRename tests renaming a column
 func TestColumnRename(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_column_rename_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users"})
 
 	// Create initial table
 	createTableSQL := `
@@ -69,18 +73,24 @@ func TestColumnRename(t *testing.T) {
 
 // TestColumnTypeChange tests changing a column type
 func TestColumnTypeChange(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_column_type_change_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"products"})
 
 	// Create initial table
 	createTableSQL := `
@@ -118,18 +128,24 @@ func TestColumnTypeChange(t *testing.T) {
 
 // TestTableRename tests renaming a table
 func TestTableRename(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_table_rename_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"old_table", "new_table"})
 
 	// Create initial table
 	createTableSQL := `
@@ -169,18 +185,24 @@ func TestTableRename(t *testing.T) {
 
 // TestAddColumnWithDefault tests adding a column with a default value
 func TestAddColumnWithDefault(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_add_column_default_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users"})
 
 	// Create initial table
 	createTableSQL := `
@@ -211,18 +233,24 @@ func TestAddColumnWithDefault(t *testing.T) {
 
 // TestAddNotNullColumnWithoutDefault tests adding a NOT NULL column without default (should fail)
 func TestAddNotNullColumnWithoutDefault(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_add_notnull_no_default_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users"})
 
 	// Create initial table with data
 	createTableSQL := `
@@ -244,15 +272,18 @@ func TestAddNotNullColumnWithoutDefault(t *testing.T) {
 
 // TestDropColumn tests dropping a column
 func TestDropColumn(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_drop_column_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -283,18 +314,24 @@ func TestDropColumn(t *testing.T) {
 
 // TestAddForeignKey tests adding a foreign key constraint
 func TestAddForeignKey(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_add_fk_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users", "posts"})
 
 	// Create parent table
 	createUsersSQL := `
@@ -327,18 +364,24 @@ func TestAddForeignKey(t *testing.T) {
 
 // TestDropForeignKey tests dropping a foreign key constraint
 func TestDropForeignKey(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_drop_fk_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users", "posts"})
 
 	// Create tables with FK
 	createUsersSQL := `
@@ -383,15 +426,18 @@ func TestDropForeignKey(t *testing.T) {
 
 // TestAddUniqueConstraint tests adding a unique constraint
 func TestAddUniqueConstraint(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_add_unique_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -423,15 +469,18 @@ func TestAddUniqueConstraint(t *testing.T) {
 
 // TestCompositeUniqueConstraint tests composite unique constraints
 func TestCompositeUniqueConstraint(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_composite_unique_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -471,18 +520,24 @@ func TestCompositeUniqueConstraint(t *testing.T) {
 
 // TestAddIndex tests adding an index
 func TestAddIndex(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_add_index_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
+
+	// Cleanup tables before creating
+	testhelpers.CleanupTables(ctx, t, postgresDB, "postgres", []string{"users"})
 
 	// Create table
 	createTableSQL := `
@@ -504,15 +559,18 @@ func TestAddIndex(t *testing.T) {
 
 // TestDropIndex tests dropping an index
 func TestDropIndex(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
-	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_drop_index_%d", time.Now().UnixNano()),
+	}
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()

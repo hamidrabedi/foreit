@@ -1,14 +1,18 @@
 package admin
 
 import (
-	"fmt"
-	"net/http"
-	"reflect"
-	"strconv"
+	"context"
 
-	httplib "github.com/forgego/forge/pkg/http"
 	"github.com/forgego/forge/pkg/query"
 )
+
+// Filter represents a filter for list views
+type Filter[T any] interface {
+	Name() string
+	Label() string
+	GetOptions(ctx context.Context, qs query.QuerySet[T]) ([]FilterOption, error)
+	Apply(ctx context.Context, qs query.QuerySet[T], value interface{}) (query.QuerySet[T], error)
+}
 
 // FilterOption represents a filter option
 type FilterOption struct {
@@ -17,159 +21,107 @@ type FilterOption struct {
 	Count int64
 }
 
-// FilterField represents a filterable field
-type FilterField struct {
-	Name    string
-	Label   string
-	Type    string
-	Options []FilterOption
-	Active  interface{} // Currently selected value
+// BooleanFilter is a filter for boolean fields
+type BooleanFilter[T any] struct {
+	field FieldExpr[T, bool]
+	name  string
+	label string
 }
 
-// applyFilters applies list filters to a queryset (reflection-based)
-func applyFilters(r *http.Request, model *AdminModel, qs reflect.Value) reflect.Value {
-	if len(model.ListFilter) == 0 {
-		return qs
+// NewBooleanFilter creates a boolean filter
+func NewBooleanFilter[T any](field FieldExpr[T, bool]) Filter[T] {
+	return &BooleanFilter[T]{
+		field: field,
+		name:  field.Name(),
+		label: field.Name(),
 	}
-
-	for _, filterField := range model.ListFilter {
-		fieldName, ok := filterField.(string)
-		if !ok {
-			continue
-		}
-
-		// Get filter value from query params
-		filterValue := httplib.GetQueryString(r, fieldName, "")
-		if filterValue == "" {
-			continue
-		}
-
-		// Apply filter based on field type
-		// This is simplified - full implementation would check field type from schema
-		filterExpr := query.NewFieldQueryExpr(fieldName, query.OpEquals, filterValue)
-		
-		// Call Filter method on queryset
-		filterMethod := qs.MethodByName("Filter")
-		if filterMethod.IsValid() {
-			results := filterMethod.Call([]reflect.Value{reflect.ValueOf(filterExpr)})
-			if len(results) > 0 {
-				qs = results[0]
-			}
-		}
-	}
-
-	return qs
 }
 
-// getFilterFields generates filter fields for the list view
-func getFilterFields(r *http.Request, model *AdminModel, manager interface{}) []FilterField {
-	var filterFields []FilterField
-
-	if len(model.ListFilter) == 0 {
-		return filterFields
-	}
-
-	ctx := r.Context()
-	managerValue := reflect.ValueOf(manager)
-
-	for _, filterField := range model.ListFilter {
-		fieldName, ok := filterField.(string)
-		if !ok {
-			continue
-		}
-
-		// Get all distinct values for this field
-		// This is simplified - full implementation would query distinct values
-		filterField := FilterField{
-			Name:  fieldName,
-			Label: fieldName,
-			Type:  "select", // Default to select
-			Active: httplib.GetQueryString(r, fieldName, ""),
-		}
-
-		// Try to get distinct values from manager
-		allMethod := managerValue.MethodByName("All")
-		if allMethod.IsValid() {
-			results := allMethod.Call([]reflect.Value{reflect.ValueOf(ctx)})
-			if len(results) >= 2 && results[1].IsNil() {
-				objects := results[0].Interface()
-				options := getDistinctValues(objects, fieldName)
-				filterField.Options = options
-			}
-		}
-
-		filterFields = append(filterFields, filterField)
-	}
-
-	return filterFields
+// Name returns the filter name
+func (f *BooleanFilter[T]) Name() string {
+	return f.name
 }
 
-// getDistinctValues extracts distinct values from objects for a field
-func getDistinctValues(objects interface{}, fieldName string) []FilterOption {
-	var options []FilterOption
-	seen := make(map[interface{}]bool)
-	counts := make(map[interface{}]int64)
-
-	objectsValue := reflect.ValueOf(objects)
-	if objectsValue.Kind() != reflect.Slice {
-		return options
-	}
-
-	for i := 0; i < objectsValue.Len(); i++ {
-		obj := objectsValue.Index(i)
-		if obj.Kind() == reflect.Ptr {
-			obj = obj.Elem()
-		}
-
-		field := obj.FieldByName(fieldName)
-		if !field.IsValid() {
-			// Try lowercase
-			field = obj.FieldByName(toTitleCase(fieldName))
-		}
-
-		if field.IsValid() {
-			value := field.Interface()
-			if !seen[value] {
-				seen[value] = true
-				options = append(options, FilterOption{
-					Label: fmt.Sprintf("%v", value),
-					Value: value,
-					Count: 1,
-				})
-			} else {
-				// Increment count
-				for i := range options {
-					if options[i].Value == value {
-						options[i].Count++
-						break
-					}
-				}
-			}
-			counts[value]++
-		}
-	}
-
-	return options
+// Label returns the filter label
+func (f *BooleanFilter[T]) Label() string {
+	return f.label
 }
 
-
-// parseFilterValue parses a filter value from string
-func parseFilterValue(valueStr string, fieldType string) interface{} {
-	switch fieldType {
-	case "bool":
-		if valueStr == "true" || valueStr == "1" {
-			return true
-		}
-		return false
-	case "int", "int64":
-		if val, err := strconv.ParseInt(valueStr, 10, 64); err == nil {
-			return val
-		}
-	case "float", "float64":
-		if val, err := strconv.ParseFloat(valueStr, 64); err == nil {
-			return val
-		}
-	}
-	return valueStr
+// GetOptions returns filter options
+func (f *BooleanFilter[T]) GetOptions(ctx context.Context, qs query.QuerySet[T]) ([]FilterOption, error) {
+	return []FilterOption{
+		{Label: "Yes", Value: true},
+		{Label: "No", Value: false},
+	}, nil
 }
 
+// Apply applies the filter to a queryset
+func (f *BooleanFilter[T]) Apply(ctx context.Context, qs query.QuerySet[T], value interface{}) (query.QuerySet[T], error) {
+	boolValue, ok := value.(bool)
+	if !ok {
+		return qs, nil
+	}
+
+	// Create query expression
+	expr := query.NewFieldQueryExpr(f.name, query.OpEquals, boolValue)
+	return qs.Filter(expr), nil
+}
+
+// ChoiceFilter is a filter for choice fields
+type ChoiceFilter[T any, F comparable] struct {
+	field   FieldExpr[T, F]
+	name    string
+	label   string
+	choices []Choice[F]
+}
+
+// Choice represents a choice option
+type Choice[F any] struct {
+	Label string
+	Value F
+}
+
+// NewChoiceFilter creates a choice filter
+func NewChoiceFilter[T any, F comparable](field FieldExpr[T, F], choices []Choice[F]) Filter[T] {
+	return &ChoiceFilter[T, F]{
+		field:   field,
+		name:    field.Name(),
+		label:   field.Name(),
+		choices: choices,
+	}
+}
+
+// Name returns the filter name
+func (f *ChoiceFilter[T, F]) Name() string {
+	return f.name
+}
+
+// Label returns the filter label
+func (f *ChoiceFilter[T, F]) Label() string {
+	return f.label
+}
+
+// GetOptions returns filter options
+func (f *ChoiceFilter[T, F]) GetOptions(ctx context.Context, qs query.QuerySet[T]) ([]FilterOption, error) {
+	options := make([]FilterOption, len(f.choices))
+	for i, choice := range f.choices {
+		options[i] = FilterOption{
+			Label: choice.Label,
+			Value: choice.Value,
+		}
+	}
+	return options, nil
+}
+
+// Apply applies the filter to a queryset
+func (f *ChoiceFilter[T, F]) Apply(ctx context.Context, qs query.QuerySet[T], value interface{}) (query.QuerySet[T], error) {
+	// Type assert value
+	val, ok := value.(F)
+	if !ok {
+		return qs, nil
+	}
+
+	// Create query expression
+	expr := query.NewFieldQueryExpr(f.name, query.OpEquals, val)
+	return qs.Filter(expr), nil
+}

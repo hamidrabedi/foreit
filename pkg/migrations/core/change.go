@@ -27,6 +27,7 @@ const (
 	ChangeTypeDropConstraint  ChangeType = "DropConstraint"
 	ChangeTypeRunSQL          ChangeType = "RunSQL"
 	ChangeTypeRunGo           ChangeType = "RunGo"
+	ChangeTypeUnknown         ChangeType = "Unknown"
 )
 
 // Change represents a single migration change
@@ -216,6 +217,16 @@ type RunGo struct {
 func (c *RunGo) Type() ChangeType { return ChangeTypeRunGo }
 func (c *RunGo) TableName() string { return "" } // Data migrations don't target a specific table
 func (c *RunGo) Reversible() bool { return c.CanReverse }
+
+// UnknownChange represents a SQL statement that couldn't be parsed
+// but should be preserved for state reconstruction
+type UnknownChange struct {
+	SQL string // Raw SQL text
+}
+
+func (c *UnknownChange) Type() ChangeType { return ChangeTypeUnknown }
+func (c *UnknownChange) TableName() string { return "" }
+func (c *UnknownChange) Reversible() bool { return false }
 
 // toSnakeCase converts CamelCase to snake_case
 func toSnakeCase(s string) string {

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/forgego/forge/pkg/cli/cmd"
-	"github.com/forgego/forge/pkg/migrations/squashing"
+	"github.com/forgego/forge/pkg/migrate/generate"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ func (c *SquashCommand) Execute(ctx *cmd.Context, args []string) error {
 		migrationsPath = "./migrations"
 	}
 
-	squasher := squashing.NewSquasher(migrationsPath)
+	squasher := generate.NewSquasher(migrationsPath)
 	if err := squasher.SquashMigrations(startVersion, endVersion, name); err != nil {
 		return fmt.Errorf("failed to squash migrations: %w", err)
 	}

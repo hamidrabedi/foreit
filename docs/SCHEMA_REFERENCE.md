@@ -223,9 +223,9 @@ import (
     "context"
     "time"
     
-    "github.com/forgego/forge/internal/schema"
-    "github.com/forgego/forge/internal/schema/fields"
-    "github.com/forgego/forge/internal/schema/relations"
+    "github.com/forgego/forge/pkg/schema"
+    "github.com/forgego/forge/pkg/schema/fields"
+    "github.com/forgego/forge/pkg/schema/relations"
 )
 
 type User struct {

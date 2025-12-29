@@ -16,7 +16,9 @@ All notable changes to the forge framework will be documented in this file.
 - Replaced generic "not implemented" errors with typed errors
 - Enhanced code organization and structure
 - **Documentation consolidation**: Merged detailed architecture docs into ARCHITECTURE.md
-- **Documentation cleanup**: Removed 24+ outdated progress/status reports
+- **Documentation cleanup**: Removed 50+ outdated progress/status/completion reports
+- **Documentation refactoring**: Merged admin documentation into single comprehensive guide
+- Updated INDEX.md with organized structure and all current documentation
 - Updated FEATURES.md and ROADMAP.md with accurate implementation status
 - Fixed broken documentation references
 

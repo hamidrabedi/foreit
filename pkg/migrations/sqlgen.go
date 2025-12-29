@@ -20,6 +20,7 @@ func NewSQLGenerator(driver string) *SQLGenerator {
 	if err != nil {
 		// For compatibility, we'll create a builder that will error on use
 		// In practice, this should not happen with valid drivers
+		// TODO: Replace panic with proper error return for better error handling
 		panic(err)
 	}
 	return &SQLGenerator{

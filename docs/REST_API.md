@@ -20,7 +20,7 @@ The REST API is built on the `ViewSet` pattern, providing:
 package models
 
 import (
-    "github.com/forgego/forge/internal/api"
+    "github.com/forgego/forge/pkg/api"
 )
 
 // UserSerializer serializes User model
@@ -46,7 +46,7 @@ package api
 
 import (
     "your-module/models"
-    "github.com/forgego/forge/internal/api"
+    "github.com/forgego/forge/pkg/api"
 )
 
 func RegisterUserViewSet(router *api.Router) {
@@ -68,8 +68,8 @@ func RegisterUserViewSet(router *api.Router) {
 package main
 
 import (
-    "github.com/forgego/forge/internal/api"
-    httplib "github.com/forgego/forge/internal/http"
+    "github.com/forgego/forge/pkg/api"
+    httplib "github.com/forgego/forge/pkg/http"
 )
 
 func main() {

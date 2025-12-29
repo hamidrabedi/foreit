@@ -4,13 +4,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/forgego/forge/pkg/admin"
 	"github.com/forgego/forge/pkg/cli/cmd"
 	"github.com/forgego/forge/pkg/config"
 	httplib "github.com/forgego/forge/pkg/http"
 	"github.com/forgego/forge/pkg/logging"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 // RunServerCommand creates the runserver command
@@ -74,13 +72,11 @@ func registerRoutes(router *httplib.Router, logger *logging.Logger) {
 		_, _ = w.Write([]byte("OK"))
 	})
 
-	// Register admin routes
-	cfg := config.NewConfig()
-	settings := config.LoadSettings(cfg)
-	if settings.Admin.Enabled {
-		admin.RegisterAdminRoutes(router, settings.Admin.Path, nil, nil)
-		logger.Info("Admin routes registered", zap.String("path", settings.Admin.Path))
-	}
+	// TODO: Register admin routes using v2 admin system
+	// Example:
+	// adminv2 := adminv2.GetGlobalRegistry()
+	// adminRouter := adminhttp.NewRouter(adminv2)
+	// adminRouter.RegisterRoutes(router, settings.Admin.Path)
 
 	// TODO: Register API routes
 }

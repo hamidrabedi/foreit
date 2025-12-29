@@ -10,7 +10,7 @@ import (
 
 // baseBuilder contains common SQL building logic
 type baseBuilder struct {
-	isSQLite  bool
+	isSQLite   bool
 	isPostgres bool
 }
 
@@ -85,7 +85,7 @@ func (b *baseBuilder) BuildCreateTable(c *core.CreateTable) (string, error) {
 	parts = append(parts, fmt.Sprintf("-- Create table: %s", tableName))
 	parts = append(parts, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (", tableName))
 
-		var columnDefs []string
+	var columnDefs []string
 	for _, field := range c.Table.Fields {
 		colDef, err := b.BuildColumnDefinition(field)
 		if err != nil {
@@ -143,7 +143,7 @@ func (b *baseBuilder) BuildModifyIndex(c *core.ModifyIndex) (string, error) {
 
 	var statements []string
 	statements = append(statements, fmt.Sprintf("DROP INDEX IF EXISTS %s;", oldIndexName))
-	
+
 	newIndex := &core.AddIndex{
 		Table: c.Table,
 		Index: c.NewIndex,
@@ -180,8 +180,19 @@ func (b *baseBuilder) BuildAddForeignKey(c *core.AddForeignKey) (string, error) 
 
 	fkName := fmt.Sprintf("fk_%s_%s", c.Table, c.Relation.Name)
 
-	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (\"%s\") REFERENCES %s (id) ON DELETE %s ON UPDATE %s;",
-		c.Table, fkName, c.Relation.Name, c.TargetTable, onDelete, onUpdate), nil
+	// Use DO block to check if constraint exists before adding (PostgreSQL-specific)
+	// This prevents errors when constraint already exists (e.g., in incremental migrations)
+	return fmt.Sprintf(`DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint 
+        WHERE conname = '%s' 
+        AND conrelid = '%s'::regclass
+    ) THEN
+        ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY ("%s") REFERENCES %s (id) ON DELETE %s ON UPDATE %s;
+    END IF;
+END $$;`,
+		fkName, c.Table, c.Table, fkName, c.Relation.Name, c.TargetTable, onDelete, onUpdate), nil
 }
 
 // BuildModifyForeignKey generates DROP and ADD FOREIGN KEY statements
@@ -190,7 +201,7 @@ func (b *baseBuilder) BuildModifyForeignKey(c *core.ModifyForeignKey) (string, e
 
 	var statements []string
 	statements = append(statements, fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s;", c.Table, oldFKName))
-	
+
 	newFK := &core.AddForeignKey{
 		Table:       c.Table,
 		Relation:    c.NewFK,
@@ -254,4 +265,3 @@ func (b *baseBuilder) BuildAddConstraint(c *core.AddConstraint) (string, error) 
 	return fmt.Sprintf("ALTER TABLE %s ADD CONSTRAINT %s %s;",
 		c.Table, c.Constraint.Name, constraintSQL), nil
 }
-

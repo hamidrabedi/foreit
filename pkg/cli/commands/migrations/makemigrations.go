@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/forgego/forge/pkg/cli/cmd"
-	"github.com/forgego/forge/pkg/migrations"
+	"github.com/forgego/forge/pkg/migrate"
 	"github.com/spf13/cobra"
 )
 
@@ -110,7 +110,7 @@ func (c *MakeMigrationsCommand) Execute(ctx *cmd.Context, args []string) error {
 			modelsDir = "./models"
 		}
 
-		gen, err := migrations.NewGenerator(modelsDir, migrationsDir)
+		gen, err := migrate.NewGenerator(modelsDir, migrationsDir)
 		if err != nil {
 			return fmt.Errorf("failed to create migration generator: %w", err)
 		}

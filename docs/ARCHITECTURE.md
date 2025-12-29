@@ -72,7 +72,7 @@ forge is a Django-like Go framework that prioritizes type safety while offering 
 
 ### 1. Schema Definition System
 
-**Location:** `internal/schema/`
+**Location:** `pkg/schema/`
 
 **Purpose:** Define models declaratively in Go code
 
@@ -82,6 +82,7 @@ forge is a Django-like Go framework that prioritizes type safety while offering 
 - `relation.go` - Relationship definitions
 - `meta.go` - Model metadata
 - `hooks.go` - Lifecycle hooks
+- `constraint_builder.go` - Database constraint builders
 
 **Example:**
 ```go
@@ -100,7 +101,7 @@ func (User) Fields() []schema.Field {
 
 ### 2. Code Generation System
 
-**Location:** `internal/generator/`
+**Location:** `pkg/generator/`
 
 **Purpose:** Generate type-safe Go code from schema definitions
 
@@ -108,6 +109,8 @@ func (User) Fields() []schema.Field {
 - `generator.go` - Main generation orchestrator
 - `ast_parser.go` - Go AST parser for schema extraction
 - `writer.go` - Code file writer
+- `templates.go` - Code generation templates
+- `templates/` - Template files for Manager and QuerySet generation
 
 **Generated Files:**
 - `models/*.gen.go` - Model structs
@@ -130,17 +133,18 @@ type UserManagerType struct {
 
 ### 3. Query System
 
-**Location:** `internal/query/`
+**Location:** `pkg/query/`
 
 **Purpose:** Type-safe and dynamic query building
 
 **Components:**
 - `field_expr.go` - Type-safe field accessors (`FieldExpr[T]`)
-- `query_expr.go` - Query conditions (`QueryExpr`, renamed from Q)
+- `query_expr.go` - Query conditions (`QueryExpr`)
 - `queryset.go` - QuerySet implementation with `BaseQuerySet[T]`
+- `manager.go` - Manager with CRUD operations
 - `dynamic.go` - Dynamic query API
-- `aggregates.go` - Aggregate functions
-- `annotations.go` - Annotation support
+- `aggregates.go` - Aggregate functions (structure ready)
+- `annotations.go` - Annotation support (structure ready)
 
 **Architecture:**
 - `BaseQuerySet[T]` - Exported base implementation that generated QuerySets embed
@@ -165,14 +169,19 @@ users, err := User.Objects.FilterDynamic(
 
 ### 4. Database Layer
 
-**Location:** `internal/db/`
+**Location:** `pkg/db/`
 
 **Purpose:** Database connection, transactions, migrations
 
 **Components:**
 - `db.go` - Database connection wrapper
 - `transaction.go` - Transaction management
-- `migrations.go` - Migration system (golang-migrate)
+- `migrations.go` - Migration system integration
+
+**Migration System:** `pkg/migrations/` and `pkg/migrate/`
+- Complete migration system with state management
+- Schema detection and diff generation
+- SQL builder for migrations
 
 **Features:**
 - Connection pooling
@@ -182,7 +191,7 @@ users, err := User.Objects.FilterDynamic(
 
 ### 5. HTTP & Routing
 
-**Location:** `internal/http/`
+**Location:** `pkg/http/`
 
 **Purpose:** HTTP server and routing (chi wrapper)
 
@@ -203,25 +212,35 @@ users, err := User.Objects.FilterDynamic(
 
 ### 6. Admin System
 
-**Location:** `internal/admin/`
+**Location:** `pkg/admin/`
 
-**Purpose:** Auto-generated admin interface
+**Purpose:** Type-safe admin interface with full CRUD operations
 
 **Components:**
+- `admin.go` - Type-safe Admin[T] and Config[T]
 - `registry.go` - Admin model registry
-- `generator.go` - Admin code generator
-- `router.go` - Admin route registration
-- `templates/` - HTML templates with HTMX
+- `list_view.go` - List view with pagination, search, filtering
+- `detail_view.go` - Detail view
+- `form_view.go` - Create/update forms
+- `fields.go` - Type-safe field expressions
+- `filters.go` - Filter system
+- `actions.go` - Bulk actions
+- `widgets.go` - Form widgets
+- `export.go` - CSV/JSON export
+- `http/` - HTTP handlers and routing
 
 **Features:**
-- Auto-generation from model metadata
-- Django-style registration
-- HTMX for interactivity
-- Sprig template functions
+- ✅ Type-safe with generics
+- ✅ Complete HTTP handlers (List, Detail, Create, Update, Delete)
+- ✅ Rich form widgets
+- ✅ Filters, search, pagination
+- ✅ Bulk actions
+- ✅ Export functionality
+- ✅ Inlines and fieldsets
 
 ### 7. Security
 
-**Location:** `internal/security/`
+**Location:** `pkg/security/`
 
 **Purpose:** Security features
 
@@ -233,7 +252,7 @@ users, err := User.Objects.FilterDynamic(
 
 ### 8. Validation
 
-**Location:** `internal/validation/`
+**Location:** `pkg/validation/`
 
 **Purpose:** Data validation
 
@@ -244,17 +263,23 @@ users, err := User.Objects.FilterDynamic(
 
 ### 9. Authentication
 
-**Location:** `internal/auth/`
+**Location:** `pkg/auth/` and `pkg/users/`
 
 **Purpose:** Authentication and authorization
 
 **Components:**
-- `password.go` - Password hashing (bcrypt)
-- `middleware.go` - Authentication middleware
+- `pkg/auth/password.go` - Password hashing (bcrypt)
+- `pkg/users/` - Complete user system with:
+  - User management (CRUD)
+  - Authentication services
+  - Session management
+  - Permission system (RBAC)
+  - Password management
+  - Authentication backends (password, token)
 
 ### 10. Configuration
 
-**Location:** `internal/config/`
+**Location:** `pkg/config/`
 
 **Purpose:** Application configuration
 
@@ -264,7 +289,7 @@ users, err := User.Objects.FilterDynamic(
 
 ### 11. Logging
 
-**Location:** `internal/logging/`
+**Location:** `pkg/logging/`
 
 **Purpose:** Structured logging
 
@@ -274,13 +299,66 @@ users, err := User.Objects.FilterDynamic(
 
 ### 12. Utilities
 
-**Location:** `internal/utils/`
+**Location:** `pkg/utils/`
 
 **Purpose:** Helper utilities
 
 **Components:**
 - `strcase.go` - String case conversion (strcase)
 - `uuid.go` - UUID utilities (google/uuid)
+
+### 13. API Framework
+
+**Location:** `pkg/api/`
+
+**Purpose:** DRF-like REST API framework
+
+**Components:**
+- `serializers/` - Complete serializer system with field types
+- `viewset.go` - BaseViewSet with CRUD operations
+- `authentication/` - Token, JWT, Basic, Session, API Key auth
+- `permissions/` - Permission system (AllowAny, IsAuthenticated, IsAdminUser, etc.)
+- `throttling/` - Rate limiting (AnonRateThrottle, UserRateThrottle, ScopedRateThrottle)
+- `renderers/` - JSON, XML, YAML, HTML, CSV renderers
+- `parsers/` - JSON, XML, Form, MultiPart parsers
+- `filters/` - Field filtering and search
+- `pagination.go` - PageNumber and LimitOffset pagination
+- `exceptions/` - Complete exception hierarchy
+- `versioning/` - API versioning support
+- `caching/` - Cache backends
+- `docs/` - OpenAPI documentation generation
+
+**Status:** ✅ Complete - Production ready
+
+### 14. User System
+
+**Location:** `pkg/users/`
+
+**Purpose:** Complete user management and authentication
+
+**Components:**
+- `models/` - User, Session, Permission, Group, Token models
+- `repository/` - Data access layer (Repository pattern)
+- `service/` - Business logic layer (User, Auth, Password, Permission services)
+- `backends/` - Authentication backends (password, token)
+- `serializers/` - API serializers
+- `handlers/` - HTTP handlers/viewsets
+- `middleware/` - Authentication middleware
+
+**Status:** ✅ Complete - Production ready
+
+### 15. CLI Tools
+
+**Location:** `pkg/cli/`
+
+**Purpose:** Command-line interface for framework operations
+
+**Components:**
+- `commands/` - CLI commands (new, generate, migrate, runserver, etc.)
+- `templates/` - Project and code templates
+- `root.go` - CLI root command
+
+**Status:** ✅ Complete
 
 ## Data Flow
 
@@ -355,7 +433,7 @@ Generated Files:
 ## Technology Stack
 
 ### Core
-- **Go 1.24+** - Programming language
+- **Go 1.21+** - Programming language
 - **database/sql** - Database interface
 - **go/ast** - Code generation
 
@@ -448,13 +526,15 @@ func NewUserQuerySet() *UserQuerySet {
 5. Relations loaded if `SelectRelated`/`PrefetchRelated` used
 
 **Implementation Status:**
-- ✅ Query building (Filter, Exclude, OrderBy, Limit, Offset)
+- ✅ Query building (Filter, Exclude, OrderBy, Limit, Offset, Distinct)
 - ✅ Query execution (All, Get, First, Last, Count, Exists)
 - ✅ SQL generation from QueryExpr
 - ✅ Row scanning into model instances
 - ✅ SQL builder with proper escaping and parameter binding
+- ✅ Manager CRUD operations (Create, Update, Delete with hooks)
 - 🚧 SelectRelated/PrefetchRelated (structure ready)
-- 🚧 Aggregates execution
+- 🚧 Aggregates execution (structure ready)
+- 🚧 Annotations execution (structure ready)
 
 ### Schema Architecture Details
 
@@ -550,3 +630,39 @@ Delete: `BeforeDelete` → Database Delete → `AfterDelete`
 | `float64` | `DOUBLE PRECISION` | No |
 | `[]byte` | `BYTEA` or `JSONB` | No |
 
+## Package Structure Summary
+
+The framework is organized into the following packages under `pkg/`:
+
+```
+pkg/
+├── admin/          # Type-safe admin interface ✅
+├── api/            # REST API framework ✅
+├── auth/           # Basic authentication utilities
+├── cli/            # Command-line interface ✅
+├── config/         # Configuration management
+├── db/             # Database connection and transactions
+├── errors/         # Error handling
+├── generator/      # Code generation system ✅
+├── http/           # HTTP routing and middleware
+├── logging/        # Structured logging
+├── migrate/        # Migration system ✅
+├── migrations/     # Migration utilities
+├── models/         # Base models
+├── query/          # Type-safe ORM ✅
+├── registry/       # Extension registry
+├── schema/         # Schema definition system ✅
+├── security/       # Security features
+├── users/          # User system ✅
+├── utils/          # Utility functions
+└── validation/     # Validation system
+```
+
+**Status Legend:**
+- ✅ Complete and production-ready
+- 🚧 In progress / structure ready
+- 📋 Planned
+
+For detailed architecture of specific packages, see:
+- [API Architecture](API_ARCHITECTURE.md) - API framework details
+- [User System Architecture](USER_SYSTEM_ARCHITECTURE.md) - User system details

@@ -2,6 +2,7 @@ package execution
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -35,13 +36,15 @@ type MigrationInfo struct {
 type StatusReporter struct {
 	migrationsPath string
 	migrate        *migrate.Migrate
+	db             *sql.DB
 }
 
 // NewStatusReporter creates a new status reporter
-func NewStatusReporter(migrationsPath string, m *migrate.Migrate) *StatusReporter {
+func NewStatusReporter(migrationsPath string, m *migrate.Migrate, db *sql.DB) *StatusReporter {
 	return &StatusReporter{
 		migrationsPath: migrationsPath,
 		migrate:        m,
+		db:             db,
 	}
 }
 
@@ -177,17 +180,41 @@ func (r *StatusReporter) getAllMigrations() ([]MigrationFile, error) {
 
 // getAppliedVersions gets applied migration versions from database
 func (r *StatusReporter) getAppliedVersions(ctx context.Context) (map[uint]bool, error) {
-	// This would query the schema_migrations table
-	// For now, return empty map as golang-migrate handles this internally
-	// A full implementation would query: SELECT version FROM schema_migrations
 	applied := make(map[uint]bool)
 	
-	// Try to get version to see if any migrations are applied
-	version, _, err := r.migrate.Version()
-	if err == nil {
-		// If we got a version, we know at least that one is applied
-		// In a full implementation, we'd query all applied versions
+	// If no database connection, fall back to migrate.Version()
+	if r.db == nil {
+		version, _, err := r.migrate.Version()
+		if err == nil {
+			applied[version] = true
+		}
+		return applied, nil
+	}
+	
+	// Query schema_migrations table (golang-migrate's internal table)
+	// The table structure is: version (bigint), dirty (boolean)
+	query := `SELECT version FROM schema_migrations WHERE dirty = false ORDER BY version`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		// If table doesn't exist or query fails, fall back to migrate.Version()
+		version, _, err := r.migrate.Version()
+		if err == nil {
+			applied[version] = true
+		}
+		return applied, nil
+	}
+	defer rows.Close()
+	
+	for rows.Next() {
+		var version uint
+		if err := rows.Scan(&version); err != nil {
+			continue
+		}
 		applied[version] = true
+	}
+	
+	if err := rows.Err(); err != nil {
+		return applied, fmt.Errorf("error reading applied versions: %w", err)
 	}
 	
 	return applied, nil

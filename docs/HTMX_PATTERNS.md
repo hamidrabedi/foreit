@@ -371,8 +371,8 @@ document.body.addEventListener("htmx:afterSwap", function (evt) {
 
 See the admin templates for complete examples:
 
-- `internal/admin/templates/list.html` - List view with search, pagination, inline editing
-- `internal/admin/templates/form.html` - Form with validation and enhanced inputs
+- `pkg/admin/templates/list.html` - List view with search, pagination, inline editing
+- `pkg/admin/templates/form.html` - Form with validation and enhanced inputs
 
 ## Further Reading
 

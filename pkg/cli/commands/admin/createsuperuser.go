@@ -9,7 +9,8 @@ import (
 
 	"github.com/forgego/forge/pkg/cli/cmd"
 	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/models"
+	"github.com/forgego/forge/pkg/users"
+	"github.com/forgego/forge/pkg/users/service"
 	"github.com/spf13/cobra"
 )
 
@@ -81,13 +82,36 @@ func (c *CreateSuperUserCommand) Execute(ctx *cmd.Context, args []string) error 
 		return fmt.Errorf("passwords do not match")
 	}
 
-	// Create superuser using UserManager
+	// Create superuser using new user system
 	cmdCtx := context.Background()
-	userManager := models.NewUserManager(database)
-
-	user, err := userManager.CreateSuperuser(cmdCtx, username, email, password)
+	userSystem, err := users.SetupUserSystem(database, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create superuser: %w", err)
+		return fmt.Errorf("failed to setup user system: %w", err)
+	}
+
+	// Create superuser request
+	createReq := &service.CreateUserRequest{
+		Username: username,
+		Email:    email,
+		Password: password,
+		IsStaff:  true,
+		IsActive: true,
+	}
+
+	// Create user first
+	user, err := userSystem.UserService.CreateUser(cmdCtx, createReq)
+	if err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Update to superuser
+	isSuperuser := true
+	updateReq := &service.UpdateUserRequest{
+		IsSuperuser: &isSuperuser,
+	}
+	user, err = userSystem.UserService.UpdateUser(cmdCtx, user.ID, updateReq)
+	if err != nil {
+		return fmt.Errorf("failed to set superuser flag: %w", err)
 	}
 
 	fmt.Printf("\n✓ Superuser created successfully (ID: %d, Username: %s)\n", user.ID, user.Username)

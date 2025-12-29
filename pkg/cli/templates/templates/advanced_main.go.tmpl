@@ -10,7 +10,8 @@ import (
 	"github.com/forgego/forge/pkg/db"
 	"github.com/forgego/forge/pkg/logging"
 	httplib "github.com/forgego/forge/pkg/http"
-	"github.com/forgego/forge/pkg/admin"
+	// adminv2 "github.com/forgego/forge/pkg/admin"
+	// adminhttp "github.com/forgego/forge/pkg/admin/http"
 )
 
 //go:generate forge discover
@@ -53,10 +54,12 @@ func main() {
 			fmt.Fprintf(w, "Welcome to {{.ProjectName}}!")
 		})
 
-		// Register admin routes
-		if settings.Admin.Enabled {
-			admin.RegisterAdminRoutes(router, settings.Admin.Path, nil, database)
-		}
+		// Register admin routes (using v2 admin system)
+		// if settings.Admin.Enabled {
+		// 	adminv2 := adminv2.GetGlobalRegistry()
+		// 	adminRouter := adminhttp.NewRouter(adminv2)
+		// 	adminRouter.RegisterRoutes(router, settings.Admin.Path)
+		// }
 	})
 
 	// Start server

@@ -106,6 +106,11 @@ func (s *BaseSerializer) Set(key string, value interface{}) {
 	s.data[key] = value
 }
 
+// SetData sets the entire data map
+func (s *BaseSerializer) SetData(data map[string]interface{}) {
+	s.data = data
+}
+
 // ToJSON converts the serializer to JSON
 func (s *BaseSerializer) ToJSON() ([]byte, error) {
 	return json.Marshal(s.data)

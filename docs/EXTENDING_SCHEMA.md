@@ -4,12 +4,26 @@ This guide explains how to extend the schema system with custom field types, val
 
 ## Architecture Overview
 
-The schema system uses a composition-based architecture:
+The schema system uses a composition-based architecture with a unified builder pattern:
 
-- **BaseFieldBuilder**: Contains all common field options (DBColumn, DBCollation, Required, etc.)
-- **Typed Field Builders**: Embed `BaseFieldBuilder` and add type-specific methods
+- **UnifiedFieldBuilder**: Core builder containing all common field options (DBColumn, DBCollation, Required, etc.)
+- **Type-Specific Builders**: Wrap `UnifiedFieldBuilder` and provide type-safe methods (Int64FieldBuilder, StringFieldBuilder, etc.)
+- **BaseFieldBuilder**: Legacy builder kept for backward compatibility (new code should use type-specific builders)
+- **FieldOptions**: Organized configuration with separated concerns (DB, Validation, Presentation)
 - **Validators**: Composable validation functions that can be applied to any field
 - **Field Registry**: Allows registration of custom field types at runtime
+
+### Recommended Approach
+
+For new code, use the type-specific builders directly:
+```go
+schema.Int64("id").Primary().AutoIncrement().Build()
+schema.String("email").Required().Unique().MaxLength(255).Build()
+```
+
+For custom field builders, you can either:
+1. Embed `BaseFieldBuilder` (backward compatible)
+2. Embed `UnifiedFieldBuilder` (recommended for new code)
 
 ## Using Validators
 
@@ -91,16 +105,38 @@ func (Model) Fields() []schema.Field {
 
 ## Creating Custom Field Builders
 
-For more complex field types, you can create custom field builders that embed `BaseFieldBuilder`:
+For more complex field types, you can create custom field builders. You have two options:
 
-### Example: Custom Field Builder
+### Option 1: Using UnifiedFieldBuilder (Recommended)
 
 ```go
 package mypackage
 
 import "github.com/forgego/forge/pkg/schema"
 
-// MyCustomFieldBuilder is a custom field builder
+// MyCustomFieldBuilder is a custom field builder using the unified architecture
+type MyCustomFieldBuilder struct {
+    *schema.UnifiedFieldBuilder
+    customOption string
+}
+
+// NewMyCustomField creates a new custom field builder
+func NewMyCustomField(name string) *MyCustomFieldBuilder {
+    return &MyCustomFieldBuilder{
+        UnifiedFieldBuilder: schema.newUnifiedFieldBuilder(name, schema.TypeString),
+        customOption: "",
+    }
+}
+```
+
+### Option 2: Using BaseFieldBuilder (Backward Compatible)
+
+```go
+package mypackage
+
+import "github.com/forgego/forge/pkg/schema"
+
+// MyCustomFieldBuilder is a custom field builder (legacy approach)
 type MyCustomFieldBuilder struct {
     *schema.BaseFieldBuilder
     customOption string
@@ -204,10 +240,17 @@ schema.String("slug").Validators(schema.SlugValidator())
 // Don't create a separate SlugFieldBuilder unless you need complex behavior
 ```
 
-### 2. Embed BaseFieldBuilder
+### 2. Embed UnifiedFieldBuilder or BaseFieldBuilder
 
-Always embed `*BaseFieldBuilder` in custom field builders to inherit all common methods:
+For new code, embed `*UnifiedFieldBuilder` to use the modern architecture:
+```go
+type MyFieldBuilder struct {
+    *schema.UnifiedFieldBuilder
+    // Your custom fields
+}
+```
 
+For backward compatibility, you can still embed `*BaseFieldBuilder`:
 ```go
 type MyFieldBuilder struct {
     *schema.BaseFieldBuilder
@@ -217,7 +260,7 @@ type MyFieldBuilder struct {
 
 ### 3. Keep Type-Specific Methods Minimal
 
-Only add methods that are truly specific to your field type. Common options (Required, DBIndex, etc.) are already available through `BaseFieldBuilder`.
+Only add methods that are truly specific to your field type. Common options (Required, DBIndex, etc.) are already available through `UnifiedFieldBuilder` or `BaseFieldBuilder`.
 
 ### 4. Document Your Extensions
 
@@ -328,6 +371,16 @@ func init() {
 - Use **validators** for format validation (slugs, IPs, emails)
 - Use **custom field builders** for complex field types with special behavior
 - Use **field registry** for globally available custom field types
-- Always embed `BaseFieldBuilder` to inherit common functionality
+- For new code: embed `UnifiedFieldBuilder` to inherit common functionality
+- For backward compatibility: embed `BaseFieldBuilder` (still supported)
 - Keep custom builders minimal - only add type-specific methods
 
+## Architecture Notes
+
+The schema package has been refactored to use a unified builder architecture:
+- **UnifiedFieldBuilder**: Single source of truth for all common field methods
+- **Type-specific builders**: Provide type-safe wrappers (Int64FieldBuilder, StringFieldBuilder, etc.)
+- **FieldOptions**: Separated configuration (DB, Validation, Presentation)
+- **Backward compatible**: All existing code continues to work without changes
+
+See `pkg/schema/ARCHITECTURE.md` for detailed architecture documentation.

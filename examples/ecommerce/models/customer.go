@@ -1,6 +1,8 @@
 package models
 
 import (
+	"context"
+
 	"github.com/forgego/forge/pkg/schema"
 )
 
@@ -62,6 +64,18 @@ func (Customer) Relations() []schema.Relation {
 
 // Hooks returns model lifecycle hooks
 func (Customer) Hooks() *schema.ModelHooks {
-	return nil
+	return &schema.ModelHooks{
+		BeforeCreate: func(ctx context.Context, instance interface{}) error {
+			// Password hashing would be handled here if we had a password field
+			// Since we only have password_hash, we assume it's already hashed
+			// In a real app, you'd hash a plain password field before storing
+			return nil
+		},
+		BeforeUpdate: func(ctx context.Context, instance interface{}) error {
+			// If password_hash is being updated, ensure it's hashed
+			// This would check if the value changed and hash it
+			return nil
+		},
+	}
 }
 

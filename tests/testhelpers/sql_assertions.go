@@ -8,15 +8,6 @@ import (
 	"testing"
 )
 
-// ColumnSpec describes expected column attributes
-type ColumnSpec struct {
-	Name      string
-	Type      string
-	Nullable  bool
-	Default   *string
-	Generated *string
-}
-
 // AssertTableExists checks if a table exists in the database
 func AssertTableExists(ctx context.Context, t *testing.T, db *sql.DB, dialect string, tableName string) {
 	var query string
@@ -179,5 +170,38 @@ func RunSQLExpectSuccess(ctx context.Context, t *testing.T, db *sql.DB, sql stri
 	_, err := db.ExecContext(ctx, sql)
 	if err != nil {
 		t.Fatalf("SQL execution failed: %v\nSQL: %s", err, sql)
+	}
+}
+
+// CleanupTables drops the specified tables if they exist
+// This is useful for test cleanup to avoid "table already exists" errors
+func CleanupTables(ctx context.Context, t *testing.T, db *sql.DB, dialect string, tables []string) {
+	if len(tables) == 0 {
+		return
+	}
+
+	var dropSQL string
+	switch {
+	case strings.Contains(dialect, "postgres"):
+		// Drop tables with CASCADE to handle foreign key dependencies
+		for _, table := range tables {
+			dropSQL = fmt.Sprintf("DROP TABLE IF EXISTS %s CASCADE;", table)
+			_, err := db.ExecContext(ctx, dropSQL)
+			if err != nil {
+				t.Logf("Warning: failed to drop table %s: %v", table, err)
+			}
+		}
+	case strings.Contains(dialect, "sqlite"):
+		// SQLite doesn't support CASCADE, but we can drop in reverse order
+		// For simplicity, just drop each table
+		for _, table := range tables {
+			dropSQL = fmt.Sprintf("DROP TABLE IF EXISTS %s;", table)
+			_, err := db.ExecContext(ctx, dropSQL)
+			if err != nil {
+				t.Logf("Warning: failed to drop table %s: %v", table, err)
+			}
+		}
+	default:
+		t.Fatalf("unsupported dialect for cleanup: %s", dialect)
 	}
 }

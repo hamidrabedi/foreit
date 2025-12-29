@@ -8,7 +8,7 @@ import (
 
 	"github.com/forgego/forge/pkg/cli/cmd"
 	"github.com/forgego/forge/pkg/generator"
-	"github.com/forgego/forge/pkg/migrations"
+	"github.com/forgego/forge/pkg/migrate"
 	"github.com/spf13/cobra"
 )
 
@@ -113,7 +113,7 @@ func (c *ShowCommand) Execute(ctx *cmd.Context, args []string) error {
 	}
 
 	// Load previous state
-	state, err := migrations.LoadState(migrationsPath)
+	state, err := migrate.LoadState(migrationsPath)
 	if err != nil {
 		return fmt.Errorf("failed to load state: %w", err)
 	}
@@ -122,8 +122,7 @@ func (c *ShowCommand) Execute(ctx *cmd.Context, args []string) error {
 	previousDefs := state.ToModelDefinitions()
 
 	// Detect changes
-	detector := migrations.NewDetector()
-	changes, err := detector.DetectChanges(currentDefs, previousDefs)
+	changes, err := migrate.DetectChanges(currentDefs, previousDefs)
 	if err != nil {
 		return fmt.Errorf("failed to detect changes: %w", err)
 	}
@@ -135,7 +134,10 @@ func (c *ShowCommand) Execute(ctx *cmd.Context, args []string) error {
 
 	// Generate SQL preview
 	driver := ctx.Config.GetDriver()
-	sqlGen := migrations.NewSQLGenerator(driver)
+	sqlGen, err := migrate.NewSQLGenerator(driver)
+	if err != nil {
+		return fmt.Errorf("failed to create SQL generator: %w", err)
+	}
 
 	upSQL, err := sqlGen.GenerateUpSQL(changes)
 	if err != nil {

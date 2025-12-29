@@ -1,14 +1,14 @@
 package admin
 
 import (
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"reflect"
-	"strings"
 
-	httplib "github.com/forgego/forge/pkg/http"
+	"github.com/forgego/forge/pkg/query"
 )
 
 // ExportFormat represents an export format
@@ -19,135 +19,124 @@ const (
 	ExportFormatJSON ExportFormat = "json"
 )
 
-// handleExport handles export requests
-func handleExport(modelName string, model *AdminModel) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Check permission
-		if !canView(r, modelName) {
-			http.Error(w, "Permission denied", http.StatusForbidden)
-			return
-		}
+// ExportView handles data export
+type ExportView[T any] struct {
+	admin    *Admin[T]
+	format   ExportFormat
+	queryset query.QuerySet[T]
+}
 
-		format := ExportFormat(strings.ToLower(httplib.GetQueryString(r, "format", "csv")))
-		
-		ctx := r.Context()
-		manager, err := getManagerForModel(model)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to get manager: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		ops := NewManagerOps()
-		instances, err := ops.GetAllInstances(ctx, manager)
-		if err != nil {
-			http.Error(w, fmt.Sprintf("Failed to get instances: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		// Get list display fields
-		listDisplay := model.ListDisplay
-		if len(listDisplay) == 0 {
-			// Default: use all fields from first instance
-			if len(instances) > 0 {
-				instanceValue := reflect.ValueOf(instances[0])
-				if instanceValue.Kind() == reflect.Ptr {
-					instanceValue = instanceValue.Elem()
-				}
-				typ := instanceValue.Type()
-				for i := 0; i < typ.NumField(); i++ {
-					field := typ.Field(i)
-					if field.IsExported() {
-						listDisplay = append(listDisplay, field.Name)
-					}
-				}
-			}
-		}
-
-		switch format {
-		case ExportFormatCSV:
-			exportCSV(w, instances, listDisplay, model)
-		case ExportFormatJSON:
-			exportJSON(w, instances, listDisplay, model)
-		default:
-			http.Error(w, fmt.Sprintf("Unsupported export format: %s", format), http.StatusBadRequest)
-		}
+// NewExportView creates a new export view
+func NewExportView[T any](admin *Admin[T], format ExportFormat) *ExportView[T] {
+	return &ExportView[T]{
+		admin:  admin,
+		format: format,
 	}
 }
 
+// Export exports data in the specified format
+func (v *ExportView[T]) Export(ctx context.Context, w http.ResponseWriter) error {
+	// Get queryset
+	qs, err := v.admin.GetQueryset(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get queryset: %w", err)
+	}
+
+	// Get all objects (no pagination for export)
+	objects, err := qs.All(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get objects: %w", err)
+	}
+
+	// Get fields to export
+	fields := v.getExportFields()
+
+	// Export based on format
+	switch v.format {
+	case ExportFormatCSV:
+		return v.exportCSV(w, objects, fields)
+	case ExportFormatJSON:
+		return v.exportJSON(w, objects, fields)
+	default:
+		return fmt.Errorf("unsupported export format: %s", v.format)
+	}
+}
+
+// getExportFields returns fields to export
+func (v *ExportView[T]) getExportFields() []FieldExpr[T, interface{}] {
+	if len(v.admin.config.ListDisplay) > 0 {
+		return v.admin.config.ListDisplay
+	}
+	// Return empty - would need schema introspection
+	return []FieldExpr[T, interface{}]{}
+}
+
 // exportCSV exports data as CSV
-func exportCSV(w http.ResponseWriter, instances []interface{}, listDisplay []interface{}, model *AdminModel) {
+func (v *ExportView[T]) exportCSV(w http.ResponseWriter, objects []*T, fields []FieldExpr[T, interface{}]) error {
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.csv", model.Name))
-	
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.csv", v.admin.name))
+
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
 
 	// Write header
-	headers := make([]string, 0, len(listDisplay))
-	for _, field := range listDisplay {
-		if fieldName, ok := field.(string); ok {
-			headers = append(headers, fieldName)
-		}
+	headers := make([]string, len(fields))
+	for i, field := range fields {
+		headers[i] = field.Name()
 	}
 	if err := writer.Write(headers); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to write CSV header: %v", err), http.StatusInternalServerError)
-		return
+		return fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
 	// Write rows
-	for _, instance := range instances {
-		row := make([]string, 0, len(listDisplay))
-		instanceValue := reflect.ValueOf(instance)
-		if instanceValue.Kind() == reflect.Ptr {
-			instanceValue = instanceValue.Elem()
+	for _, obj := range objects {
+		row := make([]string, len(fields))
+		for i, field := range fields {
+			value := field.Get(obj)
+			row[i] = fmt.Sprintf("%v", value)
 		}
-
-		for _, field := range listDisplay {
-			if fieldName, ok := field.(string); ok {
-				fieldValue := instanceValue.FieldByName(fieldName)
-				var value string
-				if fieldValue.IsValid() && fieldValue.CanInterface() {
-					value = fmt.Sprintf("%v", fieldValue.Interface())
-				}
-				row = append(row, value)
-			}
-		}
-		
 		if err := writer.Write(row); err != nil {
-			http.Error(w, fmt.Sprintf("Failed to write CSV row: %v", err), http.StatusInternalServerError)
-			return
+			return fmt.Errorf("failed to write CSV row: %w", err)
 		}
 	}
+
+	return nil
 }
 
 // exportJSON exports data as JSON
-func exportJSON(w http.ResponseWriter, instances []interface{}, listDisplay []interface{}, model *AdminModel) {
+func (v *ExportView[T]) exportJSON(w http.ResponseWriter, objects []*T, fields []FieldExpr[T, interface{}]) error {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", model.Name))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.json", v.admin.name))
 
-	// Convert instances to maps
-	results := make([]map[string]interface{}, 0, len(instances))
-	for _, instance := range instances {
-		instanceValue := reflect.ValueOf(instance)
-		if instanceValue.Kind() == reflect.Ptr {
-			instanceValue = instanceValue.Elem()
+	// Convert objects to maps
+	results := make([]map[string]interface{}, len(objects))
+	for i, obj := range objects {
+		result := make(map[string]interface{})
+		for _, field := range fields {
+			value := field.Get(obj)
+			result[field.Name()] = value
 		}
-
-		obj := make(map[string]interface{})
-		for _, field := range listDisplay {
-			if fieldName, ok := field.(string); ok {
-				fieldValue := instanceValue.FieldByName(fieldName)
-				if fieldValue.IsValid() && fieldValue.CanInterface() {
-					obj[fieldName] = fieldValue.Interface()
-				}
-			}
-		}
-		results = append(results, obj)
+		results[i] = result
 	}
 
-	if err := json.NewEncoder(w).Encode(results); err != nil {
-		http.Error(w, fmt.Sprintf("Failed to encode JSON: %v", err), http.StatusInternalServerError)
-		return
-	}
+	return json.NewEncoder(w).Encode(results)
 }
 
+// GetFieldValue gets a field value from an object using reflection
+func GetFieldValue(obj interface{}, fieldName string) interface{} {
+	objValue := reflect.ValueOf(obj)
+	if objValue.Kind() == reflect.Ptr {
+		objValue = objValue.Elem()
+	}
+
+	fieldValue := objValue.FieldByName(fieldName)
+	if !fieldValue.IsValid() {
+		return nil
+	}
+
+	if fieldValue.CanInterface() {
+		return fieldValue.Interface()
+	}
+
+	return nil
+}

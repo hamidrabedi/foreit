@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/forgego/forge/pkg/cli/cmd"
-	"github.com/forgego/forge/pkg/migrations"
+	"github.com/forgego/forge/pkg/migrate/verify"
 	"github.com/spf13/cobra"
 )
 
@@ -40,7 +40,7 @@ func (c *LintCommand) Execute(ctx *cmd.Context, args []string) error {
 	}
 
 	// Create linter
-	linter := migrations.NewLinter()
+	linter := verify.NewLinter()
 
 	// Lint all migrations
 	results, err := linter.LintMigrationsDir(migrationsPath)
@@ -49,9 +49,9 @@ func (c *LintCommand) Execute(ctx *cmd.Context, args []string) error {
 	}
 
 	// Group results by level
-	errors := []migrations.LintResult{}
-	warnings := []migrations.LintResult{}
-	infos := []migrations.LintResult{}
+	errors := []verify.LintResult{}
+	warnings := []verify.LintResult{}
+	infos := []verify.LintResult{}
 
 	for _, result := range results {
 		switch result.Level {

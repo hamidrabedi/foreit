@@ -1,6 +1,9 @@
 package models
 
 import (
+	"context"
+	"reflect"
+
 	"github.com/forgego/forge/pkg/schema"
 )
 
@@ -89,7 +92,83 @@ func (Order) Relations() []schema.Relation {
 }
 
 // Hooks returns model lifecycle hooks
+// Note: These hooks use reflection to work before code generation.
+// After code generation, you can update them to use direct field access for better performance.
 func (Order) Hooks() *schema.ModelHooks {
-	return nil
+	return &schema.ModelHooks{
+		BeforeSave: func(ctx context.Context, instance interface{}) error {
+			// Calculate total from items if not set
+			// Uses reflection to work before/after code generation
+			val := reflect.ValueOf(instance).Elem()
+			
+			// Get total_amount field
+			totalAmountField := val.FieldByName("TotalAmount")
+			if !totalAmountField.IsValid() {
+				return nil // Field doesn't exist yet (before code generation)
+			}
+			
+			// Check if total is zero
+			if totalAmountField.MethodByName("IsZero").Call(nil)[0].Bool() {
+				// Calculate from subtotal + tax + shipping - discount
+				subtotal := val.FieldByName("Subtotal")
+				taxAmount := val.FieldByName("TaxAmount")
+				shippingAmount := val.FieldByName("ShippingAmount")
+				discountAmount := val.FieldByName("DiscountAmount")
+				
+				if subtotal.IsValid() {
+					// Use reflection to call Add/Sub methods on decimal.Decimal
+					total := reflect.ValueOf(subtotal.Interface())
+					if taxAmount.IsValid() {
+						total = total.MethodByName("Add").Call([]reflect.Value{taxAmount})[0]
+					}
+					if shippingAmount.IsValid() {
+						total = total.MethodByName("Add").Call([]reflect.Value{shippingAmount})[0]
+					}
+					if discountAmount.IsValid() {
+						total = total.MethodByName("Sub").Call([]reflect.Value{discountAmount})[0]
+					}
+					totalAmountField.Set(total)
+				}
+			}
+			
+			return nil
+		},
+		BeforeCreate: func(ctx context.Context, instance interface{}) error {
+			// Order number and placed_at are handled by field defaults (UUID and AutoNowAdd)
+			return nil
+		},
+		AfterCreate: func(ctx context.Context, instance interface{}) error {
+			// After order is created, we could send notifications, update customer stats, etc.
+			// This will be implemented after code generation when we can access related models
+			return nil
+		},
+		BeforeUpdate: func(ctx context.Context, instance interface{}) error {
+			// Recalculate totals if needed
+			val := reflect.ValueOf(instance).Elem()
+			totalAmountField := val.FieldByName("TotalAmount")
+			if !totalAmountField.IsValid() {
+				return nil
+			}
+			
+			if totalAmountField.MethodByName("IsZero").Call(nil)[0].Bool() {
+				subtotal := val.FieldByName("Subtotal")
+				if subtotal.IsValid() {
+					total := reflect.ValueOf(subtotal.Interface())
+					if taxAmount := val.FieldByName("TaxAmount"); taxAmount.IsValid() {
+						total = total.MethodByName("Add").Call([]reflect.Value{taxAmount})[0]
+					}
+					if shippingAmount := val.FieldByName("ShippingAmount"); shippingAmount.IsValid() {
+						total = total.MethodByName("Add").Call([]reflect.Value{shippingAmount})[0]
+					}
+					if discountAmount := val.FieldByName("DiscountAmount"); discountAmount.IsValid() {
+						total = total.MethodByName("Sub").Call([]reflect.Value{discountAmount})[0]
+					}
+					totalAmountField.Set(total)
+				}
+			}
+			
+			return nil
+		},
+	}
 }
 

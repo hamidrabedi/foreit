@@ -129,10 +129,6 @@ func (r *Resolver) topologicalSort(migrations map[string]*MigrationWithDeps) ([]
 	// Calculate in-degrees
 	for _, mig := range migrations {
 		for _, dep := range mig.Dependencies {
-			depKey := dep.Version
-			if dep.App != "" {
-				depKey = dep.App + ":" + dep.Version
-			}
 			// For same-app dependencies, just use version
 			if dep.App == "" {
 				if _, exists := migrations[dep.Version]; exists {

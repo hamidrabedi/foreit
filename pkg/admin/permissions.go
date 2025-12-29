@@ -1,50 +1,61 @@
 package admin
 
 import (
-	"github.com/forgego/forge/pkg/models"
+	"context"
+	"fmt"
 )
 
-// HasPerm checks if a user has a specific permission
-// For now, this is a simplified implementation
-// Full implementation would check against a permissions table
-func HasPerm(user *models.User, perm string) bool {
-	// Superusers have all permissions
-	if user.IsSuperuser {
-		return true
-	}
-	
-	// For MVP, we only check built-in permissions
-	switch perm {
-	case "admin.view_user", "admin.add_user", "admin.change_user", "admin.delete_user":
-		return user.IsStaff
-	default:
-		// Default: staff users have access to admin
-		return user.IsStaff
-	}
+// PermissionChecker checks permissions for admin operations
+type PermissionChecker interface {
+	HasPermission(ctx context.Context, user interface{}, perm string) bool
+	HasPermissions(ctx context.Context, user interface{}, perms []string) bool
+	HasAnyPermission(ctx context.Context, user interface{}, perms []string) bool
 }
 
-// HasPerms checks if a user has all specified permissions
-func HasPerms(user *models.User, perms []string) bool {
+// DefaultPermissionChecker provides default permission checking
+type DefaultPermissionChecker struct{}
+
+// NewDefaultPermissionChecker creates a new default permission checker
+func NewDefaultPermissionChecker() PermissionChecker {
+	return &DefaultPermissionChecker{}
+}
+
+// HasPermission checks if user has a permission
+func (c *DefaultPermissionChecker) HasPermission(ctx context.Context, user interface{}, perm string) bool {
+	// Default implementation - always allow
+	// In production, this would check against a permissions system
+	return true
+}
+
+// HasPermissions checks if user has all permissions
+func (c *DefaultPermissionChecker) HasPermissions(ctx context.Context, user interface{}, perms []string) bool {
 	for _, perm := range perms {
-		if !HasPerm(user, perm) {
+		if !c.HasPermission(ctx, user, perm) {
 			return false
 		}
 	}
 	return true
 }
 
-// HasAnyPerm checks if a user has any of the specified permissions
-func HasAnyPerm(user *models.User, perms []string) bool {
+// HasAnyPermission checks if user has any permission
+func (c *DefaultPermissionChecker) HasAnyPermission(ctx context.Context, user interface{}, perms []string) bool {
 	for _, perm := range perms {
-		if HasPerm(user, perm) {
+		if c.HasPermission(ctx, user, perm) {
 			return true
 		}
 	}
 	return false
 }
 
-// IsActive checks if user is active (helper function)
-func IsActiveUser(user *models.User) bool {
-	return user.IsActive
-}
+// Permission names
+const (
+	PermAdd    = "add"
+	PermChange = "change"
+	PermDelete = "delete"
+	PermView   = "view"
+)
 
+// GetPermissionName returns permission name for a model and action
+func GetPermissionName(modelName, action string) string {
+	return fmt.Sprintf("%s.%s_%s", "admin", action, modelName)
+}

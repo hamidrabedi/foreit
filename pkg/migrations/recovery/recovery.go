@@ -68,9 +68,13 @@ func (r *Recovery) GetRecoverySteps(version string, errorMsg string) []string {
 func (r *Recovery) RollbackPartialMigration(ctx context.Context, version string, downSQL string) error {
 	// This would attempt to execute the down migration
 	// For now, return instructions
-	return fmt.Errorf("partial migration detected - manual rollback required:\n" +
-		"1. Review the down migration SQL for version " + version + "\n" +
-		"2. Execute the down migration manually\n" +
-		"3. Mark migration as clean in schema_migrations table")
+	// TODO: Implement automatic partial rollback by:
+	// 1. Detecting which statements were successfully executed
+	// 2. Executing only the corresponding down statements
+	// 3. Handling transaction boundaries correctly
+	return fmt.Errorf("partial migration detected - manual rollback required:\n"+
+		"1. Review the down migration SQL for version %s\n"+
+		"2. Execute the down migration manually\n"+
+		"3. Mark migration as clean in schema_migrations table", version)
 }
 

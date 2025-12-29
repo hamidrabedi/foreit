@@ -1,12 +1,15 @@
 package {{.AppName}}
 
 import (
-	"github.com/forgego/forge/pkg/admin"
+	// adminv2 "github.com/forgego/forge/pkg/admin"
+	// "github.com/forgego/forge/pkg/query"
 )
 
 func init() {
-	// Auto-register models for admin interface
+	// Auto-register models for admin interface (using v2 admin system)
 	// Example:
-	// admin.RegisterModel(&YourModel{})
+	// manager := &query.Manager[*YourModel]{}
+	// config := &adminv2.Config[*YourModel]{}
+	// adminv2.Register(&YourModel{}, manager, config)
 }
 

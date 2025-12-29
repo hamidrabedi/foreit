@@ -6,7 +6,7 @@ forge uses a custom SQL builder that generates safe SQL queries with proper esca
 
 ## Architecture
 
-The SQL builder is located in `internal/query/sql_builder.go` and provides:
+The SQL builder is located in `pkg/query/sql_builder.go` and provides:
 
 - **Identifier Escaping**: All table and column names are properly escaped to prevent SQL injection
 - **Parameter Binding**: All values use PostgreSQL-style parameter placeholders (`$1`, `$2`, etc.)

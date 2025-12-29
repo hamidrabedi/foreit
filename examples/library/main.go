@@ -57,6 +57,12 @@ func main() {
 		}
 	})
 
+	// Run query examples if database is available
+	if database != nil {
+		fmt.Println("\n=== Running Query Examples ===")
+		RunQueryExamples(database)
+	}
+
 	// Start server
 	fmt.Printf("Starting server on %s:%s\n", settings.Server.Host, settings.Server.Port)
 	fmt.Printf("Admin interface available at http://%s:%s%s\n", settings.Server.Host, settings.Server.Port, settings.Admin.Path)

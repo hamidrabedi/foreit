@@ -40,7 +40,7 @@ make lint
 make lint-fix
 
 # Or directly
-golangci-lint run ./internal/...
+golangci-lint run ./pkg/...
 ```
 
 ### 2. go vet
@@ -52,7 +52,7 @@ golangci-lint run ./internal/...
 ```bash
 make vet
 # Or
-go vet ./internal/...
+go vet ./pkg/...
 ```
 
 ### 3. gosec
@@ -70,7 +70,7 @@ go install github.com/securego/gosec/v2/cmd/gosec@latest
 ```bash
 make sec
 # Or
-gosec ./internal/...
+gosec ./pkg/...
 ```
 
 ### 4. staticcheck
@@ -88,7 +88,7 @@ go install honnef.co/go/tools/cmd/staticcheck@latest
 ```bash
 make staticcheck
 # Or
-staticcheck ./internal/...
+staticcheck ./pkg/...
 ```
 
 ## Makefile Commands
@@ -228,13 +228,13 @@ jobs:
           curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s latest
       - name: Run golangci-lint
         run: |
-          ./bin/golangci-lint run ./internal/...
+          ./bin/golangci-lint run ./pkg/...
       - name: Run go vet
-        run: go vet ./internal/...
+        run: go vet ./pkg/...
       - name: Run gosec
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec ./internal/...
+          gosec ./pkg/...
 ```
 
 ## Best Practices

@@ -149,9 +149,9 @@ package models
 import (
     "context"
     
-    "github.com/forgego/forge/internal/schema"
-    "github.com/forgego/forge/internal/schema/fields"
-    "github.com/forgego/forge/internal/schema/relations"
+    "github.com/forgego/forge/pkg/schema"
+    "github.com/forgego/forge/pkg/schema/fields"
+    "github.com/forgego/forge/pkg/schema/relations"
 )
 
 type User struct {
@@ -242,8 +242,8 @@ import (
     "context"
     
     "myproject/models"
-    "github.com/forgego/forge/internal/db"
-    "github.com/forgego/forge/internal/config"
+    "github.com/forgego/forge/pkg/db"
+    "github.com/forgego/forge/pkg/config"
 )
 
 func main() {
@@ -282,7 +282,7 @@ func main() {
 ### Step 6: Register Admin
 
 ```go
-import "github.com/forgego/forge/internal/admin"
+import "github.com/forgego/forge/pkg/admin"
 
 func init() {
     admin.RegisterModel(&models.User{})

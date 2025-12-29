@@ -57,7 +57,7 @@ Edit `models/example.go` or create new model files. Here's a complete example:
 package models
 
 import (
-	"github.com/forgego/forge/internal/schema"
+	"github.com/forgego/forge/pkg/schema"
 )
 
 // Post represents a blog post
@@ -124,12 +124,12 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/forgego/forge/internal/admin"
-	"github.com/forgego/forge/internal/config"
-	"github.com/forgego/forge/internal/db"
-	"github.com/forgego/forge/internal/logging"
-	httplib "github.com/forgego/forge/internal/http"
-	"github.com/forgego/forge/internal/registry"
+	"github.com/forgego/forge/pkg/admin"
+	"github.com/forgego/forge/pkg/config"
+	"github.com/forgego/forge/pkg/db"
+	"github.com/forgego/forge/pkg/logging"
+	httplib "github.com/forgego/forge/pkg/http"
+	"github.com/forgego/forge/pkg/registry"
 	"your-module/models"
 )
 

@@ -16,21 +16,25 @@ import (
 
 // TestMigrationUpDown tests that migrations can be applied and rolled back
 func TestMigrationUpDown(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 
@@ -83,8 +87,8 @@ func TestMigrationUpDown(t *testing.T) {
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "users")
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "posts")
 
-	// Verify migration state
-	testhelpers.AssertMigrationState(ctx, t, database, migrationsDir, 2, false)
+	// Verify migration state using the existing runner
+	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 2, false, runner)
 
 	// Rollback one migration
 	err = runner.Rollback(ctx)
@@ -101,8 +105,8 @@ func TestMigrationUpDown(t *testing.T) {
 	// Verify users table still exists
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "users")
 
-	// Verify migration state
-	testhelpers.AssertMigrationState(ctx, t, database, migrationsDir, 1, false)
+	// Verify migration state using the existing runner
+	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner)
 
 	// Rollback again
 	err = runner.Rollback(ctx)
@@ -115,27 +119,32 @@ func TestMigrationUpDown(t *testing.T) {
 	`).Scan(&exists)
 	require.Error(t, err, "users table should not exist after rollback")
 
-	// Verify migration state
-	testhelpers.AssertMigrationState(ctx, t, database, migrationsDir, 0, false)
+	// Verify migration state using the existing runner
+	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 0, false, runner)
 }
 
 // TestMigrationRollbackSequence tests rolling back multiple migrations in sequence
 func TestMigrationRollbackSequence(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 
@@ -191,11 +200,11 @@ func TestMigrationRollbackSequence(t *testing.T) {
 		testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", mig.table)
 	}
 
-	// Verify migration state
-	testhelpers.AssertMigrationState(ctx, t, database, migrationsDir, 3, false)
+	// Verify migration state using the existing runner
+	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 3, false, runner)
 
-	// Rollback all migrations
-	err = testhelpers.RollbackMigrationSequence(ctx, t, database, migrationsDir, 3)
+	// Rollback all migrations using the existing runner
+	err = testhelpers.RollbackMigrationSequence(ctx, t, database, migrationsDir, 3, runner)
 	require.NoError(t, err)
 
 	// Verify all tables are gone
@@ -214,21 +223,26 @@ func TestMigrationRollbackSequence(t *testing.T) {
 
 // TestMigrationReapplyAfterRollback tests reapplying migrations after rollback
 func TestMigrationReapplyAfterRollback(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 
@@ -289,21 +303,26 @@ func TestMigrationReapplyAfterRollback(t *testing.T) {
 
 // TestMigrationDownWithData tests rolling back migrations that have data
 func TestMigrationDownWithData(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 
@@ -358,21 +377,26 @@ func TestMigrationDownWithData(t *testing.T) {
 
 // TestMigrationPartialRollback tests rolling back to a specific version
 func TestMigrationPartialRollback(t *testing.T) {
-	if os.Getenv("DATABASE_URL") == "" && os.Getenv("RUN_POSTGRES_TESTS") == "" {
-		t.Skip("Postgres not available, skipping test")
-	}
-
+	// Using localhost PostgreSQL
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := testhelpers.DefaultPostgresOpts()
+	opts := testhelpers.PostgresOpts{
+		UseDirect: true,
+		Host:      "localhost",
+		Port:      "5432",
+		User:      "postgres",
+		Password:  "123",
+		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
+	}
 	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
-	// Create a temporary directory for migrations
-	tempDir := t.TempDir()
+	// Create a temporary directory for migrations under tests/tmp (returns relative path)
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
+	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
 

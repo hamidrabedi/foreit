@@ -34,8 +34,8 @@ func ValidateForm[T any](admin *Admin[T], instance *T, formData FormData, isNew 
 	return errors
 }
 
-// getFieldName extracts field name from FormField
-func getFieldName[T any](field FormField[T]) string {
+// getFieldNameFromFormField extracts field name from FormField
+func getFieldNameFromFormField[T any](field FormField[T]) string {
 	// Access expr field using reflection
 	val := reflect.ValueOf(field)
 	exprField := val.FieldByName("expr")
@@ -49,7 +49,7 @@ func getFieldName[T any](field FormField[T]) string {
 
 // isFieldRequired checks if field is required
 func isFieldRequired[T any](field FormField[T]) bool {
-	return field.required
+	return field.IsRequired()
 }
 
 // validateFieldValue validates a field value

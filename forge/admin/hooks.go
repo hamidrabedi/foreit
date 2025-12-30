@@ -3,11 +3,9 @@ package admin
 import (
 	"context"
 	"net/http"
-
-	query "github.com/forgego/forge/orm"
 )
 
-// ViewHooks provides hooks for customizing admin views
+// ViewHooks provides hooks for customizing admin views in the new admincore system
 type ViewHooks[T any] struct {
 	admin *Admin[T]
 }
@@ -20,13 +18,16 @@ func NewViewHooks[T any](admin *Admin[T]) *ViewHooks[T] {
 }
 
 // ChangelistViewHook allows customizing the changelist (list) view
-type ChangelistViewHook[T any] func(ctx context.Context, admin *Admin[T], request *http.Request) (*ListView[T], error)
+// Returns interface{} to avoid import cycle - will be cast to *views.ListView[T] in handlers
+type ChangelistViewHook[T any] func(ctx context.Context, admin *Admin[T], request *http.Request) (interface{}, error)
 
 // ChangeViewHook allows customizing the change (edit) view
-type ChangeViewHook[T any] func(ctx context.Context, admin *Admin[T], obj *T, request *http.Request) (*FormView[T], error)
+// Returns interface{} to avoid import cycle - will be cast to *views.FormView[T] in handlers
+type ChangeViewHook[T any] func(ctx context.Context, admin *Admin[T], obj *T, request *http.Request) (interface{}, error)
 
 // AddViewHook allows customizing the add (create) view
-type AddViewHook[T any] func(ctx context.Context, admin *Admin[T], request *http.Request) (*FormView[T], error)
+// Returns interface{} to avoid import cycle - will be cast to *views.FormView[T] in handlers
+type AddViewHook[T any] func(ctx context.Context, admin *Admin[T], request *http.Request) (interface{}, error)
 
 // DeleteViewHook allows customizing the delete view
 type DeleteViewHook[T any] func(ctx context.Context, admin *Admin[T], obj *T, request *http.Request) error
@@ -43,25 +44,6 @@ type ResponseChangeHook[T any] func(ctx context.Context, admin *Admin[T], obj *T
 // ResponseDeleteHook allows customizing response after delete
 type ResponseDeleteHook[T any] func(ctx context.Context, admin *Admin[T], obj *T, request *http.Request, response http.ResponseWriter) error
 
-// MessageUser sends a message to the user
-func MessageUser(ctx context.Context, message string, level MessageLevel) {
-	// In a real implementation, this would store messages in the session/flash
-	// For now, it's a placeholder
-	_ = ctx
-	_ = message
-	_ = level
-}
-
-// MessageLevel represents the level of a message
-type MessageLevel string
-
-const (
-	MessageSuccess MessageLevel = "success"
-	MessageInfo    MessageLevel = "info"
-	MessageWarning MessageLevel = "warning"
-	MessageError   MessageLevel = "error"
-)
-
 // GetURLsHook allows adding custom URLs to admin
 type GetURLsHook[T any] func(admin *Admin[T]) []URLPattern
 
@@ -72,5 +54,12 @@ type URLPattern struct {
 	Name    string
 }
 
-// GetQuerysetHook allows customizing the base queryset
-type GetQuerysetHook[T any] func(ctx context.Context, admin *Admin[T], qs query.QuerySet[T]) (query.QuerySet[T], error)
+// LogEntry represents a change history entry
+type LogEntry struct {
+	ID        int64
+	ObjectID  int64
+	Action    string
+	UserID    int64
+	Timestamp int64
+	Changes   map[string]interface{}
+}

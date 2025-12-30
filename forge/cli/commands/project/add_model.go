@@ -323,25 +323,24 @@ func registerModelInAdmin(adminPath, appName, modelName string) error {
 	}
 
 		// Check if model is already registered
-	registration := fmt.Sprintf("adminv2.Register(&%s{}, manager, config)", modelName)
-	if strings.Contains(string(content), registration) {
-		return nil // Already registered
+	registrationComment := fmt.Sprintf("// Register %s model for admin\n\t// schemaInstance := &%sSchema{}\n\t// manager := orm.NewManager[%s](db)\n\t// config := &admin.Config[%s]{...}\n\t// admin.Register(schemaInstance, manager, config)", modelName, modelName, modelName, modelName)
+	if strings.Contains(string(content), modelName+"Schema") || strings.Contains(string(content), "Register") {
+		return nil // Already registered or has registration pattern
 	}
 
 	// Find the init function and add registration
 	contentStr := string(content)
-	if !strings.Contains(contentStr, registration) {
+	if !strings.Contains(contentStr, registrationComment) {
 		// Add import if needed
 		if !strings.Contains(contentStr, "github.com/forgego/forge/admin") {
 			// This is a simplified version - in production, use AST parsing
 		}
 
 		// Add registration in init function
-		// Format: adminv2.Register(&ModelName{}, manager, config)
-		// Note: manager and config need to be set up separately
+		// Format: Comment with example registration code
 		newContent := strings.Replace(contentStr,
 			"func init() {",
-			fmt.Sprintf("func init() {\n\t// %s", registration),
+			fmt.Sprintf("func init() {\n\t%s", registrationComment),
 			1)
 
 		return os.WriteFile(adminPath, []byte(newContent), 0644)

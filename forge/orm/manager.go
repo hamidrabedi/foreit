@@ -167,6 +167,95 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	return nil
 }
 
+// BulkCreate creates multiple model instances efficiently using a single INSERT statement
+func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
+	if m.db == nil {
+		return errors.NewNotImplementedError("Manager.BulkCreate() - database connection not set")
+	}
+
+	if len(instances) == 0 {
+		return nil
+	}
+
+	// Run BeforeCreate hooks for all instances
+	for _, instance := range instances {
+		if hookable, ok := any(instance).(interface{ BeforeCreate(context.Context) error }); ok {
+			if err := hookable.BeforeCreate(ctx); err != nil {
+				return fmt.Errorf("BeforeCreate hook failed: %w", err)
+			}
+		}
+
+		// Run BeforeSave hook
+		if hookable, ok := any(instance).(interface{ BeforeSave(context.Context) error }); ok {
+			if err := hookable.BeforeSave(ctx); err != nil {
+				return fmt.Errorf("BeforeSave hook failed: %w", err)
+			}
+		}
+
+		// Validate instance
+		if validatable, ok := any(instance).(interface{ Clean() error }); ok {
+			if err := validatable.Clean(); err != nil {
+				return fmt.Errorf("validation failed: %w", err)
+			}
+		}
+	}
+
+	// Convert []*T to []interface{} for BuildBulkInsertSQL
+	instancesInterface := make([]interface{}, len(instances))
+	for i, instance := range instances {
+		instancesInterface[i] = instance
+	}
+
+	// Build bulk INSERT SQL
+	sql, args, _, err := BuildBulkInsertSQL(instancesInterface, m.tableName)
+	if err != nil {
+		return fmt.Errorf("failed to build bulk insert SQL: %w", err)
+	}
+
+	// Execute bulk INSERT and get generated IDs
+	ids, err := ExecuteBulkInsert(ctx, m.db, sql, args)
+	if err != nil {
+		return err
+	}
+
+	// Set IDs on instances
+	for i, instance := range instances {
+		if i < len(ids) {
+			if modelWithID, ok := any(instance).(ModelWithID); ok {
+				modelWithID.SetID(ids[i])
+			} else {
+				// Fallback to reflection
+				instanceValue := reflect.ValueOf(instance).Elem()
+				idField := instanceValue.FieldByName("ID")
+				if !idField.IsValid() {
+					idField = instanceValue.FieldByName("id")
+				}
+				if idField.IsValid() && idField.CanSet() {
+					idField.SetInt(ids[i])
+				}
+			}
+		}
+	}
+
+	// Run AfterCreate hooks for all instances
+	for _, instance := range instances {
+		if hookable, ok := any(instance).(interface{ AfterCreate(context.Context) error }); ok {
+			if err := hookable.AfterCreate(ctx); err != nil {
+				return fmt.Errorf("AfterCreate hook failed: %w", err)
+			}
+		}
+
+		// Run AfterSave hook
+		if hookable, ok := any(instance).(interface{ AfterSave(context.Context) error }); ok {
+			if err := hookable.AfterSave(ctx); err != nil {
+				return fmt.Errorf("AfterSave hook failed: %w", err)
+			}
+		}
+	}
+
+	return nil
+}
+
 // Update updates an existing model instance
 func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 	if m.db == nil {

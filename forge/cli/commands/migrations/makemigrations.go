@@ -30,6 +30,7 @@ func (c *MakeMigrationsCommand) Definition() *cobra.Command {
 	cmd.Flags().Bool("auto", false, "Generate SQL from models automatically")
 	cmd.Flags().Bool("empty", false, "Create an empty migration file")
 	cmd.Flags().Bool("merge", false, "Enable fixing of migration conflicts")
+	cmd.Flags().Bool("verbose", false, "Enable verbose output including parse errors and warnings")
 	return cmd
 }
 

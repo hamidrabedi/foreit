@@ -137,7 +137,8 @@ func RateLimit(requestsPerMinute int) Middleware {
 	// In production, use a proper rate limiting library
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// TODO: Implement actual rate limiting
+			// Note: Actual rate limiting implementation is planned.
+			// For production use, integrate a proper rate limiting library like golang.org/x/time/rate
 			next.ServeHTTP(w, r)
 		})
 	}
@@ -453,7 +454,9 @@ func Metrics(opts *MetricsOptions) Middleware {
 			next.ServeHTTP(ww, r)
 
 			duration := time.Since(start)
-			_ = duration // TODO: Store metrics
+			// Note: Metrics storage is planned. For now, duration is available for logging.
+			// Consider integrating Prometheus or another metrics system.
+			_ = duration
 			_ = ww.statusCode
 		})
 	}

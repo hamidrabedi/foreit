@@ -8,6 +8,7 @@ import (
 
 	"github.com/forgego/forge/cli/core"
 	"github.com/forgego/forge/codegen"
+	dbstate "github.com/forgego/forge/db/migrate/state"
 	"github.com/forgego/forge/migrate"
 	"github.com/spf13/cobra"
 )
@@ -30,6 +31,7 @@ func (c *ShowCommand) Definition() *cobra.Command {
 	cmd.Flags().String("path", "./migrations", "Path to migrations directory")
 	cmd.Flags().String("models", "./models", "Directory containing model definitions")
 	cmd.Flags().Bool("sql", false, "Show raw SQL (for specific migration, shows both up and down)")
+	cmd.Flags().Bool("verbose", false, "Enable verbose output including parse errors")
 	return cmd
 }
 
@@ -112,10 +114,36 @@ func (c *ShowCommand) Execute(ctx *core.Context, args []string) error {
 		return nil
 	}
 
+	// Get verbose flag
+	verbose, _ := ctx.Cmd.Flags().GetBool("verbose")
+
 	// Load previous state
 	state, err := migrate.LoadState(migrationsPath)
 	if err != nil {
 		return fmt.Errorf("failed to load state: %w", err)
+	}
+
+	// If verbose, also show parse errors from state loader
+	if verbose {
+		loader := dbstate.NewFileStateLoaderWithOptions(migrationsPath, dbstate.LoaderOptions{Verbose: true})
+		_, loadErr := loader.Load()
+		if loadErr == nil {
+			// Show parse errors if any
+			if fileLoader, ok := loader.(*dbstate.FileStateLoader); ok {
+				parseErrors := fileLoader.GetParseErrors()
+				if len(parseErrors) > 0 {
+					fmt.Println("⚠️  Parse Warnings:")
+					for _, perr := range parseErrors {
+						fmt.Printf("  %s", perr.File)
+						if perr.Line > 0 {
+							fmt.Printf(":%d", perr.Line)
+						}
+						fmt.Printf(": %s\n", perr.Message)
+					}
+					fmt.Println()
+				}
+			}
+		}
 	}
 
 	// Convert state to model definitions

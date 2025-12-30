@@ -22,14 +22,25 @@ Migrations are version-controlled database schema changes. They allow you to:
 Generate migrations from your model definitions:
 
 ```bash
-forge makemigrations
+forge makemigrations <name> --auto
 ```
 
 This will:
 1. Scan your models directory
 2. Compare current models with database state
-3. Generate migration files for any changes
-4. Save migrations to `migrations/` directory
+3. **Automatically detect dependencies** from foreign keys and table references
+4. Generate migration files for any changes
+5. Save migrations to `migrations/` directory
+
+### Verbose Mode
+
+Use `--verbose` to see detailed information about parse errors and warnings:
+
+```bash
+forge makemigrations <name> --auto --verbose
+```
+
+This helps debug issues with migration parsing and state loading.
 
 ### Migration Files
 
@@ -47,6 +58,27 @@ migrations/
 Each migration has:
 - **Up migration** (`.up.sql`) - Applies the change
 - **Down migration** (`.down.sql`) - Reverts the change
+
+### Dependency Auto-Detection
+
+The migration system automatically detects dependencies between migrations:
+
+```sql
+-- Auto-detected dependencies:
+-- DEPENDS: 000001
+
+CREATE TABLE posts (
+    id BIGSERIAL PRIMARY KEY,
+    author_id BIGINT NOT NULL,
+    FOREIGN KEY (author_id) REFERENCES users(id)
+);
+```
+
+Dependencies are automatically detected from:
+- Foreign key relationships in model definitions
+- Table references in SQL (REFERENCES, ALTER TABLE, etc.)
+
+The system validates that all dependencies exist before generating migrations.
 
 ## Applying Migrations
 
@@ -81,6 +113,70 @@ forge migrate status
 ```
 
 Shows which migrations have been applied.
+
+### Show Migration Plan
+
+Preview what migration would be generated:
+
+```bash
+forge migrate show
+```
+
+Shows the migration plan that would be generated from current models. Use `--sql` to see the full SQL, or `--verbose` to see parse warnings.
+
+### Lint Migrations
+
+Check migration files for common issues:
+
+```bash
+forge migrate lint
+```
+
+Use `--verbose` to also see parse errors from the state loader:
+
+```bash
+forge migrate lint --verbose
+```
+
+### Fake Migrations
+
+Mark migrations as applied without running them. Useful when:
+- Migrating an existing database
+- Marking initial migrations that already exist in the database
+- Marking all pending migrations as applied
+
+#### Fake Initial Migrations
+
+If you have an existing database with tables, mark the initial migrations that created those tables:
+
+```bash
+forge migrate fake --fake-initial
+```
+
+This will:
+1. Query the database for existing tables
+2. Find migrations that create those tables
+3. Mark them as applied without running them
+
+#### Mark All Pending as Applied
+
+Mark all pending migrations as applied:
+
+```bash
+forge migrate fake
+```
+
+This marks all migrations with versions greater than the current version as applied. A confirmation prompt appears if more than 5 migrations would be faked.
+
+#### Fake Specific Migration
+
+Mark a specific migration version as applied:
+
+```bash
+forge migrate fake <version>
+```
+
+**Warning:** Use fake commands with caution. Only use when you're certain the migration has already been applied or when you want to skip it.
 
 ## Migration Examples
 
@@ -274,6 +370,23 @@ forge migrate status
 forge migrate force 5
 ```
 
+### Parse Errors
+
+If you see parse errors or warnings:
+
+```bash
+# Use verbose mode to see detailed parse errors
+forge migrate show --verbose
+forge migrate lint --verbose
+```
+
+The migration system uses a robust three-pass retry mechanism to handle:
+- Out-of-order CREATE TABLE statements
+- Foreign key constraints referencing tables not yet created
+- Indexes created before their tables
+
+Parse errors are collected and can be viewed with verbose mode.
+
 ## Advanced Topics
 
 ### Custom Migration SQL
@@ -291,6 +404,47 @@ BEGIN
     END IF;
 END $$;
 ```
+
+### Migration Dependencies
+
+Dependencies are automatically detected, but you can also specify them manually:
+
+```sql
+-- DEPENDS: 000001
+-- DEPENDS: 000002
+
+CREATE TABLE posts (
+    -- ...
+);
+```
+
+For cross-application dependencies:
+
+```sql
+-- DEPENDS: app_name:000001
+
+CREATE TABLE shared_table (
+    -- ...
+);
+```
+
+### State Loading Improvements
+
+The migration system includes improved state loading:
+
+- **Three-pass retry mechanism**: Handles out-of-order migrations gracefully
+- **Table context tracking**: Automatically infers table names for indexes
+- **Parse error collection**: Collects and reports parse errors without failing
+- **Verbose logging**: Optional detailed logging for debugging
+
+### Parser Improvements
+
+The SQL parser includes:
+
+- **Two-pass parsing**: Processes CREATE TABLE statements first, then constraints
+- **Better error handling**: Fails softly with UnknownChange for unparseable statements
+- **Table context inference**: Tracks table context for DROP INDEX and CREATE INDEX
+- **Verbose mode**: Logs UnknownChange statements and parse errors
 
 ### Migration Hooks
 

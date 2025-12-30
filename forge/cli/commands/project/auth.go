@@ -104,16 +104,25 @@ func (User) Hooks() *schema.ModelHooks {
 	adminCode := `package auth
 
 import (
-	adminv2 "github.com/forgego/forge/admin"
+	admincore "github.com/forgego/forge/admin"
 	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/schema"
 )
 
 func init() {
 	// Register User model for admin
 	// After code generation, uncomment and use:
-	// manager := &query.Manager[*User]{}
-	// config := &adminv2.Config[*User]{}
-	// adminv2.Register(&User{}, manager, config)
+	// schemaInstance := &UserSchema{} // Your schema implementation
+	// manager := orm.NewManager[*User](db) // Your ORM manager
+	// config := &admin.Config[*User]{
+	//     VerboseName:       "User",
+	//     VerboseNamePlural: "Users",
+	//     ListPerPage:       20,
+	// }
+	// admin, err := admin.Register(schemaInstance, manager, config)
+	// if err != nil {
+	//     log.Fatal(err)
+	// }
 }
 `
 

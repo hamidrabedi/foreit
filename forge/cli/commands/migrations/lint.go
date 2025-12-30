@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/forgego/forge/cli/core"
+	"github.com/forgego/forge/db/migrate/state"
 	"github.com/forgego/forge/migrate/verify"
 	"github.com/spf13/cobra"
 )
@@ -25,6 +26,7 @@ func (c *LintCommand) Definition() *cobra.Command {
 		Long:  "Check migration files for common issues and best practices",
 	}
 	cmd.Flags().String("path", "./migrations", "Path to migrations directory")
+	cmd.Flags().Bool("verbose", false, "Enable verbose output including parse errors")
 	return cmd
 }
 
@@ -39,6 +41,9 @@ func (c *LintCommand) Execute(ctx *core.Context, args []string) error {
 		migrationsPath = "./migrations"
 	}
 
+	// Get verbose flag
+	verbose, _ := ctx.Cmd.Flags().GetBool("verbose")
+
 	// Create linter
 	linter := verify.NewLinter()
 
@@ -46,6 +51,30 @@ func (c *LintCommand) Execute(ctx *core.Context, args []string) error {
 	results, err := linter.LintMigrationsDir(migrationsPath)
 	if err != nil {
 		return fmt.Errorf("failed to lint migrations: %w", err)
+	}
+
+	// If verbose, also show parse errors from state loader
+	if verbose {
+		// Load state with verbose mode to get parse errors
+		loader := state.NewFileStateLoaderWithOptions(migrationsPath, state.LoaderOptions{Verbose: true})
+		_, err := loader.Load()
+		if err == nil {
+			// Get parse errors if available
+			if fileLoader, ok := loader.(*state.FileStateLoader); ok {
+				parseErrors := fileLoader.GetParseErrors()
+				if len(parseErrors) > 0 {
+					fmt.Println("\n📋 Parse Errors (from state loader):")
+					for _, perr := range parseErrors {
+						fmt.Printf("  %s", perr.File)
+						if perr.Line > 0 {
+							fmt.Printf(":%d", perr.Line)
+						}
+						fmt.Printf(": %s\n", perr.Message)
+					}
+					fmt.Println()
+				}
+			}
+		}
 	}
 
 	// Group results by level

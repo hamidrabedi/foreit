@@ -1,0 +1,110 @@
+{{define "form"}}
+<div class="admin-form-view">
+    <div class="admin-form-header">
+        <h2 class="admin-form-title">
+            {{if .IsNew}}
+                Add {{.ModelName}}
+            {{else}}
+                Change {{.ModelName}}
+            {{end}}
+        </h2>
+    </div>
+
+    {{if .Errors}}
+        <div class="admin-form-errors">
+            <ul class="error-list">
+                {{range .Errors}}
+                    <li class="error-item">{{.}}</li>
+                {{end}}
+            </ul>
+        </div>
+    {{end}}
+
+    <form method="post" class="admin-form" enctype="multipart/form-data">
+        {{.CSRFToken}}
+
+        {{if .Fieldsets}}
+            {{range .Fieldsets}}
+                <fieldset class="form-fieldset {{if .Collapsed}}collapsed{{end}}">
+                    {{if .Name}}
+                        <legend class="fieldset-legend">
+                            {{.Name}}
+                            {{if .Collapsed}}
+                                <button type="button" class="toggle-fieldset">Expand</button>
+                            {{end}}
+                        </legend>
+                    {{end}}
+                    {{if .Description}}
+                        <p class="fieldset-description">{{.Description}}</p>
+                    {{end}}
+
+                    <div class="fieldset-fields">
+                        {{range .Fields}}
+                            <div class="form-field {{if .Errors}}has-error{{end}}">
+                                <label for="id_{{.Name}}" class="form-label">
+                                    {{.Label}}
+                                    {{if .Required}}<span class="required">*</span>{{end}}
+                                </label>
+                                <div class="form-widget">
+                                    {{.Widget}}
+                                </div>
+                                {{if .HelpText}}
+                                    <p class="form-help">{{.HelpText}}</p>
+                                {{end}}
+                                {{if .Errors}}
+                                    <ul class="field-errors">
+                                        {{range .Errors}}
+                                            <li class="field-error">{{.}}</li>
+                                        {{end}}
+                                    </ul>
+                                {{end}}
+                            </div>
+                        {{end}}
+                    </div>
+                </fieldset>
+            {{end}}
+        {{else}}
+            {{range .Fields}}
+                <div class="form-field {{if .Errors}}has-error{{end}}">
+                    <label for="id_{{.Name}}" class="form-label">
+                        {{.Label}}
+                        {{if .Required}}<span class="required">*</span>{{end}}
+                    </label>
+                    <div class="form-widget">
+                        {{.Widget}}
+                    </div>
+                    {{if .HelpText}}
+                        <p class="form-help">{{.HelpText}}</p>
+                    {{end}}
+                    {{if .Errors}}
+                        <ul class="field-errors">
+                            {{range .Errors}}
+                                <li class="field-error">{{.}}</li>
+                            {{end}}
+                        </ul>
+                    {{end}}
+                </div>
+            {{end}}
+        {{end}}
+
+        <!-- Inlines -->
+        {{if .Inlines}}
+            {{range .Inlines}}
+                {{template "inline" .}}
+            {{end}}
+        {{end}}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary" name="_save">Save</button>
+            {{if not .IsNew}}
+                <button type="submit" class="btn btn-secondary" name="_saveandcontinue">Save and continue editing</button>
+                <button type="submit" class="btn btn-secondary" name="_addanother">Save and add another</button>
+            {{end}}
+            <a href="{{.CancelURL}}" class="btn btn-link">Cancel</a>
+            {{if not .IsNew}}
+                <a href="{{.DeleteURL}}" class="btn btn-danger">Delete</a>
+            {{end}}
+        </div>
+    </form>
+</div>
+{{end}}

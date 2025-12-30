@@ -1,0 +1,15 @@
+database:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  dbname: enterprise_demo
+  sslmode: disable
+
+server:
+  host: localhost
+  port: "8080"
+
+admin:
+  enabled: true
+  path: "/admin"

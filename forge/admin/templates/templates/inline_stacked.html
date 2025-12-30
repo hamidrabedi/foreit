@@ -1,0 +1,44 @@
+{{define "inline_stacked"}}
+<div class="inline-group inline-stacked">
+    <h3 class="inline-title">{{.Name}}</h3>
+    
+    <div class="inline-forms">
+        {{range .Instances}}
+            <div class="inline-form">
+                <div class="inline-form-header">
+                    <h4>{{.Label}}</h4>
+                    <input type="checkbox" name="{{$.Name}}-DELETE" value="{{.ID}}">
+                    <label>Delete</label>
+                </div>
+                <div class="inline-form-fields">
+                    {{range $.Fields}}
+                        <div class="form-field">
+                            <label>{{.Label}}</label>
+                            <input type="text" name="{{$.Name}}-{{.Name}}" value="{{.Value}}" class="form-control">
+                        </div>
+                    {{end}}
+                </div>
+            </div>
+        {{end}}
+        
+        {{range .ExtraForms}}
+            <div class="inline-form empty-form">
+                <div class="inline-form-fields">
+                    {{range $.Fields}}
+                        <div class="form-field">
+                            <label>{{.Label}}</label>
+                            <input type="text" name="{{$.Name}}-{{.Name}}" class="form-control">
+                        </div>
+                    {{end}}
+                </div>
+            </div>
+        {{end}}
+    </div>
+    
+    {{if .CanAddMore}}
+        <button type="button" class="btn btn-sm btn-add-inline" onclick="addInlineForm('{{.Name}}')">
+            Add another {{.Name}}
+        </button>
+    {{end}}
+</div>
+{{end}}

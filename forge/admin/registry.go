@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+
 )
 
 // Registry maintains a registry of admin instances
@@ -59,22 +60,11 @@ func (r *Registry) GetAll() map[string]AdminInterface {
 	return result
 }
 
-// ModelType returns the model type
-func (a *Admin[T]) ModelType() reflect.Type {
-	var zero T
-	typ := reflect.TypeOf(zero)
-	if typ.Kind() == reflect.Ptr {
-		typ = typ.Elem()
-	}
-	return typ
+// GetGlobalRegistry returns the global registry
+func GetGlobalRegistry() *Registry {
+	return globalRegistry
 }
 
-// ManagerInterface returns the manager as interface{} for dynamic access
-func (a *Admin[T]) ManagerInterface() interface{} {
-	return a.manager
-}
+// ModelType, ManagerInterface, and ConfigInterface are defined in admin.go
 
-// ConfigInterface returns the config as interface{} for dynamic access
-func (a *Admin[T]) ConfigInterface() interface{} {
-	return a.config
-}
+// Permission names are defined in permissions.go

@@ -48,6 +48,15 @@ const sidebars = {
   fullGuides: [
     {
       type: 'category',
+      label: 'Tutorials',
+      items: [
+        'tutorials/01-overview',
+        'tutorials/02-getting-started',
+        'tutorials/03-admin-interface',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Guides',
       items: [
         'guides/models',

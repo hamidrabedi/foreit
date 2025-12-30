@@ -650,6 +650,140 @@ func QueryExamples(database *db.DB) {
 	fmt.Println("\n=== ALL QUERY EXAMPLES COMPLETED ===")
 }
 
+// TypeSafeExamples demonstrates the new type-safe API using generic constraints
+func TypeSafeExamples(database *db.DB) {
+	ctx := context.Background()
+
+	fmt.Println("\n=== TYPE-SAFE API EXAMPLES ===")
+
+	// Create manager for Book model
+	bookManager, err := orm.NewManager[models.Book]("books")
+	if err != nil {
+		log.Fatalf("Failed to create manager: %v", err)
+	}
+	bookManager.SetDB(database)
+
+	// Get field accessor for type-safe field access
+	fa, err := bookManager.GetFieldAccessor()
+	if err != nil {
+		log.Fatalf("Failed to get field accessor: %v", err)
+	}
+
+	// Example: Type-safe field expressions
+	fmt.Println("\nType-Safe Field Expressions:")
+	priceField := orm.FieldFor[models.Book, float64](fa, "price")
+	titleField := orm.FieldFor[models.Book, string](fa, "title")
+
+	// Example 1: Type-safe Select - using FieldExpression
+	fmt.Println("\n1. Type-safe Select with FieldExpression:")
+	qs, err := orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		// Using generated fields (if available) or FieldExpression
+		results, err := qs.SetDB(database).
+			Select(priceField, titleField). // Type-safe!
+			Limit(5).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Found %d books\n", len(results))
+		}
+	}
+
+	// Example 2: Mixed approach - strings and FieldExpression together
+	fmt.Println("\n2. Mixed Select - strings and FieldExpression:")
+	qs, err = orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		results, err := qs.SetDB(database).
+			Select(priceField, "description"). // Mixed: type-safe + string!
+			Limit(5).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Found %d books\n", len(results))
+		}
+	}
+
+	// Example 3: Type-safe OrderBy with .Asc() and .Desc()
+	fmt.Println("\n3. Type-safe OrderBy with .Asc() and .Desc():")
+	qs, err = orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		results, err := qs.SetDB(database).
+			Filter(priceField.Gt(10.0)).
+			OrderBy(priceField.Desc(), titleField.Asc()). // Type-safe ordering!
+			Limit(10).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Found %d books\n", len(results))
+		}
+	}
+
+	// Example 4: Mixed OrderBy - OrderField and FieldExpression
+	fmt.Println("\n4. Mixed OrderBy - OrderField and FieldExpression:")
+	qs, err = orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		results, err := qs.SetDB(database).
+			OrderBy(
+				priceField.Desc(),              // Type-safe
+				orm.Asc("title"),               // String-based
+			).
+			Limit(5).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Found %d books\n", len(results))
+		}
+	}
+
+	// Example 5: Type-safe Values
+	fmt.Println("\n5. Type-safe Values:")
+	qs, err = orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		values, err := qs.SetDB(database).
+			Values(priceField, titleField). // Type-safe!
+			Limit(5).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Got %d value maps\n", len(values))
+		}
+	}
+
+	// Example 6: Type-safe Distinct
+	fmt.Println("\n6. Type-safe Distinct:")
+	qs, err = orm.NewQuerySet[models.Book]("books")
+	if err != nil {
+		log.Printf("Error: %v", err)
+	} else {
+		results, err := qs.SetDB(database).
+			Distinct(priceField). // Type-safe!
+			Limit(10).
+			All(ctx)
+		if err != nil {
+			log.Printf("Error: %v", err)
+		} else {
+			fmt.Printf("Found %d distinct books\n", len(results))
+		}
+	}
+
+	fmt.Println("\n=== TYPE-SAFE API EXAMPLES COMPLETED ===")
+}
+
 // RunQueryExamples is a helper function to run all examples
 func RunQueryExamples(database *db.DB) {
 	if database == nil {

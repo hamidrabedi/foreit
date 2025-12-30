@@ -258,6 +258,15 @@ func (fa *FieldAccessor[T]) Field(name string) FieldExpression[interface{}] {
 	return NewField[interface{}](name, fa.table)
 }
 
+// AllFieldExpressions returns all field expressions as a map
+func (fa *FieldAccessor[T]) AllFieldExpressions() map[string]FieldExpression[interface{}] {
+	result := make(map[string]FieldExpression[interface{}])
+	for _, field := range fa.schema.Fields {
+		result[field.Name] = NewField[interface{}](field.Name, fa.table)
+	}
+	return result
+}
+
 // RelatedField creates a type-safe related field expression
 // Use RelatedFieldFor to specify related model and field types
 func (fa *FieldAccessor[T]) RelatedField(relationName, fieldName string) FieldExpression[interface{}] {

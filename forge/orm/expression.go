@@ -253,6 +253,22 @@ func (f FieldExpression[string]) IExact(val string) ComparisonExpression[string]
 	}
 }
 
+// Asc creates an ascending order field expression
+func (f FieldExpression[T]) Asc() OrderFieldExpr[T] {
+	return OrderFieldExpr[T]{
+		field:     f,
+		ascending: true,
+	}
+}
+
+// Desc creates a descending order field expression
+func (f FieldExpression[T]) Desc() OrderFieldExpr[T] {
+	return OrderFieldExpr[T]{
+		field:     f,
+		ascending: false,
+	}
+}
+
 // CombinedExpression represents arithmetic operations between fields
 type CombinedExpression[T any] struct {
 	Left  FieldExpression[T]
@@ -531,10 +547,13 @@ const (
 	ConnectorOr  Connector = "OR"
 )
 
-// Helper function to split field path (e.g., "author__name" -> ["author", "name"])
+// splitFieldPath splits a field path by double underscores (e.g., "author__name" -> ["author", "name"])
+// This handles Django-style field paths for relations
 func splitFieldPath(path string) []string {
-	// Simple implementation - can be enhanced for more complex paths
-	parts := []string{path}
-	// TODO: Handle double underscore for actual underscores
+	if path == "" {
+		return []string{}
+	}
+	// Split by double underscore
+	parts := strings.Split(path, "__")
 	return parts
 }

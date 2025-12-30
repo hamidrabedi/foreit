@@ -17,30 +17,30 @@ type QuerySet[T any] interface {
 	Exclude(expr Expression) QuerySet[T]
 
 	// Ordering
-	OrderBy(fields ...OrderField) QuerySet[T]
+	OrderBy(fields ...any) QuerySet[T]
 	Reverse() QuerySet[T]
 
 	// Limiting
 	Limit(n int) QuerySet[T]
 	Offset(n int) QuerySet[T]
-	Distinct(fields ...string) QuerySet[T]
+	Distinct(fields ...any) QuerySet[T]
 
 	// Field Selection
-	Select(fields ...string) QuerySet[T]
-	Only(fields ...string) QuerySet[T]
-	Defer(fields ...string) QuerySet[T]
+	Select(fields ...any) QuerySet[T]
+	Only(fields ...any) QuerySet[T]
+	Defer(fields ...any) QuerySet[T]
 
 	// Relations
-	SelectRelated(relations ...string) QuerySet[T]
-	PrefetchRelated(relations ...string) QuerySet[T]
+	SelectRelated(relations ...any) QuerySet[T]
+	PrefetchRelated(relations ...any) QuerySet[T]
 
 	// Aggregation
 	Aggregate(aggs ...Aggregate) QuerySet[T]
 	Annotate(anns ...AnnotationExpr) QuerySet[T]
 
 	// Values - type-safe return types
-	Values(fields ...string) ValuesQuerySet[T]
-	ValuesList(fields ...string) ValuesListQuerySet[T]
+	Values(fields ...any) ValuesQuerySet[T]
+	ValuesList(fields ...any) ValuesListQuerySet[T]
 
 	// Execution
 	All(ctx context.Context) ([]*T, error)
@@ -68,6 +68,16 @@ type QuerySet[T any] interface {
 type OrderField struct {
 	Field     string
 	Ascending bool
+}
+
+// GetFieldPath returns the field path for ordering
+func (o OrderField) GetFieldPath() string {
+	return o.Field
+}
+
+// IsAscending returns whether the ordering is ascending
+func (o OrderField) IsAscending() bool {
+	return o.Ascending
 }
 
 // NewOrderField creates an order field
@@ -188,11 +198,43 @@ func (qs *BaseQuerySet[T]) Exclude(expr Expression) QuerySet[T] {
 	return clone
 }
 
-// OrderBy sets ordering
-func (qs *BaseQuerySet[T]) OrderBy(fields ...OrderField) QuerySet[T] {
+// OrderBy sets ordering - accepts both OrderField (string) and OrderFieldExpr[T] (type-safe)
+func (qs *BaseQuerySet[T]) OrderBy(fields ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.orderBy = append(clone.orderBy, fields...)
+	for _, field := range fields {
+		orderField := OrderField{
+			Field:     extractOrderFieldPath(field),
+			Ascending: extractOrderFieldAscending(field),
+		}
+		clone.orderBy = append(clone.orderBy, orderField)
+	}
 	return clone
+}
+
+// extractOrderFieldPath extracts the field path from an OrderFieldSpec
+func extractOrderFieldPath(field any) string {
+	// Use type assertion to OrderFieldSpec interface
+	if spec, ok := field.(OrderFieldSpec); ok {
+		return spec.GetFieldPath()
+	}
+	// Fallback for OrderField (struct type)
+	if of, ok := field.(OrderField); ok {
+		return of.GetFieldPath()
+	}
+	return ""
+}
+
+// extractOrderFieldAscending extracts the ascending flag from an OrderFieldSpec
+func extractOrderFieldAscending(field any) bool {
+	// Use type assertion to OrderFieldSpec interface
+	if spec, ok := field.(OrderFieldSpec); ok {
+		return spec.IsAscending()
+	}
+	// Fallback for OrderField (struct type)
+	if of, ok := field.(OrderField); ok {
+		return of.IsAscending()
+	}
+	return true
 }
 
 // Reverse reverses the current ordering
@@ -218,49 +260,73 @@ func (qs *BaseQuerySet[T]) Offset(n int) QuerySet[T] {
 	return clone
 }
 
-// Distinct sets distinct fields
-func (qs *BaseQuerySet[T]) Distinct(fields ...string) QuerySet[T] {
+// Distinct sets distinct fields - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) Distinct(fields ...any) QuerySet[T] {
 	clone := qs.clone()
 	if len(fields) > 0 {
-		clone.distinctFields = fields
+		paths := make([]string, len(fields))
+		for i, field := range fields {
+			paths[i] = extractPathFromAny(field)
+		}
+		clone.distinctFields = paths
 	} else {
 		clone.distinctFields = []string{"*"}
 	}
 	return clone
 }
 
-// Select sets fields to select
-func (qs *BaseQuerySet[T]) Select(fields ...string) QuerySet[T] {
+// Select sets fields to select - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) Select(fields ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.selectFields = fields
+	paths := make([]string, len(fields))
+	for i, field := range fields {
+		paths[i] = extractPathFromAny(field)
+	}
+	clone.selectFields = paths
 	return clone
 }
 
-// Only sets fields to only load
-func (qs *BaseQuerySet[T]) Only(fields ...string) QuerySet[T] {
+// Only sets fields to only load - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) Only(fields ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.onlyFields = fields
+	paths := make([]string, len(fields))
+	for i, field := range fields {
+		paths[i] = extractPathFromAny(field)
+	}
+	clone.onlyFields = paths
 	return clone
 }
 
-// Defer sets fields to defer loading
-func (qs *BaseQuerySet[T]) Defer(fields ...string) QuerySet[T] {
+// Defer sets fields to defer loading - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) Defer(fields ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.deferFields = fields
+	paths := make([]string, len(fields))
+	for i, field := range fields {
+		paths[i] = extractPathFromAny(field)
+	}
+	clone.deferFields = paths
 	return clone
 }
 
-// SelectRelated adds relations to select
-func (qs *BaseQuerySet[T]) SelectRelated(relations ...string) QuerySet[T] {
+// SelectRelated adds relations to select - accepts both string and RelationExpression
+func (qs *BaseQuerySet[T]) SelectRelated(relations ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.selectRelated = append(clone.selectRelated, relations...)
+	paths := make([]string, len(relations))
+	for i, relation := range relations {
+		paths[i] = extractRelationPathFromAny(relation)
+	}
+	clone.selectRelated = append(clone.selectRelated, paths...)
 	return clone
 }
 
-// PrefetchRelated adds relations to prefetch
-func (qs *BaseQuerySet[T]) PrefetchRelated(relations ...string) QuerySet[T] {
+// PrefetchRelated adds relations to prefetch - accepts both string and RelationExpression
+func (qs *BaseQuerySet[T]) PrefetchRelated(relations ...any) QuerySet[T] {
 	clone := qs.clone()
-	clone.prefetchRelated = append(clone.prefetchRelated, relations...)
+	paths := make([]string, len(relations))
+	for i, relation := range relations {
+		paths[i] = extractRelationPathFromAny(relation)
+	}
+	clone.prefetchRelated = append(clone.prefetchRelated, paths...)
 	return clone
 }
 
@@ -278,17 +344,25 @@ func (qs *BaseQuerySet[T]) Annotate(anns ...AnnotationExpr) QuerySet[T] {
 	return clone
 }
 
-// Values returns a ValuesQuerySet
-func (qs *BaseQuerySet[T]) Values(fields ...string) ValuesQuerySet[T] {
+// Values returns a ValuesQuerySet - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) Values(fields ...any) ValuesQuerySet[T] {
 	clone := qs.clone()
-	clone.selectFields = fields
+	paths := make([]string, len(fields))
+	for i, field := range fields {
+		paths[i] = extractPathFromAny(field)
+	}
+	clone.selectFields = paths
 	return &BaseValuesQuerySet[T]{base: clone}
 }
 
-// ValuesList returns a ValuesListQuerySet
-func (qs *BaseQuerySet[T]) ValuesList(fields ...string) ValuesListQuerySet[T] {
+// ValuesList returns a ValuesListQuerySet - accepts both string and FieldExpression[T]
+func (qs *BaseQuerySet[T]) ValuesList(fields ...any) ValuesListQuerySet[T] {
 	clone := qs.clone()
-	clone.selectFields = fields
+	paths := make([]string, len(fields))
+	for i, field := range fields {
+		paths[i] = extractPathFromAny(field)
+	}
+	clone.selectFields = paths
 	return &BaseValuesListQuerySet[T]{base: clone}
 }
 
@@ -683,9 +757,10 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 }
 
 // BulkUpdate performs bulk updates
+// Note: This is a planned feature. For now, use Update() in a loop or implement
+// custom bulk update logic using raw SQL if needed.
 func (qs *BaseQuerySet[T]) BulkUpdate(ctx context.Context, updates []UpdateMap) error {
-	// TODO: Implement bulk update
-		return fmt.Errorf("BulkUpdate not yet implemented in QuerySet")
+	return fmt.Errorf("BulkUpdate not yet implemented in QuerySet - use Update() in a loop or raw SQL for now")
 }
 
 // Delete performs a bulk delete
@@ -815,7 +890,11 @@ func (vqs *BaseValuesQuerySet[T]) All(ctx context.Context) ([]map[string]interfa
 }
 
 func (vqs *BaseValuesQuerySet[T]) Get(ctx context.Context) (map[string]interface{}, error) {
-	results, err := vqs.base.Limit(2).Values(vqs.base.selectFields...).All(ctx)
+	fields := make([]any, len(vqs.base.selectFields))
+	for i, f := range vqs.base.selectFields {
+		fields[i] = f
+	}
+	results, err := vqs.base.Limit(2).Values(fields...).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -832,7 +911,11 @@ func (vqs *BaseValuesQuerySet[T]) Get(ctx context.Context) (map[string]interface
 }
 
 func (vqs *BaseValuesQuerySet[T]) First(ctx context.Context) (map[string]interface{}, error) {
-	results, err := vqs.base.Limit(1).Values(vqs.base.selectFields...).All(ctx)
+	fields := make([]any, len(vqs.base.selectFields))
+	for i, f := range vqs.base.selectFields {
+		fields[i] = f
+	}
+	results, err := vqs.base.Limit(1).Values(fields...).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -903,7 +986,11 @@ func (vls *BaseValuesListQuerySet[T]) Get(ctx context.Context) ([]interface{}, e
 	limit := 2
 	limited.limitVal = &limit
 
-	results, err := limited.ValuesList(limited.selectFields...).All(ctx)
+	fields := make([]any, len(limited.selectFields))
+	for i, f := range limited.selectFields {
+		fields[i] = f
+	}
+	results, err := limited.ValuesList(fields...).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -925,7 +1012,11 @@ func (vls *BaseValuesListQuerySet[T]) First(ctx context.Context) ([]interface{},
 	limit := 1
 	limited.limitVal = &limit
 
-	results, err := limited.ValuesList(limited.selectFields...).All(ctx)
+	fields := make([]any, len(limited.selectFields))
+	for i, f := range limited.selectFields {
+		fields[i] = f
+	}
+	results, err := limited.ValuesList(fields...).All(ctx)
 	if err != nil {
 		return nil, err
 	}

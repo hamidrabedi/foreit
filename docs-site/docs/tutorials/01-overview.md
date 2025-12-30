@@ -22,12 +22,12 @@ By completing these tutorials, you'll learn:
 The tutorials are designed to be completed in order:
 
 1. **Getting Started** - Set up your first project
-2. **Models and Database** - Define your data models
-3. **Queries and ORM** - Query your data efficiently
-4. **Admin Interface** - Build admin panels
-5. **REST APIs** - Create API endpoints
-6. **Authentication** - Add user authentication
-7. **Deployment** - Deploy to production
+2. **Admin Interface** - Build admin panels with zero code
+3. **Models and Database** - Define your data models (coming soon)
+4. **Queries and ORM** - Query your data efficiently (coming soon)
+5. **REST APIs** - Create API endpoints (coming soon)
+6. **Authentication** - Add user authentication (coming soon)
+7. **Deployment** - Deploy to production (coming soon)
 
 ## Prerequisites
 
@@ -49,4 +49,6 @@ If you get stuck:
 
 ## Next Steps
 
-Ready to start? Begin with [Tutorial 1: Getting Started](/docs/getting-started/02-getting-started).
+Ready to start? Begin with [Tutorial 1: Getting Started](/docs/tutorials/02-getting-started).
+
+After completing the getting started tutorial, continue with [Tutorial 2: Admin Interface](/docs/tutorials/03-admin-interface) to learn how to build powerful admin panels.

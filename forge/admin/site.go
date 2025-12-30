@@ -25,19 +25,6 @@ func NewSite(name string) *Site {
 	}
 }
 
-// Register registers a model with this site
-// Note: Generic methods on non-generic types are not supported in Go.
-// Use RegisterModel on the site's registry or call admin.Register directly.
-func RegisterModel[T any](site *Site, model T, manager interface{}, config *Config[T]) *Admin[T] {
-	// Convert manager to proper type
-	// This is a simplified version - in production would need proper type assertion
-	_ = manager
-	_ = config
-	_ = site
-	// Would call admin.Register and register with this site's registry
-	return nil // Placeholder
-}
-
 // GetRegistry returns the registry for this site
 func (s *Site) GetRegistry() *Registry {
 	return s.registry
@@ -49,10 +36,11 @@ func (s *Site) IndexView() http.HandlerFunc {
 		allAdmins := s.registry.GetAll()
 
 		models := make([]map[string]interface{}, 0, len(allAdmins))
-		for name := range allAdmins {
+		for name, admin := range allAdmins {
 			models = append(models, map[string]interface{}{
 				"name":        name,
 				"verboseName": name,
+				"modelType":   admin.ModelType().String(),
 			})
 		}
 

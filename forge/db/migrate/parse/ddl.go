@@ -8,12 +8,19 @@ import (
 	"github.com/forgego/forge/db/migrate/core"
 )
 
+// DDLParserOptions configures DDL parser behavior
+type DDLParserOptions struct {
+	Verbose bool // Enable verbose logging
+}
+
 // DDLParser parses DDL statements into core.Change objects
 // Uses best-effort parsing with soft failure (returns UnknownChange for unparseable statements)
 type DDLParser struct {
 	dialect     core.Driver
 	classifier  *Classifier
 	tableParser *TableParser
+	verbose     bool
+	tableCtx    string // Current table context for index parsing
 }
 
 // NewDDLParser creates a new DDL parser
@@ -23,11 +30,22 @@ func NewDDLParser() *DDLParser {
 
 // NewDDLParserWithDialect creates a new DDL parser with a specific dialect
 func NewDDLParserWithDialect(dialect core.Driver) *DDLParser {
+	return NewDDLParserWithOptions(DDLParserOptions{Verbose: false})
+}
+
+// NewDDLParserWithOptions creates a new DDL parser with options
+func NewDDLParserWithOptions(opts DDLParserOptions) *DDLParser {
 	return &DDLParser{
-		dialect:     dialect,
+		dialect:     core.DriverPostgreSQL,
 		classifier:  NewClassifier(),
 		tableParser: NewTableParser(),
+		verbose:     opts.Verbose,
 	}
+}
+
+// SetTableContext sets the current table context for index parsing
+func (p *DDLParser) SetTableContext(tableName string) {
+	p.tableCtx = tableName
 }
 
 // ParseStatement parses a single SQL statement into core.Change objects
@@ -62,6 +80,13 @@ func (p *DDLParser) ParseStatement(stmt *Statement) ([]core.Change, error) {
 
 // parseCreateTable parses CREATE TABLE statements
 func (p *DDLParser) parseCreateTable(sql string) ([]core.Change, error) {
+	// Extract table name and set context for index parsing
+	re := regexp.MustCompile(`(?i)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?`)
+	matches := re.FindStringSubmatch(sql)
+	if len(matches) >= 2 {
+		p.SetTableContext(matches[1])
+	}
+
 	createTable, err := p.tableParser.ParseCreateTable(sql)
 	if err != nil {
 		// Fail softly: return as UnknownChange
@@ -74,6 +99,13 @@ func (p *DDLParser) parseCreateTable(sql string) ([]core.Change, error) {
 func (p *DDLParser) parseAlterTable(sql string) ([]core.Change, error) {
 	upper := strings.ToUpper(sql)
 	var changes []core.Change
+
+	// Extract table name and set context
+	re := regexp.MustCompile(`(?i)ALTER\s+TABLE\s+["']?(\w+)["']?`)
+	matches := re.FindStringSubmatch(sql)
+	if len(matches) >= 2 {
+		p.SetTableContext(matches[1])
+	}
 
 	// ALTER TABLE ADD COLUMN
 	// Check for "ADD COLUMN" specifically to avoid matching "ADD CONSTRAINT"
@@ -89,6 +121,27 @@ func (p *DDLParser) parseAlterTable(sql string) ([]core.Change, error) {
 		change := p.parseAddForeignKey(sql)
 		if change != nil {
 			changes = append(changes, change)
+		}
+	}
+
+	// ALTER TABLE CREATE INDEX (indexes created within ALTER TABLE)
+	if strings.Contains(upper, "CREATE") && strings.Contains(upper, "INDEX") {
+		// Extract index creation from ALTER TABLE
+		indexRe := regexp.MustCompile(`(?i)CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?\s*\(([^)]+)\)`)
+		indexMatches := indexRe.FindStringSubmatch(sql)
+		if len(indexMatches) >= 3 && p.tableCtx != "" {
+			indexName := indexMatches[1]
+			fieldsStr := indexMatches[2]
+			isUnique := strings.Contains(upper, "UNIQUE")
+			fields := extractIndexFieldsFromString(fieldsStr)
+			changes = append(changes, &core.AddIndex{
+				Table: p.tableCtx,
+				Index: generator.IndexDefinition{
+					Name:   indexName,
+					Fields: fields,
+					Unique: isUnique,
+				},
+			})
 		}
 	}
 
@@ -222,6 +275,26 @@ func (p *DDLParser) parseCreateIndex(sql string) ([]core.Change, error) {
 	re := regexp.MustCompile(`(?i)CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?\s+ON\s+["']?(\w+)["']?\s*\(([^)]+)\)`)
 	matches := re.FindStringSubmatch(sql)
 	if len(matches) < 4 {
+		// Try to infer table name from context if available
+		if p.tableCtx != "" {
+			// Pattern: CREATE [UNIQUE] INDEX [IF NOT EXISTS] index_name (columns)
+			re2 := regexp.MustCompile(`(?i)CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?\s*\(([^)]+)\)`)
+			matches2 := re2.FindStringSubmatch(sql)
+			if len(matches2) >= 3 {
+				indexName := matches2[1]
+				fieldsStr := matches2[2]
+				isUnique := strings.Contains(strings.ToUpper(sql), "UNIQUE")
+				fields := extractIndexFieldsFromString(fieldsStr)
+				return []core.Change{&core.AddIndex{
+					Table: p.tableCtx,
+					Index: generator.IndexDefinition{
+						Name:   indexName,
+						Fields: fields,
+						Unique: isUnique,
+					},
+				}}, nil
+			}
+		}
 		return []core.Change{&core.UnknownChange{SQL: sql}}, nil
 	}
 
@@ -258,19 +331,31 @@ func (p *DDLParser) parseDropTable(sql string) ([]core.Change, error) {
 
 // parseDropIndex parses DROP INDEX statements
 func (p *DDLParser) parseDropIndex(sql string) ([]core.Change, error) {
-	// Pattern: DROP INDEX [IF EXISTS] index_name
-	re := regexp.MustCompile(`(?i)DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?["']?(\w+)["']?`)
+	// Pattern: DROP INDEX [IF EXISTS] index_name [ON table_name] (PostgreSQL)
+	// Pattern: DROP INDEX [IF EXISTS] table_name.index_name (SQLite)
+	re := regexp.MustCompile(`(?i)DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?(?:["']?(\w+)["']?\.)?["']?(\w+)["']?(?:\s+ON\s+["']?(\w+)["']?)?`)
 	matches := re.FindStringSubmatch(sql)
 	if len(matches) < 2 {
 		return []core.Change{&core.UnknownChange{SQL: sql}}, nil
 	}
 
-	indexName := matches[1]
-	// Note: DROP INDEX doesn't include table name, so we leave it empty
-	// This is a limitation but acceptable for state reconstruction
-	// TODO: Try to infer table name from context or track index-to-table mapping
+	indexName := matches[2]
+	tableName := ""
+	
+	// Try to get table name from various patterns
+	if len(matches) > 3 && matches[3] != "" {
+		// ON table_name pattern (PostgreSQL)
+		tableName = matches[3]
+	} else if len(matches) > 1 && matches[1] != "" {
+		// table_name.index_name pattern (SQLite)
+		tableName = matches[1]
+	} else if p.tableCtx != "" {
+		// Use context if available
+		tableName = p.tableCtx
+	}
+
 	return []core.Change{&core.DropIndex{
-		Table:     "", // Table name not available from DROP INDEX alone
+		Table:     tableName,
 		IndexName: indexName,
 	}}, nil
 }

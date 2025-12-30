@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"sync"
 
 	admin "github.com/forgego/forge/admin"
@@ -56,20 +55,43 @@ func GetAdminHandler(modelName string) (AdminHandler, error) {
 }
 
 // adminHandler provides type-safe handlers for Admin[T]
+// Note: This uses the old admin.Admin[T] for backward compatibility
+// New code should use admin.Admin[T] directly
 type adminHandler[T any] struct {
 	admin *admin.Admin[T]
+	// For new system, would use: admin *admin.Admin[T]
 }
 
 // HandleList handles list view
 func (h *adminHandler[T]) HandleList(ctx context.Context, page, pageSize int, search string, filters map[string]interface{}) (interface{}, error) {
-	// Import views package functions directly
-	// For now, return a placeholder response
-	// TODO: Fix import cycle by moving views to same package or using interface
+	// Get queryset
+	qs, err := h.admin.GetQueryset(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get count
+	totalCount, err := qs.Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Apply pagination
+	qs = qs.Offset((page - 1) * pageSize).Limit(pageSize)
+
+	// Get objects
+	objects, err := qs.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	return map[string]interface{}{
-		"page":     page,
-		"pageSize": pageSize,
-		"search":   search,
-		"filters":  filters,
+		"objects":    objects,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalCount": totalCount,
+		"search":     search,
+		"filters":    filters,
 	}, nil
 }
 
@@ -125,76 +147,26 @@ func (h *adminHandler[T]) HandleDelete(ctx context.Context, id int64) error {
 	return h.admin.DeleteModel(ctx, instance)
 }
 
-// HandleExport handles export - returns ExportView for HTTP handler to use
+// HandleExport handles export
 func (h *adminHandler[T]) HandleExport(ctx context.Context, format string) (interface{}, error) {
-	exportView := admin.NewExportView(h.admin, admin.ExportFormat(format))
-	return exportView, nil
-}
-
-// HandleBulkAction handles bulk action
-func (h *adminHandler[T]) HandleBulkAction(ctx context.Context, action string, ids []int64) error {
-	// Get instances
-	instances := make([]*T, 0, len(ids))
-	for _, id := range ids {
-		instance, err := h.admin.Manager().Get(ctx, id)
-		if err != nil {
-			continue
-		}
-		instances = append(instances, instance)
-	}
-
-	// Find and execute action
-	for _, act := range h.admin.Config().Actions {
-		if act.Name == action {
-			return act.Handler(ctx, instances)
-		}
-	}
-
-	return fmt.Errorf("action %s not found", action)
-}
-
-// HandleAutocomplete handles autocomplete
-func (h *adminHandler[T]) HandleAutocomplete(ctx context.Context, search string, limit int) ([]map[string]interface{}, error) {
+	// Get all objects for export
 	qs, err := h.admin.GetQueryset(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if search != "" {
-		// Apply search
-		// This is simplified - would use search fields from config
-	}
 
-	objects, err := qs.Limit(limit).All(ctx)
+	objects, err := qs.All(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	results := make([]map[string]interface{}, len(objects))
-	for i, obj := range objects {
-		// Convert to map (simplified)
-		results[i] = map[string]interface{}{
-			"id":    getID(obj),
-			"label": fmt.Sprintf("%v", obj),
-		}
-	}
-
-	return results, nil
+	return map[string]interface{}{
+		"objects": objects,
+		"format":  format,
+	}, nil
 }
 
-// getID extracts ID from an object
-func getID(obj interface{}) int64 {
-	// Use reflection to get ID field
-	val := reflect.ValueOf(obj)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
+// HandleBulkAction is implemented in bulk_action.go
 
-	idField := val.FieldByName("ID")
-	if idField.IsValid() && idField.CanInterface() {
-		if id, ok := idField.Interface().(int64); ok {
-			return id
-		}
-	}
+// HandleAutocomplete is implemented in autocomplete.go
 
-	return 0
-}

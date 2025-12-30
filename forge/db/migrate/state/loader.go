@@ -10,6 +10,21 @@ import (
 	"github.com/forgego/forge/db/migrate/parse"
 )
 
+// LoaderOptions configures state loader behavior
+type LoaderOptions struct {
+	Verbose bool // Enable verbose logging of parse errors
+}
+
+// ParseErrorInfo stores information about parse errors
+type ParseErrorInfo struct {
+	File    string
+	Line    int
+	Column  int
+	SQL     string
+	Message string
+	Error   error
+}
+
 // LoadStateFromFiles loads state from migration files
 func LoadStateFromFiles(migrationsDir string) (*SchemaState, error) {
 	loader := NewFileStateLoader(migrationsDir)
@@ -20,17 +35,38 @@ func LoadStateFromFiles(migrationsDir string) (*SchemaState, error) {
 type FileStateLoader struct {
 	migrationsDir string
 	state         *SchemaState
+	verbose       bool
+	parseErrors   []*ParseErrorInfo
+	skippedFiles  []string
 }
 
 // NewFileStateLoader creates a new file-based state loader
 func NewFileStateLoader(migrationsDir string) StateManager {
+	return NewFileStateLoaderWithOptions(migrationsDir, LoaderOptions{Verbose: false})
+}
+
+// NewFileStateLoaderWithOptions creates a new file-based state loader with options
+func NewFileStateLoaderWithOptions(migrationsDir string, opts LoaderOptions) StateManager {
 	return &FileStateLoader{
 		migrationsDir: migrationsDir,
 		state:         nil, // Will be loaded on first Load() call
+		verbose:       opts.Verbose,
+		parseErrors:   []*ParseErrorInfo{},
+		skippedFiles:  []string{},
 	}
 }
 
-// Load loads state from migration files
+// GetParseErrors returns all parse errors collected during loading
+func (l *FileStateLoader) GetParseErrors() []*ParseErrorInfo {
+	return l.parseErrors
+}
+
+// GetSkippedFiles returns list of files that were skipped
+func (l *FileStateLoader) GetSkippedFiles() []string {
+	return l.skippedFiles
+}
+
+// Load loads state from migration files with retry mechanism
 func (l *FileStateLoader) Load() (*SchemaState, error) {
 	// Load state if not already loaded
 	if l.state == nil {
@@ -54,47 +90,148 @@ func (l *FileStateLoader) Load() (*SchemaState, error) {
 		// Sort files by version
 		sortedFiles := sortMigrationFiles(matches)
 
-		// Parse each migration file and apply to state
-		parser := parse.NewSQLParser()
+		// Create parser with verbose mode if enabled
+		parserOpts := parse.ParserOptions{Verbose: l.verbose}
+		parser := parse.NewSQLParserWithOptions(parserOpts)
+
+		// Collect all changes from all files first
+		type fileChanges struct {
+			file    string
+			changes []core.Change
+			errors  []*parse.ParseError
+		}
+		var allFileChanges []fileChanges
+
 		for _, file := range sortedFiles {
 			content, err := os.ReadFile(file)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read migration file %s: %w", file, err)
+				if l.verbose {
+					l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+						File:    file,
+						Message: fmt.Sprintf("failed to read file: %v", err),
+						Error:   err,
+					})
+				}
+				l.skippedFiles = append(l.skippedFiles, file)
+				continue
 			}
 
 			changes, err := parser.ParseUpSQL(string(content))
 			if err != nil {
-				// Skip files that can't be parsed (might be manual SQL)
-				// TODO: Add optional logging/warning for unparseable migration files
-				// TODO: Consider storing parse errors for user review
+				// Store parse error
+				if l.verbose {
+					l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+						File:    file,
+						Message: fmt.Sprintf("failed to parse SQL: %v", err),
+						Error:   err,
+					})
+				}
+				l.skippedFiles = append(l.skippedFiles, file)
 				continue
 			}
 
-			// Sort changes to ensure CREATE TABLE comes before ALTER TABLE
-			changes = sortChangesByType(changes)
+			// Collect parse errors from parser
+			parseErrs := parser.GetErrors()
+			if len(parseErrs) > 0 && l.verbose {
+				for _, perr := range parseErrs {
+					l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+						File:    file,
+						Line:    perr.Line,
+						Column:  perr.Column,
+						SQL:     perr.SQL,
+						Message: perr.Message,
+					})
+				}
+			}
 
-			// Apply changes to state
+			// Log UnknownChange statements if verbose
 			for _, change := range changes {
-				// Skip UnknownChange - these are unparseable statements
-				// They don't affect schema state reconstruction
+				if unknown, ok := change.(*core.UnknownChange); ok && l.verbose {
+					l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+						File:    file,
+						SQL:     unknown.SQL,
+						Message: "unparseable statement (UnknownChange)",
+					})
+				}
+			}
+
+			allFileChanges = append(allFileChanges, fileChanges{
+				file:    file,
+				changes: changes,
+			})
+		}
+
+		// Three-pass retry mechanism
+		// Pass 1: Process all CREATE TABLE statements
+		var deferredChanges []core.Change
+		for _, fc := range allFileChanges {
+			for _, change := range fc.changes {
+				if _, ok := change.(*core.CreateTable); ok {
+					if err := applyChangeToState(state, change); err != nil {
+						return nil, l.formatError(fc.file, change, err, "CREATE TABLE")
+					}
+				} else if _, ok := change.(*core.UnknownChange); !ok {
+					// Defer non-CREATE TABLE changes
+					deferredChanges = append(deferredChanges, change)
+				}
+			}
+		}
+
+		// Pass 2: Process constraints, indexes, foreign keys
+		var retryChanges []core.Change
+		for _, fc := range allFileChanges {
+			for _, change := range fc.changes {
+				if _, ok := change.(*core.CreateTable); ok {
+					continue // Already processed
+				}
 				if _, ok := change.(*core.UnknownChange); ok {
-					// Log or skip silently - UnknownChange doesn't affect state
-					// TODO: Add optional verbose mode to log UnknownChange statements for debugging
-					continue
+					continue // Skip unknown
 				}
 
-				if err := applyChangeToState(state, change); err != nil {
-					// If table doesn't exist error, it might be because the change is out of order
-					// Try to continue - this is a limitation of the SQL parser
-					if strings.Contains(err.Error(), "does not exist") {
-						// Skip this change - it might be a constraint on a table that will be created later
-						// or it's a constraint that was already added
-						// TODO: Improve change ordering logic to handle out-of-order constraints better
-						// TODO: Add retry mechanism after all CREATE TABLE statements are processed
-						continue
+				// Check if this is a constraint/index/FK change
+				changeType := change.Type()
+				if changeType == core.ChangeTypeAddIndex ||
+					changeType == core.ChangeTypeAddForeignKey ||
+					changeType == core.ChangeTypeAddConstraint ||
+					changeType == core.ChangeTypeAddColumn {
+					if err := applyChangeToState(state, change); err != nil {
+						if strings.Contains(err.Error(), "does not exist") {
+							// Table might not exist yet, retry in pass 3
+							retryChanges = append(retryChanges, change)
+							if l.verbose {
+								l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+									File:    fc.file,
+									Message: fmt.Sprintf("deferred change (table not found): %s", change.Type()),
+									Error:   err,
+								})
+							}
+						} else {
+							return nil, l.formatError(fc.file, change, err, "constraint/index")
+						}
 					}
-					return nil, fmt.Errorf("failed to apply change from %s: %w", file, err)
+				} else {
+					// Other changes
+					if err := applyChangeToState(state, change); err != nil {
+						if strings.Contains(err.Error(), "does not exist") {
+							retryChanges = append(retryChanges, change)
+						} else {
+							return nil, l.formatError(fc.file, change, err, "change")
+						}
+					}
 				}
+			}
+		}
+
+		// Pass 3: Retry changes that failed due to missing tables
+		for _, change := range retryChanges {
+			if err := applyChangeToState(state, change); err != nil {
+				if l.verbose {
+					l.parseErrors = append(l.parseErrors, &ParseErrorInfo{
+						Message: fmt.Sprintf("failed to apply change after retry: %s - %v", change.Type(), err),
+						Error:   err,
+					})
+				}
+				// Continue - some changes might fail if tables truly don't exist
 			}
 		}
 
@@ -102,6 +239,15 @@ func (l *FileStateLoader) Load() (*SchemaState, error) {
 	}
 
 	return l.state, nil
+}
+
+// formatError formats an error with context
+func (l *FileStateLoader) formatError(file string, change core.Change, err error, context string) error {
+	tableName := change.TableName()
+	if tableName != "" {
+		return fmt.Errorf("failed to apply %s change for table %q in %s: %w", context, tableName, file, err)
+	}
+	return fmt.Errorf("failed to apply %s change in %s: %w", context, file, err)
 }
 
 // Apply applies changes to the state (required for StateManager interface)

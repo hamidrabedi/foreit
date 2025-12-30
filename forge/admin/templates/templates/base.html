@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.Title}} - {{.SiteTitle}}</title>
+    <link rel="stylesheet" href="/admin/static/css/admin.css">
+    {{if .ExtraCSS}}
+        {{range .ExtraCSS}}
+            <link rel="stylesheet" href="{{.}}">
+        {{end}}
+    {{end}}
+</head>
+<body class="admin-body">
+    <div class="admin-wrapper">
+        <!-- Header -->
+        <header class="admin-header">
+            <div class="admin-header-content">
+                <h1 class="admin-site-title">
+                    <a href="{{.SiteURL}}">{{.SiteTitle}}</a>
+                </h1>
+                <nav class="admin-nav">
+                    <a href="{{.SiteURL}}" class="admin-nav-link">Home</a>
+                    {{if .User}}
+                        <span class="admin-user">{{.User}}</span>
+                        <a href="{{.LogoutURL}}" class="admin-nav-link">Logout</a>
+                    {{end}}
+                </nav>
+            </div>
+        </header>
+
+        <div class="admin-container">
+            <!-- Sidebar -->
+            <aside class="admin-sidebar">
+                <nav class="admin-sidebar-nav">
+                    <ul class="admin-sidebar-menu">
+                        {{range .Models}}
+                            <li class="admin-sidebar-item">
+                                <a href="{{.URL}}" class="admin-sidebar-link">{{.Name}}</a>
+                            </li>
+                        {{end}}
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="admin-main">
+                <!-- Breadcrumbs -->
+                {{if .Breadcrumbs}}
+                    <nav class="admin-breadcrumbs">
+                        <ol class="breadcrumb-list">
+                            {{range .Breadcrumbs}}
+                                {{if .URL}}
+                                    <li class="breadcrumb-item"><a href="{{.URL}}">{{.Label}}</a></li>
+                                {{else}}
+                                    <li class="breadcrumb-item active">{{.Label}}</li>
+                                {{end}}
+                            {{end}}
+                        </ol>
+                    </nav>
+                {{end}}
+
+                <!-- Messages -->
+                {{if .Messages}}
+                    <div class="admin-messages">
+                        {{range .Messages}}
+                            <div class="alert alert-{{.Type}}">{{.Message}}</div>
+                        {{end}}
+                    </div>
+                {{end}}
+
+                <!-- Content -->
+                <div class="admin-content">
+                    {{.Content}}
+                </div>
+            </main>
+        </div>
+
+        <!-- Footer -->
+        <footer class="admin-footer">
+            <p>&copy; {{.Year}} {{.SiteTitle}}. Powered by Forge Admin.</p>
+        </footer>
+    </div>
+
+    <script src="/admin/static/js/admin.js"></script>
+    {{if .ExtraJS}}
+        {{range .ExtraJS}}
+            <script src="{{.}}"></script>
+        {{end}}
+    {{end}}
+</body>
+</html>

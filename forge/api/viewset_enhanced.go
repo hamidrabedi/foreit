@@ -152,6 +152,9 @@ func (vs *EnhancedBaseViewSet) handleException(w http.ResponseWriter, r *http.Re
 }
 
 // List handles GET /resource/
+// Returns a paginated list of resources.
+// Supports filtering, ordering, and search via query parameters.
+// Validates authentication and permissions before processing.
 func (vs *EnhancedBaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	vs.SetAction("list")
 	ctx := r.Context()
@@ -274,6 +277,9 @@ func (vs *EnhancedBaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create handles POST /resource/
+// Creates a new resource instance from request body.
+// Validates authentication, permissions, and throttling before processing.
+// Validates serializer data and returns the created resource on success.
 func (vs *EnhancedBaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	vs.SetAction("create")
 	ctx := r.Context()
@@ -377,6 +383,9 @@ func (vs *EnhancedBaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 // Retrieve handles GET /resource/{id}/
+// Returns a single resource instance by ID.
+// Validates authentication and permissions before processing.
+// Returns 404 if resource not found.
 func (vs *EnhancedBaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 	vs.SetAction("retrieve")
 	ctx := r.Context()
@@ -484,6 +493,9 @@ func (vs *EnhancedBaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) 
 }
 
 // Update handles PUT /resource/{id}/
+// Performs full update of a resource instance.
+// Validates authentication, permissions, and throttling before processing.
+// Returns the updated resource on success, or appropriate error response.
 func (vs *EnhancedBaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 	vs.SetAction("update")
 	ctx := r.Context()
@@ -639,12 +651,19 @@ func (vs *EnhancedBaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 // PartialUpdate handles PATCH /resource/{id}/
+// PartialUpdate handles PATCH /resource/{id}/
+// Performs partial update of a resource instance (only provided fields).
+// Currently delegates to Update - will be enhanced to support partial updates.
+// Validates authentication, permissions, and throttling before processing.
 func (vs *EnhancedBaseViewSet) PartialUpdate(w http.ResponseWriter, r *http.Request) {
 	// For now, same as Update - will be enhanced later
 	vs.Update(w, r)
 }
 
 // Destroy handles DELETE /resource/{id}/
+// Deletes a resource instance by ID.
+// Validates authentication, permissions, and throttling before processing.
+// Returns 204 No Content on success, or appropriate error response.
 func (vs *EnhancedBaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 	vs.SetAction("destroy")
 	ctx := r.Context()

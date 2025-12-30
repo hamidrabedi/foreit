@@ -2,40 +2,141 @@ package admin
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
-	query "github.com/forgego/forge/orm"
+	adminfilter "github.com/forgego/forge/admin/filter"
+	adminorm "github.com/forgego/forge/admin/orm"
+	adminschema "github.com/forgego/forge/admin/schema"
+	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/schema"
 )
 
 // Admin represents a type-safe admin configuration for a model
+// It fully integrates with schema, ORM, and filter systems
 type Admin[T any] struct {
-	model   T
-	manager *query.Manager[T]
-	config  *Config[T]
-	name    string
+	// Core dependencies
+	schema      schema.Schema
+	manager     *adminorm.AdminManager[T]
+	filterset   *adminfilter.AdminFilterSet[T]
+	config      *Config[T]
+	modelSchema *orm.ModelSchema
+
+	// Discovered information
+	fields    []adminschema.FieldInfo
+	relations []adminschema.RelationInfo
+	meta      adminschema.MetaInfo
+
+	// Metadata
+	name string
 }
 
 // Register registers a model with the admin system
-func Register[T any](model T, manager *query.Manager[T], config *Config[T]) *Admin[T] {
-	// Get model name from type
+// It automatically discovers fields, relations, and metadata from the schema
+func Register[T any](
+	schemaInstance schema.Schema,
+	manager *orm.Manager[T],
+	config *Config[T],
+) (*Admin[T], error) {
+	// Get model schema from ORM
+	modelSchema, err := orm.GetModelSchema[T]()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get model schema: %w", err)
+	}
+
+	// Create admin manager wrapper
+	adminManager, err := adminorm.NewAdminManager(manager)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create admin manager: %w", err)
+	}
+
+	// Create filterset
+	adminFilterSet, err := adminfilter.NewAdminFilterSet[T]()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create filterset: %w", err)
+	}
+
+	// Discover fields from schema
+	fields, err := adminschema.DiscoverFields[T](schemaInstance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover fields: %w", err)
+	}
+
+	// Discover relations from schema
+	relations, err := adminschema.DiscoverRelations[T](schemaInstance)
+	if err != nil {
+		return nil, fmt.Errorf("failed to discover relations: %w", err)
+	}
+
+	// Discover metadata
+	meta := adminschema.DiscoverMeta(schemaInstance)
+
+	// Build filters from schema
+	if err := adminfilter.BuildFiltersFromSchema[T](schemaInstance, adminFilterSet.FilterSet()); err != nil {
+		return nil, fmt.Errorf("failed to build filters: %w", err)
+	}
+
+	// Get model name
 	var zero T
 	typ := reflect.TypeOf(zero)
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 	}
 	name := typ.Name()
+	if meta.TableName != "" {
+		name = meta.TableName
+	}
 
 	admin := &Admin[T]{
-		model:   model,
-		manager: manager,
-		config:  config,
-		name:    name,
+		schema:      schemaInstance,
+		manager:     adminManager,
+		filterset:   adminFilterSet,
+		config:      config,
+		modelSchema: modelSchema,
+		fields:      fields,
+		relations:   relations,
+		meta:        meta,
+		name:        name,
+	}
+
+	// Auto-configure from schema if config is minimal
+	if config != nil {
+		admin.autoConfigureFromSchema()
 	}
 
 	// Register with global registry
 	globalRegistry.register(admin)
 
-	return admin
+	return admin, nil
+}
+
+// autoConfigureFromSchema auto-configures admin from discovered schema information
+func (a *Admin[T]) autoConfigureFromSchema() {
+	if a.config == nil {
+		return
+	}
+
+	// Auto-configure list display if not set
+	if len(a.config.ListDisplay) == 0 {
+		// Use first few fields that should be displayed
+		fieldMapper := adminschema.NewFieldMapper()
+		for _, field := range a.fields {
+			if fieldMapper.ShouldDisplayInList(field.SchemaField) {
+				// Add to list display (would need to create field expressions)
+				// This is a placeholder - actual implementation would create proper field expressions
+			}
+		}
+	}
+
+	// Auto-configure search fields if not set
+	if len(a.config.SearchFields) == 0 {
+		// Use string fields for search
+		for _, field := range a.fields {
+			if field.Type == schema.TypeString || field.Type == schema.TypeText || field.Type == schema.TypeEmail {
+				// Add to search fields (would need to create field expressions)
+			}
+		}
+	}
 }
 
 // ModelName returns the name of the model
@@ -43,20 +144,50 @@ func (a *Admin[T]) ModelName() string {
 	return a.name
 }
 
-// Manager returns the manager for this admin
-func (a *Admin[T]) Manager() *query.Manager[T] {
+// Manager returns the admin manager
+func (a *Admin[T]) Manager() *adminorm.AdminManager[T] {
 	return a.manager
 }
 
-// Config returns the configuration for this admin
+// FilterSet returns the admin filterset
+func (a *Admin[T]) FilterSet() *adminfilter.AdminFilterSet[T] {
+	return a.filterset
+}
+
+// Config returns the configuration
 func (a *Admin[T]) Config() *Config[T] {
 	return a.config
 }
 
+// Schema returns the schema instance
+func (a *Admin[T]) Schema() schema.Schema {
+	return a.schema
+}
+
+// ModelSchema returns the ORM model schema
+func (a *Admin[T]) ModelSchema() *orm.ModelSchema {
+	return a.modelSchema
+}
+
+// Fields returns discovered field information
+func (a *Admin[T]) Fields() []adminschema.FieldInfo {
+	return a.fields
+}
+
+// Relations returns discovered relation information
+func (a *Admin[T]) Relations() []adminschema.RelationInfo {
+	return a.relations
+}
+
+// Meta returns model metadata
+func (a *Admin[T]) Meta() adminschema.MetaInfo {
+	return a.meta
+}
+
 // GetQueryset returns the base queryset for this admin
-func (a *Admin[T]) GetQueryset(ctx context.Context) (query.QuerySet[T], error) {
+func (a *Admin[T]) GetQueryset(ctx context.Context) (orm.QuerySet[T], error) {
 	// Start with manager's base queryset
-	qs, err := a.manager.Filter(nil)
+	qs, err := a.manager.GetQueryset(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -154,4 +285,24 @@ func (a *Admin[T]) HasModulePermission(ctx context.Context, user interface{}) bo
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermView))
 	}
 	return true // Default allow
+}
+
+// ModelType returns the model type for Admin[T]
+func (a *Admin[T]) ModelType() reflect.Type {
+	var zero T
+	typ := reflect.TypeOf(zero)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	return typ
+}
+
+// ManagerInterface returns the manager as interface{} for dynamic access
+func (a *Admin[T]) ManagerInterface() interface{} {
+	return a.manager.Manager()
+}
+
+// ConfigInterface returns the config as interface{} for dynamic access
+func (a *Admin[T]) ConfigInterface() interface{} {
+	return a.config
 }

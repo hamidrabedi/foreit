@@ -314,6 +314,90 @@ func ExecuteInsert(ctx context.Context, database *db.DB, sql string, args []inte
 	return id, nil
 }
 
+// BuildBulkInsertSQL builds a bulk INSERT SQL statement for multiple instances
+func BuildBulkInsertSQL(instances []interface{}, tableName string) (sql string, values []interface{}, columns []string, err error) {
+	if len(instances) == 0 {
+		return "", nil, nil, fmt.Errorf("no instances to insert")
+	}
+
+	// Use first instance to determine columns
+	firstInstance := instances[0]
+	_, _, columns, err = BuildInsertSQL(firstInstance, tableName)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("failed to build insert SQL for first instance: %w", err)
+	}
+
+	if len(columns) == 0 {
+		return "", nil, nil, fmt.Errorf("no columns to insert")
+	}
+
+	// Build VALUES clause for all instances
+	var valueClauses []string
+	var allValues []interface{}
+	paramIndex := 1
+
+	for _, instance := range instances {
+		// Get values for this instance
+		_, instanceValues, _, err := BuildInsertSQL(instance, tableName)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("failed to build insert SQL for instance: %w", err)
+		}
+
+		// Build placeholders for this row
+		var placeholders []string
+		for range instanceValues {
+			placeholders = append(placeholders, fmt.Sprintf("$%d", paramIndex))
+			paramIndex++
+		}
+		valueClauses = append(valueClauses, "("+strings.Join(placeholders, ", ")+")")
+		allValues = append(allValues, instanceValues...)
+	}
+
+	// Build final SQL: INSERT INTO table (cols) VALUES (row1), (row2), ... RETURNING id
+	escapedColumns := make([]string, len(columns))
+	for i, col := range columns {
+		escapedColumns[i] = EscapeIdentifier(col)
+	}
+
+	sql = fmt.Sprintf(
+		"INSERT INTO %s (%s) VALUES %s RETURNING id",
+		EscapeIdentifier(tableName),
+		strings.Join(escapedColumns, ", "),
+		strings.Join(valueClauses, ", "),
+	)
+
+	return sql, allValues, columns, nil
+}
+
+// ExecuteBulkInsert executes a bulk INSERT statement and returns all generated IDs
+func ExecuteBulkInsert(ctx context.Context, database *db.DB, sql string, args []interface{}) ([]int64, error) {
+	sqldb, err := getSQLDB(database)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := sqldb.QueryContext(ctx, database.Rebind(sql), args...)
+	if err != nil {
+		return nil, fmt.Errorf("bulk insert failed: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan ID: %w", err)
+		}
+		ids = append(ids, id)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	return ids, nil
+}
+
 // ExecuteUpdate executes an UPDATE statement and returns rows affected
 func ExecuteUpdate(ctx context.Context, database *db.DB, sql string, args []interface{}) (int64, error) {
 	sqldb, err := getSQLDB(database)

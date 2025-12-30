@@ -18,7 +18,7 @@ Declarative model definitions with full Django field options, relationships, met
 **Location:** `forge/codegen/`  
 **Documentation:** [features/code-generation.md](features/code-generation.md)
 
-AST-based code generation for models, managers, querysets, and field expressions.
+AST-based code generation for models, managers, querysets, and field expressions. Generates type-safe Go code from schema definitions.
 
 ### 3. Type-Safe ORM
 **Status:** ✅ Complete  
@@ -46,28 +46,28 @@ DRF-like REST API framework with serializers, viewsets, authentication, permissi
 **Location:** `forge/filter/`  
 **Documentation:** [features/filter-system.md](features/filter-system.md)
 
-Advanced filtering system with AST support, query parsing, expression conversion, and security validation.
+Advanced filtering system with AST support, query parsing, expression conversion, security validation, and query optimization.
 
 ### 7. Identity System
 **Status:** ✅ Complete  
 **Location:** `forge/identity/`  
 **Documentation:** [features/identity-system.md](features/identity-system.md)
 
-Complete user management and authentication system with repositories, services, backends, and permissions.
+Complete user management and authentication system with repositories, services, authentication backends, permissions, sessions, password management, and HTTP handlers.
 
 ### 8. Database Layer
 **Status:** ✅ Complete  
 **Location:** `forge/db/`  
 **Documentation:** [features/database-layer.md](features/database-layer.md)
 
-Database connection management, transactions, and migration integration.
+Database connection management with pooling, transaction support with savepoints, and migration integration.
 
 ### 9. Migration System
 **Status:** ✅ Complete  
-**Location:** `forge/migrate/`  
+**Location:** `forge/db/migrate/` and `forge/migrate/`  
 **Documentation:** [features/migration-system.md](features/migration-system.md)
 
-Database schema migrations with detection, diff generation, execution, and rollback.
+Complete migration system with schema detection, diff generation, SQL generation, execution, rollback, state management, and drift detection.
 
 ### 10. HTTP & Server
 **Status:** ✅ Complete  
@@ -222,18 +222,18 @@ Each feature has:
 ## Feature Documentation
 
 For detailed documentation on each feature, see:
-- [features/schema-system.md](features/schema-system.md)
-- [features/code-generation.md](features/code-generation.md)
-- [features/orm-system.md](features/orm-system.md)
-- [features/admin-system.md](features/admin-system.md)
-- [features/api-framework.md](features/api-framework.md)
-- [features/filter-system.md](features/filter-system.md)
-- [features/identity-system.md](features/identity-system.md)
-- [features/database-layer.md](features/database-layer.md)
-- [features/migration-system.md](features/migration-system.md)
-- [features/http-server.md](features/http-server.md)
-- [features/logging-system.md](features/logging-system.md)
-- [features/configuration-system.md](features/configuration-system.md)
-- [features/validation-system.md](features/validation-system.md)
-- [features/security-system.md](features/security-system.md)
-- [features/cli-tools.md](features/cli-tools.md)
+- [features/schema-system.md](features/schema-system.md) - Schema definition system
+- [features/code-generation.md](features/code-generation.md) - Code generation from schemas
+- [features/orm-system.md](features/orm-system.md) - Type-safe ORM system
+- [features/admin-system.md](features/admin-system.md) - Django-like admin interface
+- [features/api-framework.md](features/api-framework.md) - DRF-like REST API framework
+- [features/filter-system.md](features/filter-system.md) - Advanced filtering system
+- [features/identity-system.md](features/identity-system.md) - User management and authentication
+- [features/database-layer.md](features/database-layer.md) - Database connection and transactions
+- [features/migration-system.md](features/migration-system.md) - Database migration system
+- [features/http-server.md](features/http-server.md) - HTTP server and routing
+- [features/logging-system.md](features/logging-system.md) - Structured logging
+- [features/configuration-system.md](features/configuration-system.md) - Configuration management
+- [features/validation-system.md](features/validation-system.md) - Data validation
+- [features/security-system.md](features/security-system.md) - Security features
+- [features/cli-tools.md](features/cli-tools.md) - Command-line interface

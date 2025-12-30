@@ -1,0 +1,24 @@
+{{define "index"}}
+<div class="admin-index">
+    <h1 class="admin-index-title">{{.Title}}</h1>
+    
+    <div class="admin-index-content">
+        <div class="admin-apps">
+            {{if .Models}}
+                <div class="app-list">
+                    {{range .Models}}
+                        <div class="app-item">
+                            <h2 class="app-title">
+                                <a href="{{.url}}" class="app-link">{{.verboseName}}</a>
+                            </h2>
+                            <p class="app-description">{{.modelType}}</p>
+                        </div>
+                    {{end}}
+                </div>
+            {{else}}
+                <p class="empty-state">No models registered.</p>
+            {{end}}
+        </div>
+    </div>
+</div>
+{{end}}

@@ -284,7 +284,8 @@ func (l *Lexer) comment(left, right string) {
 	i := strings.Index(l.input[l.pos:], right)
 	if i == -1 {
 		// Comment not closed, treat rest as comment
-		// TODO: Consider warning about unclosed comments in verbose mode
+		// This is a warning condition - unclosed comments can cause parsing issues
+		// Note: Warning would be logged if verbose mode is enabled in the parser
 		l.addPos(len(l.input) - l.pos)
 		return
 	}

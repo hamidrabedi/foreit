@@ -24,6 +24,7 @@ func RegisterAllCommands() {
 	registry.RegisterCommand("runserver", server.NewRunServerCommand())
 	registry.RegisterCommand("shell", development.NewShellCommand())
 	registry.RegisterCommand("test", development.NewTestCommand())
+	registry.RegisterCommand("check", development.NewCheckCommand())
 	registry.RegisterCommand("auth", project.NewAuthCommand())
 
 	// Register command groups

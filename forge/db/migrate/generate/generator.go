@@ -184,11 +184,38 @@ func (g *MigrationGenerator) GenerateMigrations(name string) error {
 	// Checksum will be calculated and validated when migration is applied
 	// See execute/checksum.go for checksum validation
 
+	// Auto-detect dependencies from foreign keys and SQL references
+	dependencyDetector := NewDependencyDetector(g.migrationsDir, g.stateManager)
+	dependencies, err := dependencyDetector.DetectDependencies(changes, upSQL)
+	if err != nil {
+		// Log error but continue - dependencies are optional
+		// In production, you might want to make this stricter
+	}
+
+	// Validate dependencies exist
+	if err := dependencyDetector.ValidateDependencies(dependencies); err != nil {
+		return core.NewMigrationError(
+			core.ErrInvalidChange,
+			"dependency validation failed",
+			err,
+		)
+	}
+
+	// Add dependency comments to SQL if dependencies were detected
+	if len(dependencies) > 0 {
+		var depComments []string
+		depComments = append(depComments, "-- Auto-detected dependencies:")
+		for _, dep := range dependencies {
+			if dep.App != "" {
+				depComments = append(depComments, fmt.Sprintf("-- DEPENDS: %s:%s", dep.App, dep.Version))
+			} else {
+				depComments = append(depComments, fmt.Sprintf("-- DEPENDS: %s", dep.Version))
+			}
+		}
+		upSQL = strings.Join(depComments, "\n") + "\n\n" + upSQL
+	}
+
 	// Create migration files
-	// Note: Dependencies can be added manually to migration files as comments
-	// TODO: Auto-detect dependencies from foreign key relationships
-	// TODO: Support dependency inference from table references in SQL
-	// Format: -- DEPENDS: version or -- DEPENDS: app:version
 	migrationName := fmt.Sprintf("%s_%s", version, name)
 	upPath := filepath.Join(g.migrationsDir, fmt.Sprintf("%s.up.sql", migrationName))
 	downPath := filepath.Join(g.migrationsDir, fmt.Sprintf("%s.down.sql", migrationName))

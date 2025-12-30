@@ -33,25 +33,29 @@ This document provides detailed implementation information for all features in t
 **Status:** ✅ Complete
 
 **Implementation Details:**
-- AST-based schema parsing
-- Model struct generation
-- FieldExpr generation
+- AST-based schema parsing from Go source
+- Model struct generation with proper types
+- FieldExpr generation for type-safe field access
 - Manager generation with CRUD operations
-- QuerySet generation
-- SQL builder integration
+- QuerySet generation with type safety
+- Template-based code generation
+- Import management
+- Code formatting (goimports)
+- Error handling and validation
 
 **Key Files:**
-- `ast_parser.go` - Go AST parser
-- `generator.go` - Code generator
-- `writer.go` - Code file writer
+- `ast_parser.go` - Go AST parser for schema extraction
+- `generator.go` - Main code generator
+- `writer.go` - Code file writer with formatting
 - `templates.go` - Code generation templates
 - `templates/` - Template files
 
 **Generated Code:**
-- Model structs with proper types
-- FieldExpr for type-safe field access
+- Model structs with proper types and DB tags
+- FieldExpr definitions for type-safe field access
 - Manager with Create, Update, Delete, Get methods
-- QuerySet wrappers with type safety
+- QuerySet wrappers with full type safety
+- Field accessors and setters
 
 #### 3. ORM System
 **Location:** `forge/orm/`  
@@ -156,15 +160,18 @@ This document provides detailed implementation information for all features in t
 **Status:** ✅ Complete
 
 **Implementation Details:**
+- Type-safe FilterSet with generics
 - Base Filter interface
-- FilterSet implementation
-- Query string parser
-- AST representation
-- Expression converter
-- Filter implementations (Boolean, Choice, Date, Number, Text, Related, Custom)
-- Filter widgets
-- Security validation
+- FilterSet implementation with AST support
+- Query string parser with multiple formats
+- AST representation for complex filters
+- Expression converter to ORM expressions
+- Multiple filter types (Boolean, Choice, Date, Number, Text, Related, Custom)
+- Filter widgets for UI
+- Security validation (field whitelist/blacklist, lookup restrictions)
 - Query optimization
+- Filter persistence and sharing
+- Custom filter registration
 
 **Key Files:**
 - `filter.go` - Base filter interface
@@ -176,66 +183,85 @@ This document provides detailed implementation information for all features in t
 - `widgets/` - Filter widgets
 - `security.go` - Security validation
 - `optimizer.go` - Query optimization
+- `custom.go` - Custom filter support
+- `persistence.go` - Filter persistence
 
 #### 7. Identity System
 **Location:** `forge/identity/`  
 **Status:** ✅ Complete
 
 **Implementation Details:**
-- User, Session, Permission, Group, Token models
-- Repository pattern for data access
+- Complete User model with all Django-like fields
+- Session, Permission, Group, Token models
+- Repository pattern for data access (User, Session, Token, Permission, Group)
 - Service layer for business logic (User, Auth, Password, Permission)
-- Authentication backends (Password, Token)
-- API serializers
-- HTTP handlers
-- Authentication middleware
-- Factory for system setup
-- Configuration system
+- Multiple authentication backends (Password, Token) with registry
+- Backend strategy pattern for extensibility
+- API serializers for all models
+- Complete HTTP handlers (register, login, logout, CRUD)
+- Authentication and authorization middleware
+- Password management with bcrypt and policies
+- Account security (lockout, expiration, verification)
+- Factory for complete system setup
+- Configuration system with password policies
 
 **Key Files:**
-- `models/` - User models
+- `models/` - User and related models
 - `repository/` - Data access layer
-- `service/` - Business logic
-- `backends/` - Authentication backends
+- `service/` - Business logic services
+- `backends/` - Authentication backends with registry
 - `serializers/` - API serializers
 - `handlers/` - HTTP handlers
-- `middleware/` - Authentication middleware
+- `middleware/` - Authentication and authorization middleware
 - `factory.go` - System setup
 - `config/` - Configuration
+- `router.go` - Route registration
 
 #### 8. Database Layer
 **Location:** `forge/db/`  
 **Status:** ✅ Complete
 
 **Implementation Details:**
-- Database connection wrapper
-- Connection pooling
+- Database connection wrapper with pooling
+- Multiple driver support (PostgreSQL, SQLite)
 - Transaction management with savepoints
+- Nested transaction support
 - Migration system integration
 - SQL builder integration
+- Connection health checks
+- Config-based connection setup
 
 **Key Files:**
-- `db.go` - Database connection
-- `transaction.go` - Transaction management
+- `db.go` - Database connection wrapper
+- `transaction.go` - Transaction management with savepoints
 - `migrations.go` - Migration integration
-- `migrate/` - Migration utilities
 
 #### 9. Migration System
-**Location:** `forge/migrate/`  
+**Location:** `forge/db/migrate/` and `forge/migrate/`  
 **Status:** ✅ Complete
 
 **Implementation Details:**
-- Schema detection
-- Diff generation
-- Migration execution
+- AST-based schema parsing
+- State management and tracking
+- Change detection (15+ change types)
+- SQL generation for multiple dialects
+- Migration execution with transactions
 - Rollback support
-- Migration verification
+- Migration verification and drift detection
+- Dependency resolution
+- Checksum verification
+- Safety checks and validation
+- Dry-run mode
+- Recovery from failed migrations
 
 **Key Files:**
-- `migrate.go` - Migration execution
-- `core.go` - Core migration logic
-- `generate/` - Migration generation
-- `verify/` - Migration verification
+- `migrate.go` - Public API
+- `generate/generator.go` - Migration generation
+- `generate/detector.go` - Change detection
+- `state/manager.go` - State management
+- `sql/builder.go` - SQL generation
+- `execute/executor.go` - Migration execution
+- `verify/` - Verification and drift detection
 
 #### 10. HTTP & Server
 **Location:** `forge/server/`  

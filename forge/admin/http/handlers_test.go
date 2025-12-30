@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	adminv2 "github.com/forgego/forge/admin"
-	"github.com/forgego/forge/orm"
+	query "github.com/forgego/forge/orm"
 	"github.com/go-chi/chi/v5"
 )
 

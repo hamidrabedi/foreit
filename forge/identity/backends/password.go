@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 )
 
 // Predefined errors
@@ -81,7 +81,7 @@ func (b *passwordBackend) Authenticate(ctx context.Context, credentials map[stri
 	}
 
 	// Check password
-	if !identity.CheckPassword(password, user.Password) {
+	if !utils.CheckPassword(password, user.Password) {
 		return nil, ErrInvalidCredentials
 	}
 

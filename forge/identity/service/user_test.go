@@ -2,13 +2,16 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func setupUserServiceTest(t *testing.T) (UserService, *db.DB, context.Context) {
@@ -20,8 +23,12 @@ func setupUserServiceTest(t *testing.T) (UserService, *db.DB, context.Context) {
 }
 
 func setupTestDB(t *testing.T) *db.DB {
-	testDB, err := db.NewDBWithDriver("sqlite", ":memory:", db.DefaultConfig())
+	sqlDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
+	// Ensure single connection for in-memory DB
+	sqlDB.SetMaxOpenConns(1)
+
+	testDB := &db.DB{DB: sqlDB, Driver: "sqlite3"}
 
 	_, err = testDB.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
@@ -83,7 +90,7 @@ func TestUserService_Register(t *testing.T) {
 		assert.Equal(t, "newuser@example.com", user.Email)
 		assert.True(t, user.IsActive)
 		assert.False(t, user.IsSuperuser)
-		assert.True(t, identity.CheckPassword("SecurePassword123!", user.Password))
+		assert.True(t, utils.CheckPassword("SecurePassword123!", user.Password))
 	})
 
 	t.Run("fails with duplicate email", func(t *testing.T) {

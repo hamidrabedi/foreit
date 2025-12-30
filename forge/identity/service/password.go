@@ -9,10 +9,10 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/identity/config"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 )
 
 // passwordService implements PasswordService interface
@@ -44,7 +44,7 @@ func (s *passwordService) ChangePassword(ctx context.Context, userID int64, req 
 	}
 
 	// Verify current password
-	if !identity.CheckPassword(req.CurrentPassword, user.Password) {
+	if !utils.CheckPassword(req.CurrentPassword, user.Password) {
 		return fmt.Errorf("current password is incorrect")
 	}
 
@@ -54,7 +54,7 @@ func (s *passwordService) ChangePassword(ctx context.Context, userID int64, req 
 	}
 
 	// Hash new password
-	hashedPassword, err := identity.HashPassword(req.NewPassword)
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -88,7 +88,7 @@ func (s *passwordService) RequestPasswordReset(ctx context.Context, email string
 	}
 
 	// Hash token before storing
-	hashedToken, err := identity.HashPassword(token)
+	hashedToken, err := utils.HashPassword(token)
 	if err != nil {
 		return fmt.Errorf("failed to hash token: %w", err)
 	}
@@ -141,7 +141,7 @@ func (s *passwordService) ResetPassword(ctx context.Context, token string, newPa
 	}
 
 	// Hash new password
-	hashedPassword, err := identity.HashPassword(newPassword)
+	hashedPassword, err := utils.HashPassword(newPassword)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %w", err)
 	}
@@ -223,7 +223,7 @@ func (s *passwordService) ValidatePassword(password string, user *models.User) e
 
 // CheckPassword checks if a password matches
 func (s *passwordService) CheckPassword(user *models.User, password string) bool {
-	return identity.CheckPassword(password, user.Password)
+	return utils.CheckPassword(password, user.Password)
 }
 
 // generateSecureToken generates a secure random token

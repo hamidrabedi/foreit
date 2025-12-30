@@ -77,66 +77,66 @@ func GetErrorCodesByVersion(version string) []*ErrorCode {
 // Common error codes - these are registered automatically
 const (
 	// Validation errors
-	CodeValidationError        = "VALIDATION_ERROR"
-	CodeInvalidField          = "INVALID_FIELD"
-	CodeMissingField          = "MISSING_FIELD"
-	CodeInvalidFormat         = "INVALID_FORMAT"
-	CodeValueTooShort         = "VALUE_TOO_SHORT"
-	CodeValueTooLong          = "VALUE_TOO_LONG"
-	CodeInvalidEmail          = "INVALID_EMAIL"
-	CodeInvalidURL            = "INVALID_URL"
-	CodeInvalidUUID           = "INVALID_UUID"
-	CodeInvalidDate           = "INVALID_DATE"
-	CodeInvalidNumber         = "INVALID_NUMBER"
-	CodeValueOutOfRange       = "VALUE_OUT_OF_RANGE"
-	CodeDuplicateValue        = "DUPLICATE_VALUE"
+	CodeValidationError = "VALIDATION_ERROR"
+	CodeInvalidField    = "INVALID_FIELD"
+	CodeMissingField    = "MISSING_FIELD"
+	CodeInvalidFormat   = "INVALID_FORMAT"
+	CodeValueTooShort   = "VALUE_TOO_SHORT"
+	CodeValueTooLong    = "VALUE_TOO_LONG"
+	CodeInvalidEmail    = "INVALID_EMAIL"
+	CodeInvalidURL      = "INVALID_URL"
+	CodeInvalidUUID     = "INVALID_UUID"
+	CodeInvalidDate     = "INVALID_DATE"
+	CodeInvalidNumber   = "INVALID_NUMBER"
+	CodeValueOutOfRange = "VALUE_OUT_OF_RANGE"
+	CodeDuplicateValue  = "DUPLICATE_VALUE"
 
 	// Authentication errors
-	CodeAuthenticationFailed  = "AUTHENTICATION_FAILED"
-	CodeInvalidCredentials    = "INVALID_CREDENTIALS"
-	CodeTokenExpired          = "TOKEN_EXPIRED"
-	CodeTokenInvalid          = "TOKEN_INVALID"
-	CodeTokenMissing          = "TOKEN_MISSING"
-	CodeSessionExpired        = "SESSION_EXPIRED"
+	CodeAuthenticationFailed = "AUTHENTICATION_FAILED"
+	CodeInvalidCredentials   = "INVALID_CREDENTIALS"
+	CodeTokenExpired         = "TOKEN_EXPIRED"
+	CodeTokenInvalid         = "TOKEN_INVALID"
+	CodeTokenMissing         = "TOKEN_MISSING"
+	CodeSessionExpired       = "SESSION_EXPIRED"
 
 	// Authorization errors
-	CodePermissionDenied      = "PERMISSION_DENIED"
+	CodePermissionDenied        = "PERMISSION_DENIED"
 	CodeInsufficientPermissions = "INSUFFICIENT_PERMISSIONS"
-	CodeForbidden             = "FORBIDDEN"
-	CodeNotOwner              = "NOT_OWNER"
+	CodeForbidden               = "FORBIDDEN"
+	CodeNotOwner                = "NOT_OWNER"
 
 	// Not found errors
-	CodeNotFound              = "NOT_FOUND"
-	CodeResourceNotFound      = "RESOURCE_NOT_FOUND"
-	CodeUserNotFound          = "USER_NOT_FOUND"
-	CodeRecordNotFound        = "RECORD_NOT_FOUND"
+	CodeNotFound         = "NOT_FOUND"
+	CodeResourceNotFound = "RESOURCE_NOT_FOUND"
+	CodeUserNotFound     = "USER_NOT_FOUND"
+	CodeRecordNotFound   = "RECORD_NOT_FOUND"
 
 	// Conflict errors
-	CodeConflict              = "CONFLICT"
-	CodeDuplicateResource     = "DUPLICATE_RESOURCE"
-	CodeResourceExists        = "RESOURCE_EXISTS"
+	CodeConflict          = "CONFLICT"
+	CodeDuplicateResource = "DUPLICATE_RESOURCE"
+	CodeResourceExists    = "RESOURCE_EXISTS"
 
 	// Rate limit errors
-	CodeRateLimitExceeded     = "RATE_LIMIT_EXCEEDED"
-	CodeTooManyRequests       = "TOO_MANY_REQUESTS"
+	CodeRateLimitExceeded = "RATE_LIMIT_EXCEEDED"
+	CodeTooManyRequests   = "TOO_MANY_REQUESTS"
 
 	// Internal errors
-	CodeInternalError         = "INTERNAL_ERROR"
-	CodeDatabaseError         = "DATABASE_ERROR"
-	CodeServiceUnavailable    = "SERVICE_UNAVAILABLE"
-	CodeTimeout               = "TIMEOUT"
+	CodeInternalError      = "INTERNAL_ERROR"
+	CodeDatabaseError      = "DATABASE_ERROR"
+	CodeServiceUnavailable = "SERVICE_UNAVAILABLE"
+	CodeTimeout            = "TIMEOUT"
 
 	// Bad request errors
-	CodeBadRequest            = "BAD_REQUEST"
-	CodeInvalidJSON           = "INVALID_JSON"
-	CodeInvalidXML            = "INVALID_XML"
-	CodeInvalidContentType    = "INVALID_CONTENT_TYPE"
-	CodeMissingRequiredField  = "MISSING_REQUIRED_FIELD"
+	CodeBadRequest           = "BAD_REQUEST"
+	CodeInvalidJSON          = "INVALID_JSON"
+	CodeInvalidXML           = "INVALID_XML"
+	CodeInvalidContentType   = "INVALID_CONTENT_TYPE"
+	CodeMissingRequiredField = "MISSING_REQUIRED_FIELD"
 
 	// Method errors
-	CodeMethodNotAllowed      = "METHOD_NOT_ALLOWED"
-	CodeNotAcceptable         = "NOT_ACCEPTABLE"
-	CodeUnsupportedMediaType  = "UNSUPPORTED_MEDIA_TYPE"
+	CodeMethodNotAllowed     = "METHOD_NOT_ALLOWED"
+	CodeNotAcceptable        = "NOT_ACCEPTABLE"
+	CodeUnsupportedMediaType = "UNSUPPORTED_MEDIA_TYPE"
 )
 
 // init registers common error codes

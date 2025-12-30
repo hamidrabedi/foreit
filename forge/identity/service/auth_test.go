@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/forgego/forge/identity"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/backends"
 	"github.com/forgego/forge/identity/models"
@@ -83,7 +83,7 @@ func (m *mockBackendRegistry) Authenticate(ctx context.Context, credentials map[
 	}
 
 	password := credentials["password"]
-	if !identity.CheckPassword(password, user.Password) {
+	if !utils.CheckPassword(password, user.Password) {
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
@@ -99,7 +99,7 @@ func TestAuthService_Authenticate(t *testing.T) {
 	defer testDB.Close()
 
 	// Create test user
-	hashedPassword, _ := identity.HashPassword("correctpassword")
+	hashedPassword, _ := utils.HashPassword("correctpassword")
 	userRepo := repository.NewUserRepository(testDB)
 	user := &models.User{
 		Username: "testuser",
@@ -181,7 +181,7 @@ func TestAuthService_CreateSession(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("password123")
+	hashedPassword, _ := utils.HashPassword("password123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -230,7 +230,7 @@ func TestAuthService_GetSession(t *testing.T) {
 
 	// Create test user and session
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("password123")
+	hashedPassword, _ := utils.HashPassword("password123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -267,7 +267,7 @@ func TestAuthService_Logout(t *testing.T) {
 
 	// Create test user and session
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("password123")
+	hashedPassword, _ := utils.HashPassword("password123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -301,7 +301,7 @@ func TestAuthService_LogoutAll(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("password123")
+	hashedPassword, _ := utils.HashPassword("password123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",

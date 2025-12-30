@@ -49,7 +49,7 @@ func RequestIDMiddleware(headerName string, generateIfMissing bool) func(http.Ha
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Get request ID from header or generate one
 			requestID := r.Header.Get(headerName)
-			
+
 			if requestID == "" && generateIfMissing {
 				requestID = uuid.New().String()
 			}
@@ -58,7 +58,7 @@ func RequestIDMiddleware(headerName string, generateIfMissing bool) func(http.Ha
 			if requestID != "" {
 				ctx := WithRequestID(r.Context(), requestID)
 				r = r.WithContext(ctx)
-				
+
 				// Add to response header
 				w.Header().Set(headerName, requestID)
 			}

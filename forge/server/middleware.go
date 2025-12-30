@@ -9,9 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-chi/cors"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	"go.uber.org/zap"
+	"github.com/go-chi/cors"
 )
 
 // Middleware is a function that wraps an http.Handler
@@ -155,7 +154,7 @@ type SecureHeadersOptions struct {
 	CSP string
 
 	// Cross-Origin policies
-	CrossOriginOpenerPolicy string
+	CrossOriginOpenerPolicy   string
 	CrossOriginEmbedderPolicy string
 
 	// Other security headers
@@ -179,7 +178,7 @@ func DefaultSecureHeadersOptions() *SecureHeadersOptions {
 		XFrameOptions:             "DENY",
 		XXSSProtection:            "1; mode=block",
 		ReferrerPolicy:            "strict-origin-when-cross-origin",
-		PermissionsPolicy:        "",
+		PermissionsPolicy:         "",
 	}
 }
 
@@ -399,45 +398,6 @@ func ConditionalGet(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-// LoggerWithZap creates a logger middleware using zap logger
-// DEPRECATED: Use log.Middleware() instead for better integration
-func LoggerWithZap(logger *zap.Logger) Middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-
-			ww := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
-
-			next.ServeHTTP(ww, r)
-
-			duration := time.Since(start)
-
-			fields := []zap.Field{
-				zap.String("method", r.Method),
-				zap.String("path", r.URL.Path),
-				zap.String("query", r.URL.RawQuery),
-				zap.Int("status", ww.statusCode),
-				zap.Duration("duration", duration),
-				zap.String("ip", r.RemoteAddr),
-				zap.String("user_agent", r.UserAgent()),
-			}
-
-			// Add request ID if available (check both old and new context keys)
-			if reqID := r.Context().Value(chimw.RequestIDKey); reqID != nil {
-				fields = append(fields, zap.String("request_id", reqID.(string)))
-			}
-
-			if ww.statusCode >= 500 {
-				logger.Error("HTTP request", fields...)
-			} else if ww.statusCode >= 400 {
-				logger.Warn("HTTP request", fields...)
-			} else {
-				logger.Info("HTTP request", fields...)
-			}
-		})
-	}
 }
 
 // responseWriter wraps http.ResponseWriter to capture status code

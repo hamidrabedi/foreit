@@ -70,7 +70,7 @@ func (h *Handler) Middleware() func(http.Handler) http.Handler {
 			rrw := &errorResponseWriter{
 				ResponseWriter: w,
 				handler:        h,
-				request:       r,
+				request:        r,
 			}
 
 			// Handle panics if enabled
@@ -229,9 +229,9 @@ func (h *Handler) logPanic(rec interface{}, problem *Problem, r *http.Request) {
 // errorResponseWriter wraps http.ResponseWriter to capture errors
 type errorResponseWriter struct {
 	http.ResponseWriter
-	handler  *Handler
-	request  *http.Request
-	written  bool
+	handler    *Handler
+	request    *http.Request
+	written    bool
 	statusCode int
 }
 
@@ -261,4 +261,3 @@ func (w *errorResponseWriter) handlePanic(rec interface{}) {
 	}
 	w.handler.HandlePanic(w, w.request, rec)
 }
-

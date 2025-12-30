@@ -17,13 +17,13 @@ func (fs *FilterSidebar) Render() template.HTML {
 	for _, item := range fs.Items {
 		html += `<div class="filter-item">`
 		html += `<label>` + template.HTMLEscapeString(item.Label) + `</label>`
-		
+
 		// Render widget
 		widgetHTML, _ := item.Widget.Render(item.Name, nil, map[string]string{
 			"class": "form-control",
 		})
 		html += widgetHTML
-		
+
 		html += `</div>`
 	}
 

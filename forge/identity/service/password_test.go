@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/forgego/forge/identity"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/config"
 	"github.com/forgego/forge/identity/models"
@@ -31,7 +31,7 @@ func TestPasswordService_ChangePassword(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("oldpassword")
+	hashedPassword, _ := utils.HashPassword("oldpassword")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -53,8 +53,8 @@ func TestPasswordService_ChangePassword(t *testing.T) {
 		// Verify password was changed
 		updated, err := userRepo.GetByID(ctx, user.ID)
 		require.NoError(t, err)
-		assert.True(t, identity.CheckPassword("newpassword123!", updated.Password))
-		assert.False(t, identity.CheckPassword("oldpassword", updated.Password))
+		assert.True(t, utils.CheckPassword("newpassword123!", updated.Password))
+		assert.False(t, utils.CheckPassword("oldpassword", updated.Password))
 	})
 
 	t.Run("fails with incorrect current password", func(t *testing.T) {
@@ -115,7 +115,7 @@ func TestPasswordService_CheckPassword(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("correctpassword")
+	hashedPassword, _ := utils.HashPassword("correctpassword")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -140,7 +140,7 @@ func TestPasswordService_RequestPasswordReset(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("password123")
+	hashedPassword, _ := utils.HashPassword("password123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -172,7 +172,7 @@ func TestPasswordService_ResetPassword(t *testing.T) {
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
 	tokenRepo := repository.NewTokenRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("oldpassword")
+	hashedPassword, _ := utils.HashPassword("oldpassword")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -199,7 +199,7 @@ func TestPasswordService_ResetPassword(t *testing.T) {
 		// Verify password was changed
 		updated, err := userRepo.GetByID(ctx, user.ID)
 		require.NoError(t, err)
-		assert.True(t, identity.CheckPassword("newpassword123!", updated.Password))
+		assert.True(t, utils.CheckPassword("newpassword123!", updated.Password))
 	})
 
 	t.Run("fails with invalid token", func(t *testing.T) {

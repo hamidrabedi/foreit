@@ -20,7 +20,7 @@ func NewListEditableView[T any](admin *Admin[T]) *ListEditableView[T] {
 // SaveEdits saves edits made in the list view
 func (v *ListEditableView[T]) SaveEdits(ctx context.Context, edits []ListEdit[T]) error {
 	config := v.admin.Config()
-	
+
 	// Check if list_editable is configured
 	if len(config.ListEditable) == 0 {
 		return fmt.Errorf("list_editable is not configured for this admin")
@@ -81,7 +81,7 @@ type ListEdit[T any] struct {
 // ValidateEdits validates that edits are allowed
 func (v *ListEditableView[T]) ValidateEdits(ctx context.Context, edits []ListEdit[T]) error {
 	config := v.admin.Config()
-	
+
 	if len(config.ListEditable) == 0 {
 		return fmt.Errorf("list_editable is not configured")
 	}

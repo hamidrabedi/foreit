@@ -5,7 +5,6 @@ import (
 	"reflect"
 
 	query "github.com/forgego/forge/orm"
-	"github.com/forgego/forge/orm"
 )
 
 // Admin represents a type-safe admin configuration for a model

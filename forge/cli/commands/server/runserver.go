@@ -2,12 +2,10 @@ package server
 
 import (
 	"fmt"
-	"net/http"
+	"os"
+	"os/exec"
 
 	"github.com/forgego/forge/cli/core"
-	"github.com/forgego/forge/config"
-	httplib "github.com/forgego/forge/server"
-	"github.com/forgego/forge/log"
 	"github.com/spf13/cobra"
 )
 
@@ -32,51 +30,31 @@ func (c *RunServerCommand) Definition() *cobra.Command {
 
 // Execute runs the command logic
 func (c *RunServerCommand) Execute(ctx *core.Context, args []string) error {
-	settings := config.LoadSettings(ctx.Config)
-
-	// Override port if provided via flag
-	if port, err := ctx.Cmd.Flags().GetString("port"); err == nil && port != "" {
-		settings.Server.Port = port
+	// Check if cmd/server/main.go exists
+	if _, err := os.Stat("cmd/server/main.go"); os.IsNotExist(err) {
+		return fmt.Errorf("cmd/server/main.go not found. Are you in a Forge project root?")
 	}
 
-	// Create logger if not already set
-	if ctx.Logger == nil {
-		logger, err := log.NewLogger(settings.App.Debug)
-		if err != nil {
-			return fmt.Errorf("failed to create logger: %w", err)
-		}
-		ctx.WithLogger(logger)
+	fmt.Println("Starting development server...")
+
+	// Prepare command: go run cmd/server/main.go
+	// In the future, we can add file watching here (using air or similar)
+	cmd := exec.Command("go", "run", "cmd/server/main.go")
+
+	// Pass through arguments if needed
+	if len(args) > 0 {
+		cmd.Args = append(cmd.Args, args...)
 	}
 
-	// Create server with all middleware
-	server, err := httplib.NewServer(ctx.Config, settings, ctx.Logger)
-	if err != nil {
-		return fmt.Errorf("failed to create server: %w", err)
+	// Connect pipes
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	// Run command
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("server crashed: %w", err)
 	}
 
-	// Register routes
-	server.RegisterRoutes(func(router *httplib.Router) {
-		registerRoutes(router, ctx.Logger)
-	})
-
-	// Start server
-	return server.Start()
-}
-
-// registerRoutes registers all framework routes
-func registerRoutes(router *httplib.Router, logger *log.Logger) {
-	// Health check
-	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		// nolint:errcheck // HTTP response write errors can't be handled meaningfully
-		_, _ = w.Write([]byte("OK"))
-	})
-
-	// TODO: Register admin routes
-	// Example:
-	// adminRegistry := admin.GetGlobalRegistry()
-	// adminRouter := adminhttp.NewRouter(adminRegistry)
-	// adminRouter.RegisterRoutes(router, settings.Admin.Path)
-
-	// TODO: Register API routes
+	return nil
 }

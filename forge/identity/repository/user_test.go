@@ -2,20 +2,27 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/models"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // setupTestDB creates an in-memory SQLite database for testing
 func setupTestDB(t *testing.T) *db.DB {
 	// Use in-memory SQLite for fast tests
-	testDB, err := db.NewDBWithDriver("sqlite", ":memory:", db.DefaultConfig())
+	sqlDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
+	// Ensure single connection for in-memory DB
+	sqlDB.SetMaxOpenConns(1)
+
+	testDB := &db.DB{DB: sqlDB, Driver: "sqlite3"}
 
 	// Run migrations
 	_, err = testDB.Exec(`
@@ -71,7 +78,7 @@ func TestUserRepository_Create(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("creates user successfully", func(t *testing.T) {
-		hashedPassword, err := identity.HashPassword("testpassword123")
+		hashedPassword, err := utils.HashPassword("testpassword123")
 		require.NoError(t, err)
 
 		user := &models.User{
@@ -91,7 +98,7 @@ func TestUserRepository_Create(t *testing.T) {
 	})
 
 	t.Run("fails with duplicate email", func(t *testing.T) {
-		hashedPassword, _ := identity.HashPassword("testpassword123")
+		hashedPassword, _ := utils.HashPassword("testpassword123")
 
 		user1 := &models.User{
 			Username: "user1",
@@ -112,7 +119,7 @@ func TestUserRepository_Create(t *testing.T) {
 	})
 
 	t.Run("fails with duplicate username", func(t *testing.T) {
-		hashedPassword, _ := identity.HashPassword("testpassword123")
+		hashedPassword, _ := utils.HashPassword("testpassword123")
 
 		user1 := &models.User{
 			Username: "duplicate_user",
@@ -133,7 +140,7 @@ func TestUserRepository_Create(t *testing.T) {
 	})
 
 	t.Run("normalizes email to lowercase", func(t *testing.T) {
-		hashedPassword, _ := identity.HashPassword("testpassword123")
+		hashedPassword, _ := utils.HashPassword("testpassword123")
 
 		user := &models.User{
 			Username: "testuser",
@@ -159,7 +166,7 @@ func TestUserRepository_GetByID(t *testing.T) {
 	ctx := context.Background()
 
 	// Create test user
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -191,7 +198,7 @@ func TestUserRepository_GetByEmail(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -226,7 +233,7 @@ func TestUserRepository_GetByUsername(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -255,7 +262,7 @@ func TestUserRepository_Update(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -304,7 +311,7 @@ func TestUserRepository_List(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 
 	// Create multiple users
 	users := []*models.User{
@@ -368,7 +375,7 @@ func TestUserRepository_Count(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 
 	// Create test users
 	for i := 0; i < 5; i++ {
@@ -405,7 +412,7 @@ func TestUserRepository_Exists(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",
@@ -434,7 +441,7 @@ func TestUserRepository_Delete(t *testing.T) {
 	repo := NewUserRepository(testDB)
 	ctx := context.Background()
 
-	hashedPassword, _ := identity.HashPassword("testpassword123")
+	hashedPassword, _ := utils.HashPassword("testpassword123")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",

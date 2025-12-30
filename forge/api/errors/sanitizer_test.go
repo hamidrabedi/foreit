@@ -17,7 +17,7 @@ func TestSanitizeError(t *testing.T) {
 	// Test that stack traces are removed
 	errMsg := "error: goroutine 1 [running]:\nmain.main()\n\t/path/to/file.go:123"
 	sanitized := sanitizer.SanitizeError(&testError{msg: errMsg})
-	
+
 	if sanitized == errMsg {
 		t.Error("Stack trace should be removed from error message")
 	}
@@ -34,7 +34,7 @@ func TestSanitizeDatabaseErrors(t *testing.T) {
 		{
 			name:     "PostgreSQL error",
 			input:    "pq: duplicate key value violates unique constraint",
-			expected: "Database error occurred",
+			expected: "Duplicate entry",
 		},
 		{
 			name:     "MySQL error",
@@ -61,30 +61,30 @@ func TestSanitizeDatabaseErrors(t *testing.T) {
 func TestSanitizePII(t *testing.T) {
 	config := SanitizerConfig{
 		HideStackTraces:  true,
-		HideDatabaseErrs:  true,
+		HideDatabaseErrs: true,
 		RedactPII:        true,
 		PIIPatterns:      []string{},
 	}
 	sanitizer := NewSanitizer(config)
 
 	tests := []struct {
-		name     string
-		input    string
+		name         string
+		input        string
 		shouldRedact bool
 	}{
 		{
-			name:     "Password field",
-			input:    "password=secret123",
+			name:         "Password field",
+			input:        "password=secret123",
 			shouldRedact: true,
 		},
 		{
-			name:     "Token field",
-			input:    "token=abc123",
+			name:         "Token field",
+			input:        "token=abc123",
 			shouldRedact: true,
 		},
 		{
-			name:     "Normal message",
-			input:    "User created successfully",
+			name:         "Normal message",
+			input:        "User created successfully",
 			shouldRedact: false,
 		},
 	}
@@ -107,7 +107,7 @@ func TestSanitizePII(t *testing.T) {
 
 func TestSanitizeMap(t *testing.T) {
 	config := SanitizerConfig{
-		RedactPII: true,
+		RedactPII:   true,
 		PIIPatterns: []string{},
 	}
 	sanitizer := NewSanitizer(config)

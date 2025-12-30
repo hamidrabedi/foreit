@@ -31,10 +31,10 @@ func (w *RawIDWidget) Render(name string, value interface{}, attrs map[string]st
 		html += fmt.Sprintf(` %s="%s"`, k, template.HTMLEscapeString(v))
 	}
 	html += ` class="form-control raw-id-field">`
-	
+
 	// Add lookup button (would trigger popup in real implementation)
 	html += fmt.Sprintf(` <a href="#" class="raw-id-lookup" data-field="%s">Lookup</a>`, name)
-	
+
 	return template.HTML(html)
 }
 

@@ -28,14 +28,14 @@ func (w *FileInputWidget) Render(name string, value interface{}, attrs map[strin
 		html += fmt.Sprintf(` %s="%s"`, k, template.HTMLEscapeString(v))
 	}
 	html += ` class="form-control file-input">`
-	
+
 	// Show current file if exists
 	if value != nil {
 		if filePath, ok := value.(string); ok && filePath != "" {
 			html += fmt.Sprintf(`<div class="current-file">Current: %s</div>`, template.HTMLEscapeString(filePath))
 		}
 	}
-	
+
 	return template.HTML(html)
 }
 
@@ -64,14 +64,14 @@ func (w *ImageInputWidget) Render(name string, value interface{}, attrs map[stri
 		html += fmt.Sprintf(` %s="%s"`, k, template.HTMLEscapeString(v))
 	}
 	html += ` class="form-control image-input">`
-	
+
 	// Show current image preview if exists
 	if value != nil {
 		if imagePath, ok := value.(string); ok && imagePath != "" {
 			html += fmt.Sprintf(`<div class="current-image"><img src="%s" alt="Current image" style="max-width: 200px; max-height: 200px;"></div>`, template.HTMLEscapeString(imagePath))
 		}
 	}
-	
+
 	return template.HTML(html)
 }
 
@@ -122,10 +122,10 @@ func (w *RichTextWidget) Render(name string, value interface{}, attrs map[string
 	html += ` class="form-control richtext-editor">`
 	html += template.HTMLEscapeString(valueStr)
 	html += `</textarea>`
-	
+
 	// Add rich text editor initialization script
 	html += fmt.Sprintf(`<script>initRichTextEditor('id_%s');</script>`, name)
-	
+
 	return template.HTML(html)
 }
 

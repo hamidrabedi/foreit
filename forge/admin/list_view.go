@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	query "github.com/forgego/forge/orm"
-	"github.com/forgego/forge/orm"
 )
 
 // ListView represents a type-safe list view
@@ -20,16 +19,16 @@ type ListView[T any] struct {
 
 // ListData contains data for rendering the list view
 type ListData[T any] struct {
-	Objects         []*T
-	Page            int
-	PageSize        int
-	TotalCount      int64
-	TotalPages      int
-	Search          string
-	DisplayFields   []FieldExpr[T, interface{}]
-	EditableFields  []FieldExpr[T, interface{}]
-	DisplayLinks    []FieldExpr[T, interface{}]
-	DateHierarchy   FieldExpr[T, interface{}]
+	Objects           []*T
+	Page              int
+	PageSize          int
+	TotalCount        int64
+	TotalPages        int
+	Search            string
+	DisplayFields     []FieldExpr[T, interface{}]
+	EditableFields    []FieldExpr[T, interface{}]
+	DisplayLinks      []FieldExpr[T, interface{}]
+	DateHierarchy     FieldExpr[T, interface{}]
 	EmptyValueDisplay string
 }
 
@@ -110,7 +109,7 @@ func (v *ListView[T]) Render(ctx context.Context) (*ListData[T], error) {
 	totalPages := int((totalCount + int64(v.pageSize) - 1) / int64(v.pageSize))
 
 	config := v.admin.Config()
-	
+
 	// Get display fields
 	displayFields := config.ListDisplay
 	if len(displayFields) == 0 {
@@ -119,16 +118,16 @@ func (v *ListView[T]) Render(ctx context.Context) (*ListData[T], error) {
 	}
 
 	return &ListData[T]{
-		Objects:          objects,
-		Page:             v.page,
-		PageSize:         v.pageSize,
-		TotalCount:       totalCount,
-		TotalPages:       totalPages,
-		Search:           v.search,
-		DisplayFields:    displayFields,
-		EditableFields:   config.ListEditable,
-		DisplayLinks:     config.ListDisplayLinks,
-		DateHierarchy:    config.DateHierarchy,
+		Objects:           objects,
+		Page:              v.page,
+		PageSize:          v.pageSize,
+		TotalCount:        totalCount,
+		TotalPages:        totalPages,
+		Search:            v.search,
+		DisplayFields:     displayFields,
+		EditableFields:    config.ListEditable,
+		DisplayLinks:      config.ListDisplayLinks,
+		DateHierarchy:     config.DateHierarchy,
 		EmptyValueDisplay: config.EmptyValueDisplay,
 	}, nil
 }
@@ -136,18 +135,19 @@ func (v *ListView[T]) Render(ctx context.Context) (*ListData[T], error) {
 // applySearch applies search to queryset
 func (v *ListView[T]) applySearch(qs query.QuerySet[T], search string) query.QuerySet[T] {
 	// Build OR expression for all search fields
-	var exprs []query.QueryExpr
+	var exprs []query.Expression
 	for _, field := range v.admin.Config().SearchFields {
 		// Create contains expression for each search field
-		expr := query.NewFieldQueryExpr(field.Name(), query.OpContains, search)
+		ormField := query.NewField[string](field.Name(), "")
+		expr := ormField.Contains(search)
 		exprs = append(exprs, expr)
 	}
 
 	// Combine with OR
 	if len(exprs) > 0 {
-		combined := exprs[0]
+		combined := query.NewQ(exprs[0])
 		for i := 1; i < len(exprs); i++ {
-			combined = combined.Or(exprs[i])
+			combined = combined.Or(query.NewQ(exprs[i]))
 		}
 		qs = qs.Filter(combined)
 	}
@@ -173,13 +173,17 @@ func (v *ListView[T]) applyFilter(qs query.QuerySet[T], name string, value inter
 
 // applyOrdering applies ordering to queryset
 func (v *ListView[T]) applyOrdering(qs query.QuerySet[T]) query.QuerySet[T] {
+	var orderFields []query.OrderField
 	for _, ordering := range v.admin.Config().Ordering {
 		fieldName := ordering.Field().Name()
 		if ordering.IsDescending() {
-			qs = qs.OrderBy(fieldName).Reverse()
+			orderFields = append(orderFields, query.Desc(fieldName))
 		} else {
-			qs = qs.OrderBy(fieldName)
+			orderFields = append(orderFields, query.Asc(fieldName))
 		}
+	}
+	if len(orderFields) > 0 {
+		qs = qs.OrderBy(orderFields...)
 	}
 	return qs
 }

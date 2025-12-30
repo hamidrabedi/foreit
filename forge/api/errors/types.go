@@ -44,13 +44,13 @@ type ProblemError interface {
 
 // BaseError is the base implementation of ProblemError
 type BaseError struct {
-	Type    ErrorType
-	Code    string
-	Status  int
-	Title   string
-	Detail  string
+	Type     ErrorType
+	Code     string
+	Status   int
+	Title    string
+	Detail   string
 	Instance string
-	Meta    map[string]interface{}
+	Meta     map[string]interface{}
 }
 
 // Error implements the error interface

@@ -10,7 +10,7 @@ import (
 
 func TestMapError_UnknownError(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	err := errors.New("unknown error")
 	problem := mapper.MapError(err, "/test")
 
@@ -24,7 +24,7 @@ func TestMapError_UnknownError(t *testing.T) {
 
 func TestMapError_ValidationError(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	valErr := exceptions.NewValidationError(map[string][]string{
 		"email": {"Invalid email format"},
 	})
@@ -43,7 +43,7 @@ func TestMapError_ValidationError(t *testing.T) {
 
 func TestMapError_NotFound(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	notFoundErr := exceptions.NewNotFound("User not found")
 	problem := mapper.MapError(notFoundErr, "/test")
 
@@ -57,7 +57,7 @@ func TestMapError_NotFound(t *testing.T) {
 
 func TestMapError_AuthenticationFailed(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	authErr := exceptions.NewAuthenticationFailed("Invalid credentials")
 	problem := mapper.MapError(authErr, "/test")
 
@@ -71,7 +71,7 @@ func TestMapError_AuthenticationFailed(t *testing.T) {
 
 func TestMapError_PermissionDenied(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	permErr := exceptions.NewPermissionDenied("Access denied")
 	problem := mapper.MapError(permErr, "/test")
 
@@ -85,7 +85,7 @@ func TestMapError_PermissionDenied(t *testing.T) {
 
 func TestMapError_Throttled(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	throttledErr := exceptions.NewThrottled("Rate limit exceeded", 60)
 	problem := mapper.MapError(throttledErr, "/test")
 
@@ -102,7 +102,7 @@ func TestMapError_Throttled(t *testing.T) {
 
 func TestMapPanic(t *testing.T) {
 	mapper := NewErrorMapper(DefaultSanitizer())
-	
+
 	problem := mapper.MapPanic("panic: test panic", "/test")
 
 	if problem.Status != http.StatusInternalServerError {

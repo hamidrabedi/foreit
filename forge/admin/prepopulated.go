@@ -75,7 +75,7 @@ func (h *PrepopulatedFieldHandler[T]) combineValues(values []string) string {
 func slugify(s string) string {
 	// Convert to lowercase
 	s = strings.ToLower(s)
-	
+
 	// Replace spaces and special characters with hyphens
 	var result strings.Builder
 	for _, r := range s {
@@ -93,7 +93,7 @@ func slugify(s string) string {
 	// Remove leading/trailing hyphens and collapse multiple hyphens
 	resultStr := result.String()
 	resultStr = strings.Trim(resultStr, "-")
-	
+
 	// Collapse multiple consecutive hyphens
 	for strings.Contains(resultStr, "--") {
 		resultStr = strings.ReplaceAll(resultStr, "--", "-")

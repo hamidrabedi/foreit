@@ -6,12 +6,12 @@ import (
 
 // Site represents an admin site instance
 type Site struct {
-	Name        string
-	Title       string
-	Header      string
-	IndexTitle  string
-	SiteURL     string
-	registry    *Registry
+	Name       string
+	Title      string
+	Header     string
+	IndexTitle string
+	SiteURL    string
+	registry   *Registry
 }
 
 // NewSite creates a new admin site

@@ -9,14 +9,14 @@ import (
 
 // LogEntry represents a change log entry
 type LogEntry struct {
-	ID          int64
-	ActionTime  time.Time
-	UserID      int64
-	User        interface{} // User object
-	ContentType string      // Model name
-	ObjectID    int64
-	ObjectRepr  string // String representation of object
-	ActionFlag  ActionFlag
+	ID            int64
+	ActionTime    time.Time
+	UserID        int64
+	User          interface{} // User object
+	ContentType   string      // Model name
+	ObjectID      int64
+	ObjectRepr    string // String representation of object
+	ActionFlag    ActionFlag
 	ChangeMessage string
 }
 
@@ -99,14 +99,14 @@ func LogChange[T any](ctx context.Context, admin *Admin[T], obj *T, action Actio
 
 	// Create log entry
 	entry := &LogEntry{
-		ActionTime:     time.Now(),
-		UserID:         userID,
-		User:           user,
-		ContentType:    admin.ModelName(),
-		ObjectID:       objID,
-		ObjectRepr:     fmt.Sprintf("%v", obj),
-		ActionFlag:     action,
-		ChangeMessage:  message,
+		ActionTime:    time.Now(),
+		UserID:        userID,
+		User:          user,
+		ContentType:   admin.ModelName(),
+		ObjectID:      objID,
+		ObjectRepr:    fmt.Sprintf("%v", obj),
+		ActionFlag:    action,
+		ChangeMessage: message,
 	}
 
 	return historyManager.LogAction(ctx, entry)
@@ -115,7 +115,7 @@ func LogChange[T any](ctx context.Context, admin *Admin[T], obj *T, action Actio
 // GetObjectHistory retrieves change history for an object
 func GetObjectHistory[T any](ctx context.Context, admin *Admin[T], objID int64) ([]*LogEntry, error) {
 	var historyManager HistoryManager = &DefaultHistoryManager{}
-	
+
 	return historyManager.GetHistory(ctx, admin.ModelName(), objID)
 }
 

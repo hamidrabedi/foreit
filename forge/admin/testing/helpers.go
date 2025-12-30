@@ -12,8 +12,8 @@ import (
 
 	adminv2 "github.com/forgego/forge/admin"
 	adminhttp "github.com/forgego/forge/admin/http"
+	query "github.com/forgego/forge/orm"
 	httplib "github.com/forgego/forge/server"
-	"github.com/forgego/forge/orm"
 )
 
 // TestAdminClient is a test client for admin HTTP endpoints
@@ -161,10 +161,10 @@ func (m *TestManager[T]) Delete(ctx context.Context, obj *T) error {
 }
 
 // Filter returns a queryset (simplified for testing)
-func (m *TestManager[T]) Filter(expr ...query.QueryExpr) query.QuerySet[T] {
+func (m *TestManager[T]) Filter(expr query.Expression) (query.QuerySet[T], error) {
 	// Return a simple queryset that wraps the manager
 	// This is a simplified version for testing
-	return &TestQuerySet[T]{manager: m}
+	return &TestQuerySet[T]{manager: m}, nil
 }
 
 // TestQuerySet is a test queryset
@@ -181,15 +181,19 @@ func (qs *TestQuerySet[T]) Count(ctx context.Context) (int64, error) {
 	return int64(len(objects)), nil
 }
 
-func (qs *TestQuerySet[T]) Filter(expr query.QueryExpr) query.QuerySet[T] {
-	return qs // Simplified - just return self
-}
-
-func (qs *TestQuerySet[T]) Exclude(expr query.QueryExpr) query.QuerySet[T] {
+func (qs *TestQuerySet[T]) SetDB(db interface{}) query.QuerySet[T] {
 	return qs
 }
 
-func (qs *TestQuerySet[T]) OrderBy(fields ...string) query.QuerySet[T] {
+func (qs *TestQuerySet[T]) Filter(expr query.Expression) query.QuerySet[T] {
+	return qs // Simplified - just return self
+}
+
+func (qs *TestQuerySet[T]) Exclude(expr query.Expression) query.QuerySet[T] {
+	return qs
+}
+
+func (qs *TestQuerySet[T]) OrderBy(fields ...query.OrderField) query.QuerySet[T] {
 	return qs
 }
 
@@ -205,7 +209,7 @@ func (qs *TestQuerySet[T]) Offset(n int) query.QuerySet[T] {
 	return qs
 }
 
-func (qs *TestQuerySet[T]) Distinct() query.QuerySet[T] {
+func (qs *TestQuerySet[T]) Distinct(fields ...string) query.QuerySet[T] {
 	return qs
 }
 
@@ -237,12 +241,12 @@ func (qs *TestQuerySet[T]) Annotate(annotations ...query.AnnotationExpr) query.Q
 	return qs
 }
 
-func (qs *TestQuerySet[T]) Values(fields ...string) query.QuerySet[T] {
-	return qs
+func (qs *TestQuerySet[T]) Values(fields ...string) query.ValuesQuerySet[T] {
+	return nil
 }
 
-func (qs *TestQuerySet[T]) ValuesList(fields ...string) query.QuerySet[T] {
-	return qs
+func (qs *TestQuerySet[T]) ValuesList(fields ...string) query.ValuesListQuerySet[T] {
+	return nil
 }
 
 func (qs *TestQuerySet[T]) Get(ctx context.Context) (*T, error) {
@@ -270,11 +274,15 @@ func (qs *TestQuerySet[T]) Exists(ctx context.Context) (bool, error) {
 	return len(objects) > 0, err
 }
 
-func (qs *TestQuerySet[T]) Update(ctx context.Context, fields map[string]interface{}) (int64, error) {
+func (qs *TestQuerySet[T]) UpdateBuilder() (*query.UpdateBuilder[T], error) {
+	return nil, fmt.Errorf("not implemented in test")
+}
+
+func (qs *TestQuerySet[T]) Update(ctx context.Context, updates query.UpdateMap) (int64, error) {
 	return 0, fmt.Errorf("not implemented in test")
 }
 
-func (qs *TestQuerySet[T]) BulkUpdate(ctx context.Context, updates []map[string]interface{}) error {
+func (qs *TestQuerySet[T]) BulkUpdate(ctx context.Context, updates []query.UpdateMap) error {
 	return fmt.Errorf("not implemented in test")
 }
 

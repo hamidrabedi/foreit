@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/forgego/forge/log"
-	"go.uber.org/zap"
 )
 
 var defaultLogger *log.Logger
@@ -22,7 +21,7 @@ func init() {
 			Format:  log.FormatConsole,
 		},
 	}
-	
+
 	var err error
 	defaultLogger, err = log.NewLoggerFromConfig(config)
 	if err != nil {

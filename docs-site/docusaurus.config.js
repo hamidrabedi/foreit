@@ -21,8 +21,12 @@ const config = {
   organizationName: 'forgego', // Usually your GitHub org/user name.
   projectName: 'forge', // Usually your repo name.
 
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
   onBrokenLinks: 'warn',
-  onBrokenMarkdownLinks: 'warn',
 
   // SEO configuration
   trailingSlash: false,

@@ -75,4 +75,3 @@ type FilterSidebarItem struct {
 	Widget  filter.Widget
 	Options []filter.FilterOption
 }
-

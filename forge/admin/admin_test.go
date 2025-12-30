@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/forgego/forge/orm"
+	query "github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 )
 

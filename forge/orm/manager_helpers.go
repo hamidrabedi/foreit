@@ -306,7 +306,7 @@ func ExecuteInsert(ctx context.Context, database *db.DB, sql string, args []inte
 	}
 
 	var id int64
-	err = sqldb.QueryRowContext(ctx, sql, args...).Scan(&id)
+	err = sqldb.QueryRowContext(ctx, database.Rebind(sql), args...).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert failed: %w", err)
 	}
@@ -321,7 +321,7 @@ func ExecuteUpdate(ctx context.Context, database *db.DB, sql string, args []inte
 		return 0, err
 	}
 
-	result, err := sqldb.ExecContext(ctx, sql, args...)
+	result, err := sqldb.ExecContext(ctx, database.Rebind(sql), args...)
 	if err != nil {
 		return 0, fmt.Errorf("update failed: %w", err)
 	}
@@ -341,7 +341,7 @@ func ExecuteDelete(ctx context.Context, database *db.DB, sql string, args []inte
 		return 0, err
 	}
 
-	result, err := sqldb.ExecContext(ctx, sql, args...)
+	result, err := sqldb.ExecContext(ctx, database.Rebind(sql), args...)
 	if err != nil {
 		return 0, fmt.Errorf("delete failed: %w", err)
 	}

@@ -87,9 +87,9 @@ func (f *DateRangeFilter[T]) Apply(ctx context.Context, qs query.QuerySet[T], va
 
 // RelatedFieldListFilter is a filter for related model fields
 type RelatedFieldListFilter[T any, R any] struct {
-	field       FieldExpr[T, *R]
-	name        string
-	label       string
+	field          FieldExpr[T, *R]
+	name           string
+	label          string
 	relatedManager *query.Manager[R]
 }
 
@@ -154,9 +154,9 @@ func (f *RelatedFieldListFilter[T, R]) Apply(ctx context.Context, qs query.Query
 
 // SimpleListFilter is a base class for custom filters
 type SimpleListFilter[T any] struct {
-	Title       string
+	Title         string
 	ParameterName string
-	Lookups     []SimpleFilterLookup
+	Lookups       []SimpleFilterLookup
 }
 
 // SimpleFilterLookup represents a filter lookup option

@@ -4,6 +4,7 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"regexp"
 
 	"github.com/forgego/forge/config"
 )
@@ -11,6 +12,7 @@ import (
 // DB wraps database/sql.DB with additional functionality
 type DB struct {
 	*sql.DB
+	Driver string
 }
 
 // NewDBFromConfig creates a new database connection from config
@@ -42,12 +44,18 @@ func NewDBFromConfig(cfg *config.Config) (*DB, error) {
 func NewDB(dsn string) (*DB, error) {
 	// Try PostgreSQL first
 	sqlDB, err := sql.Open("postgres", dsn)
-	if err != nil {
-		// Try SQLite as fallback
-		sqlDB, err = sql.Open("sqlite3", dsn)
-		if err != nil {
-			return nil, fmt.Errorf("failed to open database: %w", err)
+	if err == nil {
+		if err := sqlDB.Ping(); err == nil {
+			return &DB{DB: sqlDB, Driver: "postgres"}, nil
 		}
+		// Functionally close if ping failed before trying next
+		sqlDB.Close()
+	}
+
+	// Try SQLite as fallback
+	sqlDB, err = sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	if err := sqlDB.Ping(); err != nil {
@@ -55,5 +63,25 @@ func NewDB(dsn string) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return &DB{DB: sqlDB}, nil
+	return &DB{DB: sqlDB, Driver: "sqlite3"}, nil
+}
+
+// Rebind modifies the query based on the driver
+// specifically mapping Postgres $N placeholders to SQLite ?N
+func (db *DB) Rebind(query string) string {
+	if db.Driver == "sqlite3" || db.Driver == "sqlite" {
+		// Simple byte-loop replacement efficient enough for SQL strings
+		// or just use regexp? Regexp is cleaner but slower.
+		// Given complexity, let's use regexp in memory.
+		// Actually, we can use a simpler approach if we trust input.
+		// But let's stick to regex to be safe.
+		return rebindPostgresToSQLite(query)
+	}
+	return query
+}
+
+var paramRegex = regexp.MustCompile(`\$([0-9]+)`)
+
+func rebindPostgresToSQLite(query string) string {
+	return paramRegex.ReplaceAllString(query, "?$1")
 }

@@ -26,7 +26,7 @@ type SanitizerConfig struct {
 func NewSanitizer(config SanitizerConfig) *Sanitizer {
 	s := &Sanitizer{
 		hideStackTraces:  config.HideStackTraces,
-		hideDatabaseErrs:  config.HideDatabaseErrs,
+		hideDatabaseErrs: config.HideDatabaseErrs,
 		redactPII:        config.RedactPII,
 		piiPatterns:      make([]*regexp.Regexp, 0),
 	}
@@ -67,7 +67,7 @@ func NewSanitizer(config SanitizerConfig) *Sanitizer {
 func DefaultSanitizer() *Sanitizer {
 	return NewSanitizer(SanitizerConfig{
 		HideStackTraces:  true, // Always true - never expose stack traces
-		HideDatabaseErrs:  true, // Always true - never expose DB errors
+		HideDatabaseErrs: true, // Always true - never expose DB errors
 		RedactPII:        true,
 		PIIPatterns:      []string{},
 	})
@@ -147,22 +147,6 @@ func (s *Sanitizer) sanitizeDatabaseErrors(msg string) string {
 		replacement string
 	}{
 		{
-			regexp.MustCompile(`(?i)pq:.*`),
-			"Database error occurred",
-		},
-		{
-			regexp.MustCompile(`(?i)sql:.*`),
-			"Database error occurred",
-		},
-		{
-			regexp.MustCompile(`(?i)mysql.*error.*`),
-			"Database error occurred",
-		},
-		{
-			regexp.MustCompile(`(?i)postgres.*error.*`),
-			"Database error occurred",
-		},
-		{
 			regexp.MustCompile(`(?i)connection.*refused`),
 			"Database connection error",
 		},
@@ -185,6 +169,22 @@ func (s *Sanitizer) sanitizeDatabaseErrors(msg string) string {
 		{
 			regexp.MustCompile(`(?i)table.*does not exist`),
 			"Database schema error",
+		},
+		{
+			regexp.MustCompile(`(?i)pq:.*`),
+			"Database error occurred",
+		},
+		{
+			regexp.MustCompile(`(?i)sql:.*`),
+			"Database error occurred",
+		},
+		{
+			regexp.MustCompile(`(?i)mysql.*error.*`),
+			"Database error occurred",
+		},
+		{
+			regexp.MustCompile(`(?i)postgres.*error.*`),
+			"Database error occurred",
 		},
 	}
 
@@ -225,7 +225,7 @@ func (s *Sanitizer) SanitizeMap(data map[string]interface{}) map[string]interfac
 	sanitized := make(map[string]interface{})
 	for k, v := range data {
 		keyLower := strings.ToLower(k)
-		
+
 		// Check if key matches PII patterns
 		isPII := false
 		for _, pattern := range s.piiPatterns {

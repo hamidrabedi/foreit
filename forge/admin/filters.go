@@ -62,8 +62,9 @@ func (f *BooleanFilter[T]) Apply(ctx context.Context, qs query.QuerySet[T], valu
 		return qs, nil
 	}
 
-	// Create query expression
-	expr := query.NewFieldQueryExpr(f.name, query.OpEquals, boolValue)
+	// Create field expression and comparison
+	field := query.NewField[bool](f.name, "")
+	expr := field.Eq(boolValue)
 	return qs.Filter(expr), nil
 }
 
@@ -121,7 +122,9 @@ func (f *ChoiceFilter[T, F]) Apply(ctx context.Context, qs query.QuerySet[T], va
 		return qs, nil
 	}
 
-	// Create query expression
-	expr := query.NewFieldQueryExpr(f.name, query.OpEquals, val)
+	// Create ORM field expression and comparison
+	// We need to create a new ORM FieldExpression with the correct type
+	field := query.NewField[F](f.name, "")
+	expr := field.Eq(val)
 	return qs.Filter(expr), nil
 }

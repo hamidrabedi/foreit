@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/forgego/forge/validate"
+	validation "github.com/forgego/forge/validate"
 )
 
 // ValidateForm validates form data against admin config

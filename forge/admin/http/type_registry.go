@@ -155,7 +155,10 @@ func (h *adminHandler[T]) HandleBulkAction(ctx context.Context, action string, i
 
 // HandleAutocomplete handles autocomplete
 func (h *adminHandler[T]) HandleAutocomplete(ctx context.Context, search string, limit int) ([]map[string]interface{}, error) {
-	qs := h.admin.Manager().Filter()
+	qs, err := h.admin.GetQueryset(ctx)
+	if err != nil {
+		return nil, err
+	}
 	if search != "" {
 		// Apply search
 		// This is simplified - would use search fields from config

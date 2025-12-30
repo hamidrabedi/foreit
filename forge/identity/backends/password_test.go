@@ -2,14 +2,17 @@ package backends
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func setupPasswordBackendTest(t *testing.T) (AuthenticationBackend, *db.DB, context.Context) {
@@ -21,8 +24,12 @@ func setupPasswordBackendTest(t *testing.T) (AuthenticationBackend, *db.DB, cont
 }
 
 func setupTestDB(t *testing.T) *db.DB {
-	testDB, err := db.NewDBWithDriver("sqlite", ":memory:", db.DefaultConfig())
+	sqlDB, err := sql.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
+	// Ensure single connection for in-memory DB
+	sqlDB.SetMaxOpenConns(1)
+
+	testDB := &db.DB{DB: sqlDB, Driver: "sqlite3"}
 
 	_, err = testDB.Exec(`
 		CREATE TABLE IF NOT EXISTS users (
@@ -72,7 +79,7 @@ func TestPasswordBackend_Authenticate(t *testing.T) {
 
 	// Create test user
 	userRepo := repository.NewUserRepository(testDB)
-	hashedPassword, _ := identity.HashPassword("correctpassword")
+	hashedPassword, _ := utils.HashPassword("correctpassword")
 	user := &models.User{
 		Username: "testuser",
 		Email:    "test@example.com",

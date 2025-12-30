@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 )
 
 // Predefined errors
@@ -58,7 +58,7 @@ func (s *userService) CreateUser(ctx context.Context, req *CreateUserRequest) (*
 	}
 
 	// Hash password
-	hashedPassword, err := identity.HashPassword(req.Password)
+	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}

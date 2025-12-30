@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Shipping represents shipping information for an order
@@ -65,4 +65,3 @@ func (Shipping) Relations() []schema.Relation {
 func (Shipping) Hooks() *schema.ModelHooks {
 	return nil
 }
-

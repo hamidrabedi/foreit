@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Book represents a book in the library
@@ -52,4 +52,3 @@ func (Book) Relations() []schema.Relation {
 func (Book) Hooks() *schema.ModelHooks {
 	return nil
 }
-

@@ -6,10 +6,10 @@ import (
 
 	"ecommerce/models"
 
-adminv2 "github.com/forgego/forge/pkg/admin"
-adminhttp "github.com/forgego/forge/pkg/admin/http"
-	httplib "github.com/forgego/forge/pkg/http"
-	"github.com/forgego/forge/pkg/schema"
+	adminhttp "github.com/forgego/forge/admin"
+	adminv2 "github.com/forgego/forge/admin"
+	"github.com/forgego/forge/schema"
+	httplib "github.com/forgego/forge/server"
 )
 
 // SetupAdmin configures the full admin system for all ecommerce models

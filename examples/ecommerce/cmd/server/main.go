@@ -10,10 +10,10 @@ import (
 	"ecommerce/models"
 
 	"github.com/forgego/forge"
-	"github.com/forgego/forge/pkg/admin"
-	forgeapi "github.com/forgego/forge/pkg/api"
-	"github.com/forgego/forge/pkg/api/authentication"
-	"github.com/forgego/forge/pkg/users"
+	"github.com/forgego/forge/admin"
+	"github.com/forgego/forge/api"
+	forgeapi "github.com/forgego/forge/api"
+	"github.com/forgego/forge/identity"
 )
 
 func main() {
@@ -42,9 +42,9 @@ func main() {
 	}
 
 	// Initialize user system
-	var userSystem *users.UserSystem
+	var userSystem *identity.IdentitySystem
 	if database != nil {
-		userSystem, err = users.SetupUserSystem(database, nil)
+		userSystem, err = identity.SetupIdentitySystem(database, nil)
 		if err != nil {
 			logger.Warn("Failed to initialize user system", forge.Error(err))
 		} else {
@@ -93,7 +93,7 @@ func main() {
 		if database != nil {
 			// Setup complete API with all features
 			forgeapi.SetupCompleteAPI()
-			
+
 			// Configure default authentication
 			forgeapi.SetDefaultAuthentication(
 				authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
@@ -101,17 +101,17 @@ func main() {
 					return nil, nil
 				}),
 			)
-			
+
 			// Simple API routes (basic CRUD)
 			simpleRouter := forgeapi.NewRouter("/api/v1")
 			api.RegisterSimpleAPIViewsets(simpleRouter)
 			simpleRouter.RegisterRoutes(router)
-			
+
 			// Complex API routes (full features)
 			complexRouter := forgeapi.NewEnhancedRouter("/api/v1")
 			api.RegisterComplexAPIViewsets(complexRouter)
 			complexRouter.RegisterRoutesEnhanced(router)
-			
+
 			// Legacy routes (backward compatible)
 			legacyRouter := forgeapi.NewRouter("/api/v1/legacy")
 			api.RegisterAPIViewsets(legacyRouter)
@@ -124,7 +124,7 @@ func main() {
 	fmt.Printf("Admin interface available at http://%s:%s%s\n", settings.Server.Host, settings.Server.Port, settings.Admin.Path)
 	fmt.Printf("REST API available at http://%s:%s/api/v1/\n", settings.Server.Host, settings.Server.Port)
 	if userSystem != nil {
-		fmt.Printf("User system API available at http://%s:%s/api/auth/ and http://%s:%s/api/users/\n", 
+		fmt.Printf("User system API available at http://%s:%s/api/auth/ and http://%s:%s/api/users/\n",
 			settings.Server.Host, settings.Server.Port, settings.Server.Host, settings.Server.Port)
 	}
 	if err := server.Start(); err != nil {

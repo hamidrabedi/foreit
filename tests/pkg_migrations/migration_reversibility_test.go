@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 

@@ -81,10 +81,10 @@ func AssertColumnExists(ctx context.Context, t *testing.T, db *sql.DB, dialect s
 func AssertIndexExists(ctx context.Context, t *testing.T, db *sql.DB, dialect string, tableName string, indexName string) {
 	var query string
 	switch {
-		case strings.Contains(dialect, "postgres"):
-			query = `SELECT 1 FROM pg_indexes WHERE tablename = $1 AND indexname = $2`
+	case strings.Contains(dialect, "postgres"):
+		query = `SELECT 1 FROM pg_indexes WHERE tablename = $1 AND indexname = $2`
 	case strings.Contains(dialect, "sqlite"):
-			query = `SELECT 1 FROM sqlite_master WHERE type='index' AND name=? AND tbl_name=?`
+		query = `SELECT 1 FROM sqlite_master WHERE type='index' AND name=? AND tbl_name=?`
 	default:
 		t.Fatalf("unsupported dialect: %s", dialect)
 	}

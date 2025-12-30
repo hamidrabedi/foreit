@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // CustomerProfile represents extended customer profile information
@@ -56,4 +56,3 @@ func (CustomerProfile) Relations() []schema.Relation {
 func (CustomerProfile) Hooks() *schema.ModelHooks {
 	return nil
 }
-

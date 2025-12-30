@@ -1,6 +1,6 @@
-# User System Package
+# Identity Package
 
-Complete user management and authentication system for forge framework.
+Complete identity and access management (IAM) system for forge framework.
 
 ## Features
 
@@ -25,12 +25,12 @@ import "github.com/forgego/forge/pkg/db"
 database, err := db.NewDBFromConfig(cfg)
 ```
 
-### 2. Initialize User System
+### 2. Initialize Identity System
 
 ```go
-import "github.com/forgego/forge/pkg/users"
+import "github.com/forgego/forge/pkg/identity"
 
-userSystem, err := users.SetupUserSystem(database, nil)
+identitySystem, err := identity.SetupIdentitySystem(database, nil)
 ```
 
 ### 3. Register Routes
@@ -39,21 +39,21 @@ userSystem, err := users.SetupUserSystem(database, nil)
 import forgehttp "github.com/forgego/forge/pkg/http"
 
 router := forgehttp.NewRouter()
-userSystem.RegisterRoutes(router)
+identitySystem.RegisterRoutes(router)
 ```
 
 ### 4. Use Services
 
 ```go
 // Register a user
-user, err := userSystem.UserService.Register(ctx, &service.RegisterRequest{
+user, err := identitySystem.UserService.Register(ctx, &service.RegisterRequest{
     Username: "johndoe",
     Email: "john@example.com",
     Password: "SecurePassword123!",
 })
 
 // Authenticate
-authUser, err := userSystem.BackendRegistry.Authenticate(ctx, map[string]string{
+authUser, err := identitySystem.BackendRegistry.Authenticate(ctx, map[string]string{
     "username": "johndoe",
     "password": "SecurePassword123!",
 })
@@ -77,7 +77,7 @@ authUser, err := userSystem.BackendRegistry.Authenticate(ctx, map[string]string{
 ## Architecture
 
 ```
-UserSystem
+IdentitySystem
 ├── Repositories (Data Access)
 │   ├── UserRepository
 │   ├── SessionRepository
@@ -106,13 +106,13 @@ UserSystem
 ## Configuration
 
 ```go
-import "github.com/forgego/forge/pkg/users/config"
+import "github.com/forgego/forge/pkg/identity/config"
 
-userConfig := config.DefaultUserConfig()
-userConfig.PasswordPolicy.MinLength = 12
-userConfig.LockoutConfig.MaxFailedAttempts = 5
+identityConfig := config.DefaultIdentityConfig()
+identityConfig.PasswordPolicy.MinLength = 12
+identityConfig.LockoutConfig.MaxFailedAttempts = 5
 
-userSystem, err := users.SetupUserSystem(database, userConfig)
+identitySystem, err := identity.SetupIdentitySystem(database, identityConfig)
 ```
 
 ## Database Migrations
@@ -123,7 +123,7 @@ Run migrations to create all required tables:
 forge migrate up
 ```
 
-Migrations are located in `pkg/users/migrations/`
+Migrations are located in `pkg/identity/migrations/`
 
 ## Examples
 

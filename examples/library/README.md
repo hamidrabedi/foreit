@@ -29,7 +29,7 @@ Build the forge CLI with CGO enabled:
 
 ```bash
 cd forge
-CGO_ENABLED=1 go build -o forge.exe ./cmd/forge
+CGO_ENABLED=1 go build -o forge.exe ./cli/cmd
 ```
 
 ### Setup Steps

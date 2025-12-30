@@ -44,4 +44,4 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 )
 
-replace github.com/forgego/forge => ../../
+replace github.com/forgego/forge => ../../forge

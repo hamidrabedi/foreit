@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Category represents a product category with hierarchical structure
@@ -59,4 +59,3 @@ func (Category) Relations() []schema.Relation {
 func (Category) Hooks() *schema.ModelHooks {
 	return nil
 }
-

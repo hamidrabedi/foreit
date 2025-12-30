@@ -1,32 +1,51 @@
 /**
- * Creating a sidebar enables you to:
- - create an ordered group of docs
- - render a sidebar for each doc of that group
- - provide next/previous navigation
-
- The sidebars can be generated from the filesystem, or explicitly defined here.
-
- Create as many sidebars as you want.
+ * Sidebar configuration for forge documentation
+ * Simplified structure with Getting Started and Full Guides
  */
 
 // @ts-check
 
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
+  // Getting Started sidebar - Concepts, Quick Start, and Core Logic
   gettingStarted: [
-    'intro',
+    {
+      type: 'doc',
+      id: 'introduction',
+      label: 'Introduction',
+    },
     {
       type: 'category',
-      label: 'Getting Started',
+      label: 'Concepts',
+      items: [
+        'learn/what-is-forge',
+        'learn/architecture',
+        'learn/request-lifecycle',
+        'learn/code-generation',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Quick Start',
       items: [
         'getting-started/installation',
+        'getting-started/hello-world',
+        'getting-started/first-api',
+        'getting-started/project-structure',
         'getting-started/quickstart',
-        'getting-started/first-app',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Core Logic',
+      items: [
+        'learn/extending-forge',
       ],
     },
   ],
 
-  guides: [
+  // Full Guides sidebar - All guides, API reference, examples, advanced, and contributing
+  fullGuides: [
     {
       type: 'category',
       label: 'Guides',
@@ -38,26 +57,22 @@ const sidebars = {
         'guides/migrations',
         'guides/security',
         'guides/deployment',
+        'guides/common-patterns',
+        'guides/best-practices',
       ],
     },
-  ],
-
-  reference: [
     {
       type: 'category',
       label: 'API Reference',
       items: [
-        'reference/schema',
-        'reference/queryset',
-        'reference/manager',
-        'reference/fields',
-        'reference/relations',
-        'reference/hooks',
+        'api-reference/schema',
+        'api-reference/queryset',
+        'api-reference/manager',
+        'api-reference/fields',
+        'api-reference/relations',
+        'api-reference/hooks',
       ],
     },
-  ],
-
-  examples: [
     {
       type: 'category',
       label: 'Examples',
@@ -67,34 +82,27 @@ const sidebars = {
         'examples/library',
       ],
     },
-  ],
-
-  advanced: [
     {
       type: 'category',
-      label: 'Advanced Topics',
+      label: 'Advanced',
       items: [
-        'advanced/code-generation',
+        'advanced/performance',
         'advanced/plugins',
         'advanced/custom-fields',
-        'advanced/performance',
+        'advanced/code-generation',
       ],
     },
-  ],
-
-  contributing: [
     {
       type: 'category',
       label: 'Contributing',
       items: [
-        'contributing/development',
         'contributing/architecture',
-        'contributing/roadmap',
+        'contributing/development',
         'contributing/changelog',
+        'contributing/roadmap',
       ],
     },
   ],
 };
 
 module.exports = sidebars;
-

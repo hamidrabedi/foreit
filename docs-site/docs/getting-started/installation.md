@@ -1,10 +1,18 @@
 ---
 sidebar_position: 1
+description: Install forge framework on your machine. Step-by-step guide for setting up forge CLI, PostgreSQL, and your development environment.
+keywords:
+  - install forge
+  - forge installation
+  - setup forge
+  - forge cli
+  - forge setup
+image: /img/forge-social-card.jpg
 ---
 
 # Installation
 
-This guide will help you install forge and set up your development environment.
+Get forge up and running on your machine in a few minutes.
 
 ## Prerequisites
 
@@ -25,7 +33,7 @@ Clone the repository and build:
 ```bash
 git clone https://github.com/forgego/forge.git
 cd forge/newforge
-go build -o forge ./cmd/forge
+go build -o forge ./cli/cmd
 ```
 
 Add `forge` to your PATH, or use it directly from the build directory.
@@ -33,7 +41,7 @@ Add `forge` to your PATH, or use it directly from the build directory.
 ### Option 2: Install via go install
 
 ```bash
-go install github.com/forgego/forge/newforge/cmd/forge@latest
+go install github.com/forgego/forge/newforge/cli/cmd@latest
 ```
 
 Make sure `$GOPATH/bin` or `$HOME/go/bin` is in your PATH.

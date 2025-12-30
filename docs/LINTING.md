@@ -143,7 +143,7 @@ The following directories are excluded from linting:
 
 - `vendor/` - Dependencies
 - `examples/` - Example code
-- `cmd/forge/` - CLI tool code
+- `cli/` - CLI tool code
 
 ## Excluded Files
 

@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Supplier represents a product supplier
@@ -59,4 +59,3 @@ func (Supplier) Relations() []schema.Relation {
 func (Supplier) Hooks() *schema.ModelHooks {
 	return nil
 }
-

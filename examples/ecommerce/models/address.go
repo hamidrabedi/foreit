@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Address represents a customer address
@@ -64,4 +64,3 @@ func (Address) Relations() []schema.Relation {
 func (Address) Hooks() *schema.ModelHooks {
 	return nil
 }
-

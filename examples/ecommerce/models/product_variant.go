@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // ProductVariant represents a variant of a product (size, color, etc.)
@@ -62,4 +62,3 @@ func (ProductVariant) Relations() []schema.Relation {
 func (ProductVariant) Hooks() *schema.ModelHooks {
 	return nil
 }
-

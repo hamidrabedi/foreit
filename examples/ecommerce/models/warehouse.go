@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Warehouse represents a warehouse location
@@ -56,4 +56,3 @@ func (Warehouse) Relations() []schema.Relation {
 func (Warehouse) Hooks() *schema.ModelHooks {
 	return nil
 }
-

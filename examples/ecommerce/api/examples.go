@@ -3,14 +3,10 @@ package api
 import (
 	"fmt"
 	"net/http"
-	
-	forgeapi "github.com/forgego/forge/pkg/api"
-	"github.com/forgego/forge/pkg/api/authentication"
-	"github.com/forgego/forge/pkg/api/filters"
-	"github.com/forgego/forge/pkg/api/permissions"
-	"github.com/forgego/forge/pkg/api/renderers"
-	"github.com/forgego/forge/pkg/api/throttling"
+
 	"ecommerce/models"
+	"github.com/forgego/forge/api"
+	forgeapi "github.com/forgego/forge/api"
 )
 
 // ============================================================================
@@ -25,7 +21,7 @@ func Example1_SimplePublicAPI() *forgeapi.EnhancedBaseViewSet {
 		nil,
 		&models.Brand{},
 	)
-	
+
 	// That's it! Default permissions allow all access
 	return viewset
 }
@@ -38,7 +34,7 @@ func Example2_AuthenticatedAPI() *forgeapi.EnhancedBaseViewSet {
 		nil,
 		&models.Customer{},
 	)
-	
+
 	// Add authentication
 	viewset.AuthenticationClasses = []authentication.Authentication{
 		authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
@@ -46,12 +42,12 @@ func Example2_AuthenticatedAPI() *forgeapi.EnhancedBaseViewSet {
 			return nil, nil
 		}),
 	}
-	
+
 	// Require authentication
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewIsAuthenticated(),
 	}
-	
+
 	return viewset
 }
 
@@ -63,18 +59,18 @@ func Example3_ReadOnlyPublic() *forgeapi.EnhancedBaseViewSet {
 		nil,
 		&models.Product{},
 	)
-	
+
 	viewset.AuthenticationClasses = []authentication.Authentication{
 		authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
 			return nil, nil
 		}),
 	}
-	
+
 	// Read for all, write for authenticated
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewIsAuthenticatedOrReadOnly(),
 	}
-	
+
 	return viewset
 }
 
@@ -86,24 +82,24 @@ func Example4_WithThrottling() *forgeapi.EnhancedBaseViewSet {
 		nil,
 		&models.Order{},
 	)
-	
+
 	viewset.AuthenticationClasses = []authentication.Authentication{
 		authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
 			return nil, nil
 		}),
 	}
-	
+
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewIsAuthenticated(),
 	}
-	
+
 	// Add throttling
 	cache := throttling.NewMemoryCache()
 	viewset.ThrottleClasses = []throttling.Throttle{
 		throttling.NewAnonRateThrottle("100/hour", cache),
 		throttling.NewUserRateThrottle("1000/day", cache),
 	}
-	
+
 	return viewset
 }
 
@@ -115,17 +111,17 @@ func Example5_WithFilters() *forgeapi.EnhancedBaseViewSetIntegrated {
 		nil,
 		&models.Product{},
 	)
-	
+
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewAllowAny(),
 	}
-	
+
 	// Add filters
 	viewset.FilterBackends = []filters.FilterBackend{
 		filters.NewSearchFilter([]string{"name", "description", "sku"}),
 		filters.NewOrderingFilter([]string{"price", "created_at", "name"}),
 	}
-	
+
 	return viewset
 }
 
@@ -137,18 +133,18 @@ func Example6_WithContentNegotiation() *forgeapi.EnhancedBaseViewSetIntegrated {
 		nil,
 		&models.Product{},
 	)
-	
+
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewAllowAny(),
 	}
-	
+
 	// Multiple renderers
 	viewset.RendererClasses = []renderers.Renderer{
 		renderers.NewJSONRenderer(),
 		renderers.NewXMLRenderer(),
 		renderers.NewHTMLRenderer(),
 	}
-	
+
 	return viewset
 }
 
@@ -160,38 +156,38 @@ func Example7_Complete() *forgeapi.EnhancedBaseViewSetIntegrated {
 		nil,
 		&models.Order{},
 	)
-	
+
 	// Authentication
 	viewset.AuthenticationClasses = []authentication.Authentication{
 		authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
 			return nil, nil
 		}),
 	}
-	
+
 	// Permissions
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewIsAuthenticated(),
 		// Add IsOwnerOrReadOnly for customer-specific filtering
 	}
-	
+
 	// Throttling
 	cache := throttling.NewMemoryCache()
 	viewset.ThrottleClasses = []throttling.Throttle{
 		throttling.NewUserRateThrottle("100/hour", cache),
 	}
-	
+
 	// Filters
 	viewset.FilterBackends = []filters.FilterBackend{
 		filters.NewSearchFilter([]string{"order_number"}),
 		filters.NewOrderingFilter([]string{"placed_at", "total_amount"}),
 	}
-	
+
 	// Content negotiation
 	viewset.RendererClasses = []renderers.Renderer{
 		renderers.NewJSONRenderer(),
 		renderers.NewXMLRenderer(),
 	}
-	
+
 	return viewset
 }
 
@@ -203,19 +199,19 @@ func Example8_AdminOnly() *forgeapi.EnhancedBaseViewSet {
 		nil,
 		&models.Inventory{},
 	)
-	
+
 	viewset.AuthenticationClasses = []authentication.Authentication{
 		authentication.NewTokenAuthentication(func(token string) (interface{}, error) {
 			return nil, nil
 		}),
 	}
-	
+
 	// Admin only
 	viewset.PermissionClasses = []permissions.Permission{
 		permissions.NewIsAuthenticated(),
 		permissions.NewIsAdminUser(),
 	}
-	
+
 	return viewset
 }
 
@@ -231,7 +227,7 @@ func Example9_CustomAction(apiRouter *forgeapi.EnhancedRouter) {
 		orderID := r.URL.Query().Get("id")
 		fmt.Fprintf(w, "Cancelling order %s", orderID)
 	})
-	
+
 	// Register another custom action
 	apiRouter.RegisterAction("refund", &forgeapi.ActionConfig{
 		Methods: []string{"POST"},
@@ -251,11 +247,11 @@ func Example10_ProductionReady() *forgeapi.EnhancedBaseViewSetIntegrated {
 		nil,
 		&models.Order{},
 	)
-	
+
 	// Additional customizations can be added
 	viewset.FilterBackends = []filters.FilterBackend{
 		filters.NewSearchFilter([]string{"order_number"}),
 	}
-	
+
 	return viewset
 }

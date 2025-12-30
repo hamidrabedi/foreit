@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Author represents a book author
@@ -44,4 +44,3 @@ func (Author) Relations() []schema.Relation {
 func (Author) Hooks() *schema.ModelHooks {
 	return nil
 }
-

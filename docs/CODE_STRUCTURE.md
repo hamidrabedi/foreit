@@ -105,9 +105,9 @@ The `pkg/` directory contains all framework packages. Each package is self-conta
 
 **Files:**
 - `queryset.go` - Base QuerySet interface and implementation
-- `queryset_v2.go` - Enhanced QuerySet with additional features
+- `queryset.go` - QuerySet with additional features
 - `manager.go` - Manager interface and base implementation
-- `manager_v2.go` - Enhanced Manager with CRUD operations
+- `manager.go` - Manager with CRUD operations
 - `field_expr.go` - Type-safe field expressions (`FieldExpr[T]`)
 - `query_expr.go` - Query expression building (`QueryExpr`)
 - `expression.go` - Expression evaluation and SQL generation
@@ -604,13 +604,15 @@ The `pkg/` directory contains all framework packages. Each package is self-conta
 
 ## Command Structure (`cmd/`)
 
-### `cmd/forge/main.go`
+### `cli/cmd/main.go`
 
 **Purpose:** Main entry point for the `forge` CLI tool.
 
 **Functionality:**
 - Initializes CLI root command
 - Registers all subcommands
+
+**Location:** `forge/cli/cmd/main.go`
 - Handles command execution
 - Error handling and exit codes
 

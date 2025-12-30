@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Inventory represents inventory tracking for products
@@ -60,4 +60,3 @@ func (Inventory) Relations() []schema.Relation {
 func (Inventory) Hooks() *schema.ModelHooks {
 	return nil
 }
-

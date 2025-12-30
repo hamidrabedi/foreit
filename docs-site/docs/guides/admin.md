@@ -1,12 +1,30 @@
 ---
 sidebar_position: 3
+description: Learn how to use and customize forge's auto-generated admin interface. Django-style admin panel with CRUD operations, search, filtering, and more.
+keywords:
+  - forge admin
+  - admin interface
+  - django admin go
+  - auto-generated admin
+  - forge admin panel
+image: /img/forge-social-card.jpg
 ---
 
-# Admin Interface Guide
+# Admin Interface
 
-forge provides a Django-like auto-generated admin interface for your models. Just register your models and you get a full-featured admin panel.
+The admin interface is forge's auto-generated admin panel. Register your models and you get a full web UI for managing your data. No code required.
 
-## Quick Start
+## Why use it?
+
+Because building admin interfaces is boring:
+
+- **Zero code** - Just register your models
+- **Full CRUD** - Create, read, update, delete—all there
+- **Search and filters** - Find what you need fast
+- **Bulk actions** - Update or delete multiple records at once
+- **Export** - Download your data as CSV or JSON
+
+## Quick start
 
 ### 1. Register Models
 
@@ -19,13 +37,11 @@ import (
 )
 
 func main() {
-    // ... setup code ...
+    // ... your setup code ...
     
-    // Register models with admin
     admin.RegisterModel(&models.User{})
     admin.RegisterModel(&models.Post{})
     
-    // Register admin routes
     if settings.Admin.Enabled {
         admin.RegisterAdminRoutes(router, settings.Admin.Path)
     }

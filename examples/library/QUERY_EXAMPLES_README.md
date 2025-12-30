@@ -77,7 +77,7 @@ The examples will run if a database connection is available.
 
 ```go
 // 1. Create manager
-manager, _ := query.NewManagerV2[models.Book]("books")
+manager, _ := query.NewManager[models.Book]("books")
 manager.SetDB(database)
 
 // 2. Get field accessor
@@ -96,7 +96,7 @@ books, err := manager.Filter(
 
 ## Notes
 
-- All examples use the new `QuerySetV2` and `ManagerV2` APIs
+- All examples use the `QuerySet` and `Manager` APIs
 - The old `QuerySet` and `Manager` APIs still work for backward compatibility
 - Examples are designed to be safe (delete operations are commented out)
 - Some examples may need database setup to run successfully

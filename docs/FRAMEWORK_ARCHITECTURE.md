@@ -1395,7 +1395,7 @@ type Throttle interface {
 
 ### User System Architecture
 
-**Location:** `pkg/users/`
+**Location:** `pkg/identity/`
 
 **Purpose:** Complete user management with authentication, sessions, and permissions.
 
@@ -1797,7 +1797,7 @@ type userService struct {
 
 **Example:**
 ```go
-type UserSystemFactory interface {
+type IdentitySystemFactory interface {
     NewUserRepository() UserRepository
     NewUserService() UserService
 }

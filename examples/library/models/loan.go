@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Loan represents a book loan/borrowing record
@@ -50,4 +50,3 @@ func (Loan) Relations() []schema.Relation {
 func (Loan) Hooks() *schema.ModelHooks {
 	return nil
 }
-

@@ -13,7 +13,7 @@ cd forge
 go mod download
 
 # Build the CLI
-go build ./cmd/forge
+go build ./cli/cmd
 ```
 
 ### Create a New Project

@@ -1,17 +1,17 @@
 package migrations
 
 import (
-	"os"
-	"fmt"
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/migrate"
+	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -48,7 +48,7 @@ func TestMigrationSystem_GenerateAndApply(t *testing.T) {
 	// Create a simple model file
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -143,7 +143,7 @@ func TestMigrationSystem_Rollback(t *testing.T) {
 	// Create two models
 	userModel := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -294,7 +294,7 @@ func TestMigrationSystem_MigrateTo(t *testing.T) {
 	// Verify only first two tables exist
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "table1")
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "table2")
-	
+
 	var exists int
 	err = postgresDB.QueryRowContext(ctx, `
 		SELECT 1 FROM information_schema.tables 
@@ -424,7 +424,7 @@ func TestMigrationSystem_IncrementalGeneration(t *testing.T) {
 	// Step 1: Create initial model
 	userModel := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -467,7 +467,7 @@ func (User) Relations() []schema.Relation {
 	// Step 2: Add a new field to the model
 	userModelUpdated := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -496,7 +496,7 @@ func (User) Relations() []schema.Relation {
 	// Create a new generator to ensure it loads state from files
 	gen2, err := migrate.NewGenerator(modelsDir, migrationsDir)
 	require.NoError(t, err, "should create new generator")
-	
+
 	err = gen2.GenerateMigrations("add_username_to_users")
 	// If no changes detected, that's also a valid outcome (state might already match)
 	// But we expect changes, so log if nil

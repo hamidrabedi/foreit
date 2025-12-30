@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/migrate"
+	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -50,7 +50,7 @@ func TestMigrationSystem_CompleteFlow(t *testing.T) {
 	// Step 1: Create initial model
 	modelContent1 := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -179,7 +179,7 @@ func TestMigrationSystem_RollbackBasic(t *testing.T) {
 	// Create model
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Product struct {
 	schema.BaseSchema
@@ -240,7 +240,7 @@ func (Product) Relations() []schema.Relation {
 	err = runner.Rollback(ctx)
 	// golang-migrate may try to TRUNCATE schema_migrations after dropping it, which causes an error
 	// This is a known issue - the rollback itself succeeds, but cleanup fails
-	if err != nil && (err.Error() == "failed to rollback migration: pq: relation \"public.schema_migrations\" does not exist in line 0: TRUNCATE \"public\".\"schema_migrations\"" || 
+	if err != nil && (err.Error() == "failed to rollback migration: pq: relation \"public.schema_migrations\" does not exist in line 0: TRUNCATE \"public\".\"schema_migrations\"" ||
 		contains(err.Error(), "schema_migrations") && contains(err.Error(), "TRUNCATE")) {
 		// This is expected - rollback succeeded but cleanup failed
 		// Verify table was actually dropped
@@ -262,7 +262,7 @@ func (Product) Relations() []schema.Relation {
 	// Verify version decreased or table was dropped
 	version, _, err := runner.Version(ctx)
 	require.NoError(t, err)
-	
+
 	// Check if table was dropped (rollback should drop it)
 	err = database.DB.QueryRowContext(ctx, `
 		SELECT EXISTS (
@@ -272,7 +272,7 @@ func (Product) Relations() []schema.Relation {
 		)
 	`).Scan(&tableExists)
 	require.NoError(t, err)
-	
+
 	// After rollback, table should be dropped or version should be 0
 	if version == 0 {
 		assert.False(t, tableExists, "products table should not exist after rollback to version 0")
@@ -311,7 +311,7 @@ func TestMigrationSystem_IncrementalChanges(t *testing.T) {
 	// Phase 1: Create initial model
 	modelContent1 := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Customer struct {
 	schema.BaseSchema
@@ -359,7 +359,7 @@ func (Customer) Relations() []schema.Relation {
 	// Phase 2: Add new field to model
 	modelContent2 := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Customer struct {
 	schema.BaseSchema
@@ -399,7 +399,7 @@ func (Customer) Relations() []schema.Relation {
 	newRunner, err := db.NewMigrationRunner(database, migrationsDir)
 	require.NoError(t, err)
 	defer newRunner.Close()
-	
+
 	runner = newRunner
 
 	// Apply second migration
@@ -461,7 +461,7 @@ func TestMigrationSystem_VersionTracking(t *testing.T) {
 			name: "order",
 			content: `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Order struct {
 	schema.BaseSchema
@@ -489,7 +489,7 @@ func (Order) Relations() []schema.Relation {
 			name: "order_item",
 			content: `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Order struct {
 	schema.BaseSchema
@@ -617,7 +617,7 @@ func TestMigrationSystem_StateReconstruction(t *testing.T) {
 	// Create and apply initial migration
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Category struct {
 	schema.BaseSchema
@@ -724,7 +724,7 @@ func TestMigrationSystem_ChecksumValidation(t *testing.T) {
 	// Create model and generate migration
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Tag struct {
 	schema.BaseSchema
@@ -811,7 +811,7 @@ func TestMigrationSystem_StatusReporting(t *testing.T) {
 	// Create and apply migration
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Review struct {
 	schema.BaseSchema
@@ -902,7 +902,7 @@ func TestMigrationSystem_RollbackToVersion(t *testing.T) {
 	for i := 1; i <= 3; i++ {
 		modelContent := fmt.Sprintf(`package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Table%d struct {
 	schema.BaseSchema

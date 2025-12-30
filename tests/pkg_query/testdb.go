@@ -7,7 +7,7 @@ import (
 	"os"
 	"testing"
 
-	_ "github.com/lib/pq"     // PostgreSQL
+	_ "github.com/lib/pq"           // PostgreSQL
 	_ "github.com/mattn/go-sqlite3" // SQLite
 )
 

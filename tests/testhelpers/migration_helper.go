@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/migrate"
+	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/orm"
 )
 
 // MigrationInfo represents information about a migration
@@ -71,7 +71,7 @@ func ApplyMigrationSequence(ctx context.Context, t *testing.T, database *db.DB, 
 	var mr *db.MigrationRunner
 	var err error
 	shouldClose := false
-	
+
 	if len(runner) > 0 && runner[0] != nil {
 		mr = runner[0]
 	} else {
@@ -100,7 +100,7 @@ func RollbackMigrationSequence(ctx context.Context, t *testing.T, database *db.D
 	var mr *db.MigrationRunner
 	var err error
 	shouldClose := false
-	
+
 	if len(runner) > 0 && runner[0] != nil {
 		mr = runner[0]
 	} else {
@@ -136,7 +136,7 @@ func AssertMigrationState(ctx context.Context, t *testing.T, database *db.DB, mi
 func AssertMigrationStateWithRunner(ctx context.Context, t *testing.T, database *db.DB, migrationsPath string, expectedVersion uint, expectedDirty bool, runner *db.MigrationRunner) {
 	var err error
 	shouldClose := false
-	
+
 	if runner == nil {
 		// Ensure database connection is still valid
 		if err := database.Ping(); err != nil {
@@ -149,7 +149,7 @@ func AssertMigrationStateWithRunner(ctx context.Context, t *testing.T, database 
 		}
 		shouldClose = true
 	}
-	
+
 	if shouldClose {
 		defer runner.Close()
 	}
@@ -202,7 +202,6 @@ func CreateUniqueTestDB(t *testing.T, prefix string) string {
 	opts := DefaultPostgresOptsWithTest(testName)
 	return opts.DBName
 }
-
 
 // AssertSchemaMatchesModels verifies database schema matches model definitions
 // This is a high-level check that validates tables, columns, and basic constraints exist
@@ -411,4 +410,3 @@ func AssertMigrationSequence(ctx context.Context, t *testing.T, database *db.DB,
 		t.Errorf("expected to be at version 0 after rolling back all migrations, got %d", version)
 	}
 }
-

@@ -47,3 +47,4 @@ migrations/*.sql
 dist/
 build/
 
+helper-projects

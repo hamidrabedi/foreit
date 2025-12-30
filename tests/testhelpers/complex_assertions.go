@@ -12,11 +12,11 @@ import (
 type CascadeBehavior string
 
 const (
-	CascadeCASCADE   CascadeBehavior = "CASCADE"
-	CascadeSET_NULL  CascadeBehavior = "SET NULL"
+	CascadeCASCADE     CascadeBehavior = "CASCADE"
+	CascadeSET_NULL    CascadeBehavior = "SET NULL"
 	CascadeSET_DEFAULT CascadeBehavior = "SET DEFAULT"
-	CascadeRESTRICT  CascadeBehavior = "RESTRICT"
-	CascadeNO_ACTION CascadeBehavior = "NO ACTION"
+	CascadeRESTRICT    CascadeBehavior = "RESTRICT"
+	CascadeNO_ACTION   CascadeBehavior = "NO ACTION"
 )
 
 // AssertForeignKeyCascade tests FK cascade behaviors
@@ -47,7 +47,7 @@ func AssertForeignKeyCascade(ctx context.Context, t *testing.T, db *sql.DB, tabl
 	// Check delete rule
 	expectedRule := string(expectedBehavior)
 	if deleteRule != expectedRule {
-		t.Errorf("foreign key %s on %s.%s has delete rule %s, expected %s", 
+		t.Errorf("foreign key %s on %s.%s has delete rule %s, expected %s",
 			constraintName, tableName, columnName, deleteRule, expectedRule)
 	}
 }
@@ -139,7 +139,7 @@ func AssertConstraintExistsEnhanced(ctx context.Context, t *testing.T, db *sql.D
 	}
 
 	if constraintType != "" && actualType != constraintType {
-		t.Errorf("constraint %s on table %s has type %s, expected %s", 
+		t.Errorf("constraint %s on table %s has type %s, expected %s",
 			constraintName, tableName, actualType, constraintType)
 	}
 }
@@ -171,11 +171,11 @@ type IndexSpec struct {
 
 // ForeignKeySpec describes expected foreign key attributes
 type ForeignKeySpec struct {
-	Column         string
-	TargetTable    string
-	TargetColumn   string
-	DeleteCascade  CascadeBehavior
-	UpdateCascade  CascadeBehavior
+	Column        string
+	TargetTable   string
+	TargetColumn  string
+	DeleteCascade CascadeBehavior
+	UpdateCascade CascadeBehavior
 }
 
 // ConstraintSpec describes expected constraint attributes
@@ -208,7 +208,7 @@ func AssertTableStructure(ctx context.Context, t *testing.T, db *sql.DB, tableNa
 
 			// Type matching is flexible - just check if it contains the expected type
 			if !strings.Contains(strings.ToLower(actualType), strings.ToLower(colSpec.Type)) {
-				t.Logf("warning: column %s.%s has type %s, expected to contain %s", 
+				t.Logf("warning: column %s.%s has type %s, expected to contain %s",
 					tableName, colSpec.Name, actualType, colSpec.Type)
 			}
 		}

@@ -175,7 +175,7 @@ To verify that all SQL features are properly supported:
 ```bash
 # First, build the forge CLI tool (from newforge directory)
 cd ../../..
-go build -o forge.exe ./cmd/forge  # or ./forge on Unix
+go build -o forge.exe ./cli/cmd  # or ./forge on Unix
 
 # Then run tests (tests will auto-generate code first)
 cd examples/ecommerce

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/forgego/forge/pkg/generator"
+	"github.com/forgego/forge/codegen"
 )
 
 var codeGenerated = false
@@ -28,8 +28,8 @@ func setupTest(t *testing.T) {
 	// Find the forge binary - try multiple locations
 	var forgePath string
 	possiblePaths := []string{
-		filepath.Join(modelsDir, "..", "..", "..", "forge.exe"),     // Windows
-		filepath.Join(modelsDir, "..", "..", "..", "forge"),         // Unix
+		filepath.Join(modelsDir, "..", "..", "..", "forge.exe"),       // Windows
+		filepath.Join(modelsDir, "..", "..", "..", "forge"),           // Unix
 		filepath.Join(modelsDir, "..", "..", "..", "..", "forge.exe"), // Alternative location
 		filepath.Join(modelsDir, "..", "..", "..", "..", "forge"),
 		"forge", // In PATH
@@ -51,7 +51,7 @@ func setupTest(t *testing.T) {
 	}
 
 	if forgePath == "" {
-		t.Skipf("Forge CLI tool not found. Please build it first: go build -o forge ./cmd/forge")
+		t.Skipf("Forge CLI tool not found. Please build it first: go build -o forge ./cli/cmd")
 		return
 	}
 
@@ -92,45 +92,45 @@ func TestSQLFeatureSupport(t *testing.T) {
 
 	// Track which features we've verified
 	features := map[string]bool{
-		"Int64":              false,
-		"Int32":              false,
-		"Decimal":            false,
-		"Float64":            false,
-		"String":             false,
-		"Text":               false,
-		"Bool":               false,
-		"UUID":               false,
-		"JSON":               false,
-		"DateTime":           false,
-		"Date":               false,
-		"Time":               false,
-		"Bytes":              false,
-		"URL":                false,
-		"Email":              false,
-		"PrimaryKey":         false,
-		"AutoIncrement":      false,
-		"Required":           false,
-		"Optional":           false,
-		"Unique":             false,
-		"Default":            false,
-		"MaxLength":          false,
-		"MaxDigits":          false,
-		"DecimalPlaces":      false,
-		"Choices":            false,
-		"AutoNow":            false,
-		"AutoNowAdd":         false,
-		"DBIndex":            false,
-		"ForeignKey":         false,
-		"OneToOne":           false,
-		"OneToMany":          false,
-		"ManyToMany":         false,
-		"SelfReferential":    false,
-		"Indexes":            false,
-		"UniqueTogether":     false,
-		"CascadeCASCADE":     false,
-		"CascadeSET_NULL":    false,
-		"CascadePROTECT":     false,
-		"WriteOnly":          false,
+		"Int64":           false,
+		"Int32":           false,
+		"Decimal":         false,
+		"Float64":         false,
+		"String":          false,
+		"Text":            false,
+		"Bool":            false,
+		"UUID":            false,
+		"JSON":            false,
+		"DateTime":        false,
+		"Date":            false,
+		"Time":            false,
+		"Bytes":           false,
+		"URL":             false,
+		"Email":           false,
+		"PrimaryKey":      false,
+		"AutoIncrement":   false,
+		"Required":        false,
+		"Optional":        false,
+		"Unique":          false,
+		"Default":         false,
+		"MaxLength":       false,
+		"MaxDigits":       false,
+		"DecimalPlaces":   false,
+		"Choices":         false,
+		"AutoNow":         false,
+		"AutoNowAdd":      false,
+		"DBIndex":         false,
+		"ForeignKey":      false,
+		"OneToOne":        false,
+		"OneToMany":       false,
+		"ManyToMany":      false,
+		"SelfReferential": false,
+		"Indexes":         false,
+		"UniqueTogether":  false,
+		"CascadeCASCADE":  false,
+		"CascadeSET_NULL": false,
+		"CascadePROTECT":  false,
+		"WriteOnly":       false,
 	}
 
 	// Verify features across all models
@@ -282,19 +282,19 @@ func TestPostgreSQLTypes(t *testing.T) {
 	setupTest(t)
 
 	expectedTypes := map[string]string{
-		"Int64":     "BIGINT",
-		"Int32":     "INTEGER",
-		"Decimal":   "NUMERIC",
-		"Float64":   "DOUBLE PRECISION",
-		"String":    "VARCHAR or TEXT",
-		"Text":      "TEXT",
-		"Bool":      "BOOLEAN",
-		"UUID":      "UUID",
-		"JSON":      "JSONB",
-		"DateTime":  "TIMESTAMP WITH TIME ZONE",
-		"Date":      "DATE",
-		"Time":      "TIME",
-		"Bytes":     "BYTEA",
+		"Int64":    "BIGINT",
+		"Int32":    "INTEGER",
+		"Decimal":  "NUMERIC",
+		"Float64":  "DOUBLE PRECISION",
+		"String":   "VARCHAR or TEXT",
+		"Text":     "TEXT",
+		"Bool":     "BOOLEAN",
+		"UUID":     "UUID",
+		"JSON":     "JSONB",
+		"DateTime": "TIMESTAMP WITH TIME ZONE",
+		"Date":     "DATE",
+		"Time":     "TIME",
+		"Bytes":    "BYTEA",
 	}
 
 	parser := generator.NewASTParser()
@@ -337,10 +337,10 @@ func TestComplexRelations(t *testing.T) {
 	}
 
 	relationTypes := map[string]int{
-		"ForeignKey":  0,
-		"OneToOne":    0,
-		"OneToMany":   0,
-		"ManyToMany":  0,
+		"ForeignKey":      0,
+		"OneToOne":        0,
+		"OneToMany":       0,
+		"ManyToMany":      0,
 		"SelfReferential": 0,
 	}
 
@@ -496,4 +496,3 @@ func TestIndexesAndConstraints(t *testing.T) {
 		t.Error("❌ No indexes found in models")
 	}
 }
-

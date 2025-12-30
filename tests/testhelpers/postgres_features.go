@@ -68,7 +68,7 @@ func AssertJSONBColumn(ctx context.Context, t *testing.T, db *sql.DB, tableName 
 
 	// Test that we can insert and retrieve JSONB data
 	testData := map[string]interface{}{
-		"test": "value",
+		"test":   "value",
 		"number": 42,
 	}
 	jsonBytes, err := json.Marshal(testData)
@@ -102,7 +102,7 @@ func AssertArrayColumn(ctx context.Context, t *testing.T, db *sql.DB, tableName 
 	// PostgreSQL array types are named like _int4, _text, etc.
 	// Or data_type might be ARRAY
 	if dataType != "ARRAY" && !strings.HasPrefix(udtName, "_") {
-		t.Fatalf("column %s.%s is not an array type, got data_type=%s, udt_name=%s", 
+		t.Fatalf("column %s.%s is not an array type, got data_type=%s, udt_name=%s",
 			tableName, columnName, dataType, udtName)
 	}
 
@@ -125,7 +125,7 @@ func AssertArrayColumn(ctx context.Context, t *testing.T, db *sql.DB, tableName 
 			err := db.QueryRowContext(ctx, typeQuery, tableName, columnName).Scan(&actualTypeName)
 			if err == nil {
 				if !strings.Contains(actualTypeName, expectedElementType) {
-					t.Logf("warning: array element type may not match expected %s, got %s", 
+					t.Logf("warning: array element type may not match expected %s, got %s",
 						expectedElementType, actualTypeName)
 				}
 			}

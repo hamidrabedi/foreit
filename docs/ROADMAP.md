@@ -106,7 +106,17 @@ The framework has achieved MVP status with all core features working. Here's wha
 
 **Impact:** Better admin user experience
 
-#### 4. Testing Infrastructure
+#### 4. Migration System Enhancements
+**Status:** ✅ Core Complete, 🚧 Enhancements Needed
+
+- [ ] **Migration Recovery** - Automatic dirty state recovery and partial rollback
+- [ ] **Schema Drift Detection** - Database introspection to detect schema drift
+- [ ] **Migration Integrity Validation** - Checksum validation for applied migrations
+- [ ] **Advanced Rollback** - Partial migration rollback support
+
+**Impact:** Better migration safety and recovery capabilities
+
+#### 5. Testing Infrastructure
 **Status:** 🚧 Partial
 
 - [ ] Comprehensive test suite
@@ -122,7 +132,17 @@ The framework has achieved MVP status with all core features working. Here's wha
 
 ### P1 - High Priority
 
-#### 5. REST API Auto-Generation
+#### 5. Migration Recovery & Drift Detection
+**Status:** 📋 Planned
+
+- [ ] Automatic dirty state recovery
+- [ ] Database introspection for drift detection
+- [ ] Migration integrity validation
+- [ ] Partial migration rollback
+
+**Impact:** Production migration safety
+
+#### 6. REST API Auto-Generation
 **Status:** ✅ Framework Complete, 🚧 Auto-Generation Needed
 
 - [ ] Auto-generate ViewSets from models
@@ -134,7 +154,7 @@ The framework has achieved MVP status with all core features working. Here's wha
 
 **Impact:** Faster API development
 
-#### 6. Advanced Query Features
+#### 7. Advanced Query Features
 **Status:** 🚧 Structure Ready
 
 - [ ] **Window Functions** - ROW_NUMBER, RANK, etc.
@@ -145,7 +165,7 @@ The framework has achieved MVP status with all core features working. Here's wha
 
 **Impact:** More powerful querying capabilities
 
-#### 7. Caching Layer
+#### 8. Caching Layer
 **Status:** 📋 Planned
 
 - [ ] Query result caching
@@ -157,7 +177,7 @@ The framework has achieved MVP status with all core features working. Here's wha
 
 **Impact:** Performance improvements
 
-#### 8. CLI Enhancements
+#### 9. CLI Enhancements
 **Status:** ✅ Basic Complete, 🚧 Enhancements Needed
 
 - [ ] `forge startapp` - Create new app

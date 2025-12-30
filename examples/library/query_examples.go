@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/query"
+	"github.com/forgego/forge/db"
+	"github.com/forgego/forge/orm"
 	"library/models"
 )
 
-// QueryExamples demonstrates all types of queries using the new QuerySetV2 system
+// QueryExamples demonstrates all types of queries using the QuerySet system
 func QueryExamples(database *db.DB) {
 	ctx := context.Background()
 
@@ -21,7 +21,7 @@ func QueryExamples(database *db.DB) {
 	fmt.Println("\n=== SIMPLE QUERIES ===")
 
 	// Create manager for Book model
-	bookManager, err := query.NewManagerV2[models.Book]("books")
+	bookManager, err := query.NewManager[models.Book]("books")
 	if err != nil {
 		log.Fatalf("Failed to create manager: %v", err)
 	}
@@ -54,7 +54,7 @@ func QueryExamples(database *db.DB) {
 	// Example 1.3: Simple filter - books with price > 10
 	fmt.Println("\n1.3 Books with price > 10:")
 	priceField := fa.Field[float64]("price")
-	qs, err := query.NewQuerySetV2[models.Book]("books")
+	qs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -69,7 +69,7 @@ func QueryExamples(database *db.DB) {
 	// Example 1.4: Simple filter - available books
 	fmt.Println("\n1.4 Available books:")
 	availableField := fa.Field[bool]("available")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -89,7 +89,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 2.1: Multiple conditions with AND
 	fmt.Println("\n2.1 Books with price > 10 AND available:")
-	qs, err := query.NewQuerySetV2[models.Book]("books")
+	qs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -127,7 +127,7 @@ func QueryExamples(database *db.DB) {
 	// Example 2.3: String operations - Contains
 	fmt.Println("\n2.3 Books with title containing 'Go':")
 	titleField := fa.Field[string]("title")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -142,7 +142,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 2.4: String operations - StartsWith
 	fmt.Println("\n2.4 Books with title starting with 'The':")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -157,7 +157,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 2.5: IN operator
 	fmt.Println("\n2.5 Books with price IN [10.0, 20.0, 30.0]:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -172,7 +172,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 2.6: Range query (BETWEEN)
 	fmt.Println("\n2.6 Books with price BETWEEN 10.0 AND 50.0:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -188,7 +188,7 @@ func QueryExamples(database *db.DB) {
 	// Example 2.7: NULL checks
 	fmt.Println("\n2.7 Books with description IS NOT NULL:")
 	descField := fa.Field[string]("description")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -203,7 +203,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 2.8: Exclude query
 	fmt.Println("\n2.8 Books excluding unavailable ones:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -224,7 +224,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 3.1: Order by price ascending
 	fmt.Println("\n3.1 Books ordered by price (ascending):")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -241,7 +241,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 3.2: Order by multiple fields
 	fmt.Println("\n3.2 Books ordered by price DESC, then title ASC:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -261,7 +261,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 3.3: Pagination with Limit and Offset
 	fmt.Println("\n3.3 Pagination - page 2 (10 per page):")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -279,7 +279,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 3.4: First and Last
 	fmt.Println("\n3.4 Get first book:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -292,7 +292,7 @@ func QueryExamples(database *db.DB) {
 	}
 
 	fmt.Println("\n3.5 Get last book:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -312,7 +312,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 4.1: Count
 	fmt.Println("\n4.1 Count all books:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -326,7 +326,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 4.2: Count with filter
 	fmt.Println("\n4.2 Count available books:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -340,7 +340,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 4.3: Exists check
 	fmt.Println("\n4.3 Check if any expensive books exist:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -355,7 +355,7 @@ func QueryExamples(database *db.DB) {
 	// Example 4.4: Aggregate functions
 	fmt.Println("\n4.4 Aggregate - Average price:")
 	avgPriceAgg := query.NewAggregate("avg_price", "price", query.AggAvg)
-	qs, err := query.NewQuerySetV2[models.Book]("books")
+	qs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -378,7 +378,7 @@ func QueryExamples(database *db.DB) {
 	fmt.Println("\n5.1 Books with price + tax annotation:")
 	// Note: Annotation with expressions requires converting to QueryExpr
 	// For now, we'll use a simpler aggregate example
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -394,7 +394,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 6.1: Values query - returns maps
 	fmt.Println("\n6.1 Get values as maps (title, price):")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -412,7 +412,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 6.2: ValuesList query - returns tuples
 	fmt.Println("\n6.2 Get values as tuples (title, price):")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -430,7 +430,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 6.3: Flat values - single field as slice
 	fmt.Println("\n6.3 Get flat list of titles:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -451,7 +451,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 7.1: Simple update
 	fmt.Println("\n7.1 Update price for expensive books:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -469,7 +469,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 7.2: Update with expressions using UpdateBuilder
 	fmt.Println("\n7.2 Update with expressions (increment views):")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -493,7 +493,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 7.3: Increment operation
 	fmt.Println("\n7.3 Increment pages by 10:")
-	qs, err = query.NewQuerySetV2[models.Book]("books")
+	qs, err = query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -521,18 +521,18 @@ func QueryExamples(database *db.DB) {
 	fmt.Println("\n8.1 Delete books (example - commented out for safety):")
 	// Uncomment to actually delete:
 	/*
-	qs, err = query.NewQuerySetV2[models.Book]("books")
-	if err != nil {
-		log.Printf("Error: %v", err)
-	} else {
-		qs = qs.SetDB(database)
-		rowsAffected, err := qs.Filter(priceField.Lt(1.0)).Delete(ctx)
+		qs, err = query.NewQuerySet[models.Book]("books")
 		if err != nil {
 			log.Printf("Error: %v", err)
 		} else {
-			fmt.Printf("Deleted %d books\n", rowsAffected)
+			qs = qs.SetDB(database)
+			rowsAffected, err := qs.Filter(priceField.Lt(1.0)).Delete(ctx)
+			if err != nil {
+				log.Printf("Error: %v", err)
+			} else {
+				fmt.Printf("Deleted %d books\n", rowsAffected)
+			}
 		}
-	}
 	*/
 	fmt.Println("(Delete operation commented out for safety)")
 
@@ -562,7 +562,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 10.1: Complex query with multiple filters, ordering, and limiting
 	fmt.Println("\n10.1 Complex query - available books, price range, ordered, limited:")
-	complexQs, err := query.NewQuerySetV2[models.Book]("books")
+	complexQs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -570,12 +570,12 @@ func QueryExamples(database *db.DB) {
 		complexQ := query.NewQ(availableField.Eq(true)).
 			And(query.NewQ(priceField.Gte(10.0))).
 			And(query.NewQ(priceField.Lte(100.0)))
-		
+
 		complexQs = complexQs.SetDB(database).
 			Filter(complexQ).
 			OrderBy(query.NewOrderField("price", false)).
 			Limit(5)
-		
+
 		results, err := complexQs.All(ctx)
 		if err != nil {
 			log.Printf("Error: %v", err)
@@ -586,7 +586,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 10.2: Query with annotations and aggregates
 	fmt.Println("\n10.2 Query with aggregates:")
-	annotatedQs, err := query.NewQuerySetV2[models.Book]("books")
+	annotatedQs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -596,7 +596,7 @@ func QueryExamples(database *db.DB) {
 			Filter(priceField.Gt(10.0)).
 			Aggregate(avgPriceAgg).
 			OrderBy(query.NewOrderField("price", true))
-		
+
 		results, err := annotatedQs.All(ctx)
 		if err != nil {
 			log.Printf("Error: %v", err)
@@ -607,7 +607,7 @@ func QueryExamples(database *db.DB) {
 
 	// Example 10.3: Chained query operations
 	fmt.Println("\n10.3 Chained query operations:")
-	chainedQs, err := query.NewQuerySetV2[models.Book]("books")
+	chainedQs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
@@ -620,7 +620,7 @@ func QueryExamples(database *db.DB) {
 			).
 			Limit(10).
 			Offset(0)
-		
+
 		results, err := chainedQs.All(ctx)
 		if err != nil {
 			log.Printf("Error: %v", err)
@@ -631,14 +631,14 @@ func QueryExamples(database *db.DB) {
 
 	// Example 10.4: Distinct query
 	fmt.Println("\n10.4 Distinct query:")
-	distinctQs, err := query.NewQuerySetV2[models.Book]("books")
+	distinctQs, err := query.NewQuerySet[models.Book]("books")
 	if err != nil {
 		log.Printf("Error: %v", err)
 	} else {
 		distinctQs = distinctQs.SetDB(database).
 			Distinct("author_id").
 			Limit(10)
-		
+
 		results, err := distinctQs.All(ctx)
 		if err != nil {
 			log.Printf("Error: %v", err)

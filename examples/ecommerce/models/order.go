@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Order represents a customer order
@@ -100,13 +100,13 @@ func (Order) Hooks() *schema.ModelHooks {
 			// Calculate total from items if not set
 			// Uses reflection to work before/after code generation
 			val := reflect.ValueOf(instance).Elem()
-			
+
 			// Get total_amount field
 			totalAmountField := val.FieldByName("TotalAmount")
 			if !totalAmountField.IsValid() {
 				return nil // Field doesn't exist yet (before code generation)
 			}
-			
+
 			// Check if total is zero
 			if totalAmountField.MethodByName("IsZero").Call(nil)[0].Bool() {
 				// Calculate from subtotal + tax + shipping - discount
@@ -114,7 +114,7 @@ func (Order) Hooks() *schema.ModelHooks {
 				taxAmount := val.FieldByName("TaxAmount")
 				shippingAmount := val.FieldByName("ShippingAmount")
 				discountAmount := val.FieldByName("DiscountAmount")
-				
+
 				if subtotal.IsValid() {
 					// Use reflection to call Add/Sub methods on decimal.Decimal
 					total := reflect.ValueOf(subtotal.Interface())
@@ -130,7 +130,7 @@ func (Order) Hooks() *schema.ModelHooks {
 					totalAmountField.Set(total)
 				}
 			}
-			
+
 			return nil
 		},
 		BeforeCreate: func(ctx context.Context, instance interface{}) error {
@@ -149,7 +149,7 @@ func (Order) Hooks() *schema.ModelHooks {
 			if !totalAmountField.IsValid() {
 				return nil
 			}
-			
+
 			if totalAmountField.MethodByName("IsZero").Call(nil)[0].Bool() {
 				subtotal := val.FieldByName("Subtotal")
 				if subtotal.IsValid() {
@@ -166,9 +166,8 @@ func (Order) Hooks() *schema.ModelHooks {
 					totalAmountField.Set(total)
 				}
 			}
-			
+
 			return nil
 		},
 	}
 }
-

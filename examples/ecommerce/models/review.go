@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Review represents a product review
@@ -63,4 +63,3 @@ func (Review) Relations() []schema.Relation {
 func (Review) Hooks() *schema.ModelHooks {
 	return nil
 }
-

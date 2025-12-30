@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Brand represents a product brand
@@ -51,4 +51,3 @@ func (Brand) Relations() []schema.Relation {
 func (Brand) Hooks() *schema.ModelHooks {
 	return nil
 }
-

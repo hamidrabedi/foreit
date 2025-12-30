@@ -1,16 +1,16 @@
 package migrations
 
 import (
-	"os"
-	"fmt"
 	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -80,20 +80,20 @@ func TestMigrationStateTracking(t *testing.T) {
 	runner2, err := db.NewMigrationRunner(database, migrationsDir)
 	require.NoError(t, err)
 	defer runner2.Close()
-	
+
 	err = runner2.Migrate(ctx)
 	require.NoError(t, err)
 
 	// Verify state using the new runner
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 2, false, runner2)
-	
+
 	// Close both runners at the end
 	runner.Close()
 
 	// Verify both tables exist
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "users")
 	testhelpers.AssertTableExists(ctx, t, postgresDB, "postgres", "posts")
-	
+
 	// Close runner after all operations
 	defer runner.Close()
 }
@@ -163,7 +163,7 @@ func TestMigrationStateAfterRollback(t *testing.T) {
 
 	// Verify state updated using the existing runner
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner)
-	
+
 	// Close runner after assertions
 	defer runner.Close()
 }
@@ -292,7 +292,7 @@ func TestMigrationStateConsistency(t *testing.T) {
 
 	// Verify state using the existing runner
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner)
-	
+
 	// Don't close the runner - golang-migrate's Close() may close the database connection
 	// Instead, create a new runner without closing the first one
 	// In a real application restart scenario, the database connection would be recreated anyway
@@ -302,7 +302,7 @@ func TestMigrationStateConsistency(t *testing.T) {
 
 	// Verify state is consistent across runner instances
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner2)
-	
+
 	// Close both runners at the end
 	defer runner.Close()
 
@@ -513,7 +513,7 @@ func TestMigrationStateAfterForce(t *testing.T) {
 
 	// Verify state using the existing runner
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner)
-	
+
 	// Simulate dirty state by manually setting it (in real scenario, this happens after failed migration)
 	// We'll use Force() to set a specific version
 	err = runner.Force(ctx, 1)
@@ -521,7 +521,7 @@ func TestMigrationStateAfterForce(t *testing.T) {
 
 	// Verify state is clean after force using the existing runner
 	testhelpers.AssertMigrationStateWithRunner(ctx, t, database, migrationsDir, 1, false, runner)
-	
+
 	// Close runner after all assertions
 	defer runner.Close()
 }

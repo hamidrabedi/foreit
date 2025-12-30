@@ -4,8 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/query"
+	"github.com/forgego/forge/orm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,14 +14,14 @@ func TestQuerySet_Integration(t *testing.T) {
 	withTestDB(t, func(testDB *sql.DB) {
 		// Convert to forge DB type
 		forgeDB := &db.DB{DB: testDB}
-		
+
 		// Load fixtures
 		LoadFixtures(t, testDB, StandardFixtures())
 
 		ctx := context.Background()
 
 		t.Run("Filter and All", func(t *testing.T) {
-			manager, err := query.NewManagerV2[Book]("books")
+			manager, err := query.NewManager[Book]("books")
 			require.NoError(t, err)
 			manager.SetDB(forgeDB)
 
@@ -30,7 +29,7 @@ func TestQuerySet_Integration(t *testing.T) {
 			require.NoError(t, err)
 
 			priceField := fa.Field[float64]("price")
-			qs, err := query.NewQuerySetV2[Book]("books")
+			qs, err := query.NewQuerySet[Book]("books")
 			require.NoError(t, err)
 
 			books, err := qs.SetDB(forgeDB).Filter(priceField.Gt(20.0)).All(ctx)
@@ -39,7 +38,7 @@ func TestQuerySet_Integration(t *testing.T) {
 		})
 
 		t.Run("Count", func(t *testing.T) {
-			manager, err := query.NewManagerV2[Book]("books")
+			manager, err := query.NewManager[Book]("books")
 			require.NoError(t, err)
 			manager.SetDB(forgeDB)
 
@@ -47,7 +46,7 @@ func TestQuerySet_Integration(t *testing.T) {
 			require.NoError(t, err)
 
 			availableField := fa.Field[bool]("available")
-			qs, err := query.NewQuerySetV2[Book]("books")
+			qs, err := query.NewQuerySet[Book]("books")
 			require.NoError(t, err)
 
 			count, err := qs.SetDB(forgeDB).Filter(availableField.Eq(true)).Count(ctx)
@@ -56,7 +55,7 @@ func TestQuerySet_Integration(t *testing.T) {
 		})
 
 		t.Run("Create", func(t *testing.T) {
-			manager, err := query.NewManagerV2[Book]("books")
+			manager, err := query.NewManager[Book]("books")
 			require.NoError(t, err)
 			manager.SetDB(forgeDB)
 
@@ -80,7 +79,7 @@ func TestQuerySet_Integration(t *testing.T) {
 		})
 
 		t.Run("Update", func(t *testing.T) {
-			manager, err := query.NewManagerV2[Book]("books")
+			manager, err := query.NewManager[Book]("books")
 			require.NoError(t, err)
 			manager.SetDB(forgeDB)
 
@@ -88,7 +87,7 @@ func TestQuerySet_Integration(t *testing.T) {
 			require.NoError(t, err)
 
 			priceField := fa.Field[float64]("price")
-			qs, err := query.NewQuerySetV2[Book]("books")
+			qs, err := query.NewQuerySet[Book]("books")
 			require.NoError(t, err)
 
 			rowsAffected, err := qs.SetDB(forgeDB).

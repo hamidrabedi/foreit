@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/migrate"
+	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -34,7 +34,7 @@ func TestMigrationApplySQLite(t *testing.T) {
 	// Create a model file
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -127,7 +127,7 @@ func TestMigrationApplyPostgres(t *testing.T) {
 	// Create User model
 	userModel := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type User struct {
 	schema.BaseSchema
@@ -156,7 +156,7 @@ func (User) Relations() []schema.Relation {
 	// Create Post model with FK
 	postModel := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Post struct {
 	schema.BaseSchema
@@ -226,4 +226,3 @@ func (Post) Relations() []schema.Relation {
 	// Posts should be deleted due to CASCADE
 	testhelpers.AssertRowCount(ctx, t, postgresDB, "posts", 0)
 }
-

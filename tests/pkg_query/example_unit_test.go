@@ -3,7 +3,7 @@ package query
 import (
 	"testing"
 
-	"github.com/forgego/forge/pkg/query"
+	"github.com/forgego/forge/orm"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -92,7 +92,7 @@ func TestQ_And(t *testing.T) {
 	builder := query.NewSQLBuilder()
 	sql, args, err := combined.ToSQL(builder)
 	require.NoError(t, err)
-	
+
 	// Should contain both conditions
 	assert.Contains(t, sql, "price")
 	assert.Contains(t, sql, "available")
@@ -103,10 +103,10 @@ func TestQ_And(t *testing.T) {
 // Example unit test for SQLBuilder
 func TestSQLBuilder_AddArg(t *testing.T) {
 	builder := query.NewSQLBuilder()
-	
+
 	placeholder1 := builder.AddArg("value1")
 	placeholder2 := builder.AddArg("value2")
-	
+
 	assert.Equal(t, "$1", placeholder1)
 	assert.Equal(t, "$2", placeholder2)
 	assert.Equal(t, []interface{}{"value1", "value2"}, builder.Args())

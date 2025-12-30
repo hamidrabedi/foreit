@@ -1,9 +1,9 @@
 package migrations
 
 import (
-	"fmt"
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 	"time"
 

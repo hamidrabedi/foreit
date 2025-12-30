@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/forgego/forge/pkg/generator"
+	"github.com/forgego/forge/codegen"
 )
 
 // TestGenerateSQL verifies that SQL can be generated from all models
@@ -389,4 +389,3 @@ func TestGenerateSQLForAllModels(t *testing.T) {
 
 	t.Logf("✅ Generated SQL files for all %d models in %s", len(definitions), outputDir)
 }
-

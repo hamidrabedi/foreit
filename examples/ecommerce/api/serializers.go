@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/forgego/forge/pkg/api"
 	"ecommerce/models"
+	"github.com/forgego/forge/api"
 )
 
 // CustomerSerializer serializes Customer model

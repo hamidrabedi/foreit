@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Payment represents a payment for an order
@@ -78,4 +78,3 @@ func (Payment) Relations() []schema.Relation {
 func (Payment) Hooks() *schema.ModelHooks {
 	return nil
 }
-

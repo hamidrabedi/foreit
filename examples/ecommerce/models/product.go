@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Product represents a product in the ecommerce system
@@ -89,4 +89,3 @@ func (Product) Relations() []schema.Relation {
 func (Product) Hooks() *schema.ModelHooks {
 	return nil
 }
-

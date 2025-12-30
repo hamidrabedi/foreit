@@ -1,9 +1,9 @@
 package migrations
 
 import (
-	"os"
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/pkg/db"
-	"github.com/forgego/forge/pkg/migrate"
+	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -53,7 +53,7 @@ func TestMigrationFlow_MigrateToVersion(t *testing.T) {
 	for i := 1; i <= 5; i++ {
 		modelContent := fmt.Sprintf(`package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Item%d struct {
 	schema.BaseSchema
@@ -169,7 +169,7 @@ func TestMigrationFlow_NoChangesDetected(t *testing.T) {
 	// Create initial model
 	modelContent := `package models
 
-import "github.com/forgego/forge/pkg/schema"
+import "github.com/forgego/forge/schema"
 
 type Author struct {
 	schema.BaseSchema
@@ -229,4 +229,3 @@ func (Author) Relations() []schema.Relation {
 		assert.Equal(t, initialFileCount, len(entries), "no new migration files should be created when there are no changes")
 	}
 }
-

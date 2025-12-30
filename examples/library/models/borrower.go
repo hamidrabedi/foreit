@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Borrower represents a library member who can borrow books
@@ -48,4 +48,3 @@ func (Borrower) Relations() []schema.Relation {
 func (Borrower) Hooks() *schema.ModelHooks {
 	return nil
 }
-

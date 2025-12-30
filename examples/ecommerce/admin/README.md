@@ -1,6 +1,6 @@
 # Ecommerce Admin Setup - Full Features
 
-This directory contains the complete admin setup for the ecommerce example using the new type-safe v2 admin system.
+This directory contains the complete admin setup for the ecommerce example using the type-safe admin system.
 
 ## Features Implemented
 

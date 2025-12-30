@@ -1,13 +1,13 @@
-# User System Architecture & Design Patterns
+# Identity System Architecture & Design Patterns
 
 ## Overview
 
-This document describes the refactored architecture and design patterns for the new user system implementation.
+This document describes the refactored architecture and design patterns for the identity and access management (IAM) system implementation.
 
 ## Directory Structure
 
 ```
-pkg/users/
+pkg/identity/
 ├── models/              # User models and related entities
 │   ├── user.go         # User model
 │   ├── session.go      # UserSession model
@@ -141,7 +141,7 @@ type AuthenticationBackend interface {
 **Purpose:** Create instances of services, repositories, and backends with proper dependencies.
 
 ```go
-type UserSystemFactory interface {
+type IdentitySystemFactory interface {
     NewUserRepository() UserRepository
     NewUserService() UserService
     NewAuthService() AuthService
@@ -335,7 +335,7 @@ func (m *mockUserRepository) GetByID(ctx context.Context, id int64) (*User, erro
 Centralized configuration for user system:
 
 ```go
-type UserConfig struct {
+type IdentityConfig struct {
     // Password policy
     PasswordPolicy PasswordPolicy
     

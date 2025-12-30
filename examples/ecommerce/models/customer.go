@@ -3,7 +3,7 @@ package models
 import (
 	"context"
 
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // Customer represents a customer in the ecommerce system
@@ -78,4 +78,3 @@ func (Customer) Hooks() *schema.ModelHooks {
 		},
 	}
 }
-

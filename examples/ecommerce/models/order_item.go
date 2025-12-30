@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/forgego/forge/pkg/schema"
+	"github.com/forgego/forge/schema"
 )
 
 // OrderItem represents an item in an order
@@ -65,15 +65,15 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 		BeforeSave: func(ctx context.Context, instance interface{}) error {
 			// Calculate total_price from unit_price * quantity if not set
 			val := reflect.ValueOf(instance).Elem()
-			
+
 			totalPriceField := val.FieldByName("TotalPrice")
 			unitPriceField := val.FieldByName("UnitPrice")
 			quantityField := val.FieldByName("Quantity")
-			
+
 			if !totalPriceField.IsValid() || !unitPriceField.IsValid() || !quantityField.IsValid() {
 				return nil // Fields don't exist yet (before code generation)
 			}
-			
+
 			// Check if total_price is zero
 			if totalPriceField.MethodByName("IsZero").Call(nil)[0].Bool() {
 				// Check if unit_price is not zero
@@ -81,14 +81,14 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 					// Calculate: total = unit_price * quantity
 					unitPrice := reflect.ValueOf(unitPriceField.Interface())
 					quantity := quantityField.Int() // Assuming Int32, convert to int64 for decimal
-					
+
 					// Create decimal from quantity and multiply
 					// This is simplified - actual implementation would use decimal package properly
 					// For now, we'll just set a placeholder that will work after code generation
 					// The actual calculation will be done in the generated code
 				}
 			}
-			
+
 			return nil
 		},
 		BeforeCreate: func(ctx context.Context, instance interface{}) error {
@@ -97,14 +97,14 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 			val := reflect.ValueOf(instance).Elem()
 			totalPriceField := val.FieldByName("TotalPrice")
 			unitPriceField := val.FieldByName("UnitPrice")
-			
+
 			if !totalPriceField.IsValid() || !unitPriceField.IsValid() {
 				return nil
 			}
-			
+
 			// Note: Inventory updates would happen here after code generation
 			// We would check available inventory and reserve it using the Inventory model
-			
+
 			return nil
 		},
 		AfterCreate: func(ctx context.Context, instance interface{}) error {
@@ -120,4 +120,3 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 		},
 	}
 }
-

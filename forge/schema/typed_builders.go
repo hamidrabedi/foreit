@@ -14,14 +14,15 @@ import (
 
 // Int64FieldBuilder provides type-safe methods for Int64 fields
 type Int64FieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*Int64FieldBuilder]
 }
 
 // Int64 creates a new Int64 field builder
 func Int64(name string) *Int64FieldBuilder {
-	return &Int64FieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeInt64),
-	}
+	b := &Int64FieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeInt64)
+	initCommonMethods(&b.CommonMethods, ufb, func() *Int64FieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -30,16 +31,22 @@ func (b *Int64FieldBuilder) Default(value int64) *Int64FieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *Int64FieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // Int32FieldBuilder provides type-safe methods for Int32 fields
 type Int32FieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*Int32FieldBuilder]
 }
 
 // Int32 creates a new Int32 field builder
 func Int32(name string) *Int32FieldBuilder {
-	return &Int32FieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeInt32),
-	}
+	b := &Int32FieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeInt32)
+	initCommonMethods(&b.CommonMethods, ufb, func() *Int32FieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -48,16 +55,22 @@ func (b *Int32FieldBuilder) Default(value int32) *Int32FieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *Int32FieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // StringFieldBuilder provides type-safe methods for String fields
 type StringFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*StringFieldBuilder]
 }
 
 // String creates a new String field builder
 func String(name string) *StringFieldBuilder {
-	return &StringFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeString),
-	}
+	b := &StringFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeString)
+	initCommonMethods(&b.CommonMethods, ufb, func() *StringFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -66,30 +79,30 @@ func (b *StringFieldBuilder) Default(value string) *StringFieldBuilder {
 	return b
 }
 
-// WriteOnly marks the field as write-only (not serialized in API responses)
-func (b *StringFieldBuilder) WriteOnly() *StringFieldBuilder {
-	b.UnifiedFieldBuilder.WriteOnly()
-	return b
+// Build returns the built field
+func (b *StringFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
 }
 
 // Text creates a new Text field builder (same as String but TypeText)
 func Text(name string) *StringFieldBuilder {
-	builder := newUnifiedFieldBuilder(name, TypeText)
-	return &StringFieldBuilder{
-		UnifiedFieldBuilder: builder,
-	}
+	b := &StringFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeText)
+	initCommonMethods(&b.CommonMethods, ufb, func() *StringFieldBuilder { return b })
+	return b
 }
 
 // EmailFieldBuilder provides type-safe methods for Email fields
 type EmailFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*EmailFieldBuilder]
 }
 
 // Email creates a new Email field builder
 func Email(name string) *EmailFieldBuilder {
-	return &EmailFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeEmail),
-	}
+	b := &EmailFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeEmail)
+	initCommonMethods(&b.CommonMethods, ufb, func() *EmailFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -98,16 +111,22 @@ func (b *EmailFieldBuilder) Default(value string) *EmailFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *EmailFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // URLFieldBuilder provides type-safe methods for URL fields
 type URLFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*URLFieldBuilder]
 }
 
 // URL creates a new URL field builder
 func URL(name string) *URLFieldBuilder {
-	return &URLFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeURL),
-	}
+	b := &URLFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeURL)
+	initCommonMethods(&b.CommonMethods, ufb, func() *URLFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -116,16 +135,22 @@ func (b *URLFieldBuilder) Default(value string) *URLFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *URLFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // BoolFieldBuilder provides type-safe methods for Bool fields
 type BoolFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*BoolFieldBuilder]
 }
 
 // Bool creates a new Bool field builder
 func Bool(name string) *BoolFieldBuilder {
-	return &BoolFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeBool),
-	}
+	b := &BoolFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeBool)
+	initCommonMethods(&b.CommonMethods, ufb, func() *BoolFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -134,16 +159,22 @@ func (b *BoolFieldBuilder) Default(value bool) *BoolFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *BoolFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // TimeFieldBuilder provides type-safe methods for Time fields
 type TimeFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*TimeFieldBuilder]
 }
 
 // Time creates a new Time field builder
 func Time(name string) *TimeFieldBuilder {
-	return &TimeFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeTime),
-	}
+	b := &TimeFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeTime)
+	initCommonMethods(&b.CommonMethods, ufb, func() *TimeFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -152,16 +183,22 @@ func (b *TimeFieldBuilder) Default(value time.Time) *TimeFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *TimeFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // DateFieldBuilder provides type-safe methods for Date fields
 type DateFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*DateFieldBuilder]
 }
 
 // Date creates a new Date field builder
 func Date(name string) *DateFieldBuilder {
-	return &DateFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeDate),
-	}
+	b := &DateFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeDate)
+	initCommonMethods(&b.CommonMethods, ufb, func() *DateFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -170,16 +207,22 @@ func (b *DateFieldBuilder) Default(value time.Time) *DateFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *DateFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // DateTimeFieldBuilder provides type-safe methods for DateTime fields
 type DateTimeFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*DateTimeFieldBuilder]
 }
 
 // DateTime creates a new DateTime field builder
 func DateTime(name string) *DateTimeFieldBuilder {
-	return &DateTimeFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeDateTime),
-	}
+	b := &DateTimeFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeDateTime)
+	initCommonMethods(&b.CommonMethods, ufb, func() *DateTimeFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -188,16 +231,22 @@ func (b *DateTimeFieldBuilder) Default(value time.Time) *DateTimeFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *DateTimeFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // Float64FieldBuilder provides type-safe methods for Float64 fields
 type Float64FieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*Float64FieldBuilder]
 }
 
 // Float64 creates a new Float64 field builder
 func Float64(name string) *Float64FieldBuilder {
-	return &Float64FieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeFloat64),
-	}
+	b := &Float64FieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeFloat64)
+	initCommonMethods(&b.CommonMethods, ufb, func() *Float64FieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -206,16 +255,22 @@ func (b *Float64FieldBuilder) Default(value float64) *Float64FieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *Float64FieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // Float32FieldBuilder provides type-safe methods for Float32 fields
 type Float32FieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*Float32FieldBuilder]
 }
 
 // Float32 creates a new Float32 field builder
 func Float32(name string) *Float32FieldBuilder {
-	return &Float32FieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeFloat32),
-	}
+	b := &Float32FieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeFloat32)
+	initCommonMethods(&b.CommonMethods, ufb, func() *Float32FieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -224,16 +279,22 @@ func (b *Float32FieldBuilder) Default(value float32) *Float32FieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *Float32FieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // DecimalFieldBuilder provides type-safe methods for Decimal fields
 type DecimalFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*DecimalFieldBuilder]
 }
 
 // Decimal creates a new Decimal field builder
 func Decimal(name string) *DecimalFieldBuilder {
-	return &DecimalFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeDecimal),
-	}
+	b := &DecimalFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeDecimal)
+	initCommonMethods(&b.CommonMethods, ufb, func() *DecimalFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -242,21 +303,22 @@ func (b *DecimalFieldBuilder) Default(value float64) *DecimalFieldBuilder {
 	return b
 }
 
-// Build returns the built field (overrides to ensure MaxDigits/DecimalPlaces are applied)
+// Build returns the built field
 func (b *DecimalFieldBuilder) Build() Field {
 	return b.UnifiedFieldBuilder.Build()
 }
 
 // JSONFieldBuilder provides type-safe methods for JSON fields
 type JSONFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*JSONFieldBuilder]
 }
 
 // JSON creates a new JSON field builder
 func JSON(name string) *JSONFieldBuilder {
-	return &JSONFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeJSON),
-	}
+	b := &JSONFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeJSON)
+	initCommonMethods(&b.CommonMethods, ufb, func() *JSONFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -265,16 +327,22 @@ func (b *JSONFieldBuilder) Default(value interface{}) *JSONFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *JSONFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // BytesFieldBuilder provides type-safe methods for Bytes fields
 type BytesFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*BytesFieldBuilder]
 }
 
 // Bytes creates a new Bytes field builder
 func Bytes(name string) *BytesFieldBuilder {
-	return &BytesFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeBytes),
-	}
+	b := &BytesFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeBytes)
+	initCommonMethods(&b.CommonMethods, ufb, func() *BytesFieldBuilder { return b })
+	return b
 }
 
 // Default sets the default value for the field
@@ -283,16 +351,22 @@ func (b *BytesFieldBuilder) Default(value []byte) *BytesFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *BytesFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}
+
 // UUIDFieldBuilder provides type-safe methods for UUID fields
 type UUIDFieldBuilder struct {
-	*UnifiedFieldBuilder
+	CommonMethods[*UUIDFieldBuilder]
 }
 
 // UUID creates a new UUID field builder
 func UUID(name string) *UUIDFieldBuilder {
-	return &UUIDFieldBuilder{
-		UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeUUID),
-	}
+	b := &UUIDFieldBuilder{}
+	ufb := newUnifiedFieldBuilder(name, TypeUUID)
+	initCommonMethods(&b.CommonMethods, ufb, func() *UUIDFieldBuilder { return b })
+	return b
 }
 
 // DefaultUUID sets a default UUID value
@@ -307,3 +381,7 @@ func (b *UUIDFieldBuilder) DefaultNewUUID() *UUIDFieldBuilder {
 	return b
 }
 
+// Build returns the built field
+func (b *UUIDFieldBuilder) Build() Field {
+	return b.UnifiedFieldBuilder.Build()
+}

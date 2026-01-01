@@ -9,13 +9,15 @@ import (
 
 // FilterUI provides UI-related functionality for filters
 type FilterUI[T any] struct {
-	filterset *filter.FilterSet[T]
+	filterset      *filter.FilterSet[T]
+	facetCalculator *FacetCalculator[T]
 }
 
 // NewFilterUI creates a new filter UI helper
 func NewFilterUI[T any](filterset *filter.FilterSet[T]) *FilterUI[T] {
 	return &FilterUI[T]{
-		filterset: filterset,
+		filterset:      filterset,
+		facetCalculator: NewFacetCalculator(filterset),
 	}
 }
 
@@ -65,4 +67,47 @@ func (fui *FilterUI[T]) GetAllFilterWidgets() map[string]filter.Widget {
 	}
 
 	return result
+}
+
+// GetFilterOptionsWithFacets gets filter options with facet counts
+func (fui *FilterUI[T]) GetFilterOptionsWithFacets(
+	ctx context.Context,
+	baseQs orm.QuerySet[T],
+	filterName string,
+) ([]filter.FilterOption, error) {
+	return fui.facetCalculator.AddFacetCountsToOptions(ctx, baseQs, filterName)
+}
+
+// GetAllFilterOptionsWithFacets gets all filter options with facet counts
+func (fui *FilterUI[T]) GetAllFilterOptionsWithFacets(
+	ctx context.Context,
+	baseQs orm.QuerySet[T],
+	excludeFilter string,
+) (map[string][]filter.FilterOption, error) {
+	results := make(map[string][]filter.FilterOption)
+	filters := fui.filterset.GetFilters()
+
+	for name := range filters {
+		if name == excludeFilter {
+			continue
+		}
+
+		options, err := fui.GetFilterOptionsWithFacets(ctx, baseQs, name)
+		if err != nil {
+			return nil, err
+		}
+
+		results[name] = options
+	}
+
+	return results, nil
+}
+
+// GetFacetCounts gets facet counts for all filters
+func (fui *FilterUI[T]) GetFacetCounts(
+	ctx context.Context,
+	baseQs orm.QuerySet[T],
+	excludeFilter string,
+) (map[string]*FacetResult, error) {
+	return fui.facetCalculator.CalculateFacets(ctx, baseQs, excludeFilter)
 }

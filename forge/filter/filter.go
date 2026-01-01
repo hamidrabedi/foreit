@@ -35,6 +35,9 @@ type Filter[T any] interface {
 
 	// ValidateValue validates a filter value
 	ValidateValue(value interface{}) error
+
+	// Label returns the human-readable label for this filter
+	Label() string
 }
 
 // BaseFilter provides common functionality for all filters
@@ -80,6 +83,14 @@ func (f *BaseFilter[T]) SetHelpText(text string) *BaseFilter[T] {
 func (f *BaseFilter[T]) SetRequired(required bool) *BaseFilter[T] {
 	f.required = required
 	return f
+}
+
+// Label returns the filter label
+func (f *BaseFilter[T]) Label() string {
+	if f.label != "" {
+		return f.label
+	}
+	return f.fieldPath
 }
 
 // FilterOption represents an option for choice filters

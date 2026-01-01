@@ -27,7 +27,7 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Get pagination parameters
-	page, pageSize, _ := api.GetPaginationParams(r, 20)
+	page, pageSize, _ := api.ParsePaginationParams(r, 20)
 
 	// Build filters
 	filters := &service.UserFilters{

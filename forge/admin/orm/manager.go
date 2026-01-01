@@ -2,6 +2,7 @@ package orm
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/forgego/forge/orm"
 )
@@ -27,12 +28,34 @@ func NewAdminManager[T any](manager *orm.Manager[T]) (*AdminManager[T], error) {
 
 // GetQueryset returns a base queryset from the manager
 func (am *AdminManager[T]) GetQueryset(ctx context.Context) (orm.QuerySet[T], error) {
-	return am.manager.Filter(nil)
+	// Check if manager is initialized
+	if am.manager == nil {
+		return nil, fmt.Errorf("manager not initialized")
+	}
+
+	// Get all results without filtering - this returns a queryset internally
+	// We can't use Filter(nil) as it would panic, so we need to create a fresh queryset
+	qs, err := orm.NewQuerySet[T]("")
+	if err != nil {
+		return nil, err
+	}
+
+	return qs, nil
 }
 
-// GetFieldAccessor returns the field accessor for type-safe field operations
+// FieldAccessor returns the field accessor for type-safe field operations.
+// The field accessor provides a way to reference model fields in a type-safe manner
+// for building queries and expressions.
+func (am *AdminManager[T]) FieldAccessor() (*orm.FieldAccessor[T], error) {
+	return am.manager.FieldAccessor()
+}
+
+// GetFieldAccessor returns the field accessor for type-safe field operations.
+//
+// Deprecated: Use FieldAccessor() instead (Go convention: getters don't have Get prefix).
+// GetFieldAccessor will be removed in v3.0.
 func (am *AdminManager[T]) GetFieldAccessor() (*orm.FieldAccessor[T], error) {
-	return am.manager.GetFieldAccessor()
+	return am.FieldAccessor()
 }
 
 // GetSchema returns the model schema

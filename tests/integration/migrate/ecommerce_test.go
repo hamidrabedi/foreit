@@ -11,8 +11,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/tests/helpers"
+	"github.com/forgego/forge/tests/testhelpers"
 )
 
 // TestFullEcommerceSchemaMigration tests creating all 15 ecommerce models in a single migration
@@ -20,7 +21,7 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -28,7 +29,7 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -36,7 +37,7 @@ func TestFullEcommerceSchemaMigration(t *testing.T) {
 	t.Logf("Connected to Postgres: %s", dsn)
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "ecommerce_full_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "ecommerce_full_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))

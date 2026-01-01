@@ -52,14 +52,14 @@ func TestQuerySet_OrderBy(t *testing.T) {
 	qs, err := NewQuerySet[testModel]("test_table")
 	require.NoError(t, err)
 
-	ordered := qs.OrderBy(NewOrderField("price", true))
+	ordered := qs.OrderBy(Asc("price"))
 	assert.NotNil(t, ordered)
 	assert.NotEqual(t, qs, ordered)
 
 	// Multiple fields
 	multiOrdered := qs.OrderBy(
-		NewOrderField("price", false),
-		NewOrderField("name", true),
+		Desc("price"),
+		Asc("name"),
 	)
 	assert.NotNil(t, multiOrdered)
 }
@@ -68,7 +68,7 @@ func TestQuerySet_Reverse(t *testing.T) {
 	qs, err := NewQuerySet[testModel]("test_table")
 	require.NoError(t, err)
 
-	qs = qs.OrderBy(NewOrderField("price", true))
+	qs = qs.OrderBy(Asc("price"))
 	reversed := qs.Reverse()
 	assert.NotNil(t, reversed)
 	assert.NotEqual(t, qs, reversed)
@@ -201,7 +201,7 @@ func TestQuerySet_Chaining(t *testing.T) {
 	chained := qs.
 		Filter(priceField.Gt(10.0)).
 		Filter(availableField.Eq(true)).
-		OrderBy(NewOrderField("price", false)).
+		OrderBy(Desc("price")).
 		Limit(10).
 		Offset(0)
 

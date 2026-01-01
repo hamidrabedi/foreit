@@ -71,12 +71,8 @@ func (aqs *AdminQuerySet[T]) ApplySearch(ctx context.Context, searchTerm string,
 	if len(searchExpressions) == 1 {
 		combinedExpr = searchExpressions[0]
 	} else {
-		// Build OR chain: expr1 OR expr2 OR expr3 ...
-		q := orm.NewQ(searchExpressions[0])
-		for i := 1; i < len(searchExpressions); i++ {
-			q = q.Or(orm.NewQ(searchExpressions[i]))
-		}
-		combinedExpr = q
+		// Build OR chain: expr1 OR expr2 OR expr3 ... using new API
+		combinedExpr = orm.Or(searchExpressions...)
 	}
 
 	// Apply filter

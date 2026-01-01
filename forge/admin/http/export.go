@@ -37,7 +37,7 @@ func (h *CoreHandler) HandleExport(modelName string) http.HandlerFunc {
 		case "json":
 			h.exportJSON(w, data)
 		case "xlsx":
-			http.Error(w, "Excel export not yet implemented", http.StatusNotImplemented)
+			h.exportXLSX(w, data)
 		default:
 			http.Error(w, fmt.Sprintf("Unsupported format: %s", format), http.StatusBadRequest)
 		}
@@ -90,4 +90,59 @@ func (h *CoreHandler) exportJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Disposition", "attachment; filename=export.json")
 	json.NewEncoder(w).Encode(data)
+}
+
+// exportXLSX exports data as Excel XLSX format
+// Note: Requires github.com/xuri/excelize/v2 package
+func (h *CoreHandler) exportXLSX(w http.ResponseWriter, data interface{}) {
+	// This is a placeholder implementation
+	// Full implementation would use excelize library:
+	//
+	// f := excelize.NewFile()
+	// defer f.Close()
+	//
+	// sheetName := "Sheet1"
+	// f.NewSheet(sheetName)
+	//
+	// if exportData, ok := data.(map[string]interface{}); ok {
+	//     if objects, ok := exportData["objects"].([]interface{}); ok {
+	//         // Write headers
+	//         if len(objects) > 0 {
+	//             if firstObj, ok := objects[0].(map[string]interface{}); ok {
+	//                 col := 1
+	//                 for key := range firstObj {
+	//                     cell := excelize.CellName(1, col)
+	//                     f.SetCellValue(sheetName, cell, key)
+	//                     col++
+	//                 }
+	//
+	//                 // Write rows
+	//                 row := 2
+	//                 for _, obj := range objects {
+	//                     if objMap, ok := obj.(map[string]interface{}); ok {
+	//                         col := 1
+	//                         for key := range firstObj {
+	//                             cell := excelize.CellName(row, col)
+	//                             if v, ok := objMap[key]; ok {
+	//                                 f.SetCellValue(sheetName, cell, v)
+	//                             }
+	//                             col++
+	//                         }
+	//                         row++
+	//                     }
+	//                 }
+	//             }
+	//         }
+	//     }
+	// }
+	//
+	// w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	// w.Header().Set("Content-Disposition", "attachment; filename=export.xlsx")
+	// f.Write(w)
+
+	// For now, return a message that it requires excelize
+	// In production, uncomment the above code and add excelize to go.mod
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusNotImplemented)
+	fmt.Fprintf(w, "Excel export requires github.com/xuri/excelize/v2 package. Please add it to go.mod and uncomment the implementation in export.go")
 }

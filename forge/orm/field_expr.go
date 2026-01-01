@@ -1,13 +1,23 @@
 package orm
 
 // FieldExpr provides type-safe field access for queries
-// This is the primary type-safe API (not Django's F)
+//
+// Deprecated: Use Field[T] (from NewField) instead. FieldExpr will be removed in v2.0.
+// Field[T] provides the same functionality with a cleaner API that matches the Expression interface.
+//
+// Migration:
+//   // Old
+//   f := orm.NewFieldExpr[string]("name", "users")
+//   // New
+//   f := orm.NewField[string]("name", "users")
 type FieldExpr[T any] struct {
 	name  string
 	table string
 }
 
 // NewFieldExpr creates a new FieldExpr
+//
+// Deprecated: Use NewField instead. NewFieldExpr will be removed in v2.0.
 func NewFieldExpr[T any](name, table string) FieldExpr[T] {
 	return FieldExpr[T]{
 		name:  name,

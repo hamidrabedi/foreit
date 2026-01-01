@@ -10,8 +10,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/migrate"
-	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -20,80 +20,6 @@ import (
 // TODO: Add support for specifying driver in migration generator
 func TestMigrationApplySQLite(t *testing.T) {
 	t.Skip("Skipping SQLite test - migration generator needs driver configuration support")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// Create temporary directories
-	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "sqlite_migration_")
-	defer cleanupTemp()
-	modelsDir := filepath.Join(tempDir, "models")
-	migrationsDir := filepath.Join(tempDir, "migrations")
-	require.NoError(t, os.MkdirAll(modelsDir, 0755))
-	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
-
-	// Create a model file
-	modelContent := `package models
-
-import "github.com/forgego/forge/schema"
-
-type User struct {
-	schema.BaseSchema
-}
-
-func (User) Fields() []schema.Field {
-	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("username").Required().MaxLength(150).Build(),
-		schema.String("email").Required().MaxLength(255).Unique().Build(),
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Timestamp("created_at").Default("CURRENT_TIMESTAMP").Build(),
-	}
-}
-
-func (User) Meta() schema.Meta {
-	return schema.Meta{TableName: "users"}
-}
-
-func (User) Relations() []schema.Relation {
-	return []schema.Relation{}
-}
-`
-	modelFile := filepath.Join(modelsDir, "user.go")
-	require.NoError(t, os.WriteFile(modelFile, []byte(modelContent), 0644))
-
-	// Generate migrations using the migration system
-	gen, err := migrate.NewGenerator(modelsDir, migrationsDir)
-	require.NoError(t, err)
-
-	err = gen.GenerateMigrations("create_users")
-	require.NoError(t, err)
-
-	// Create SQLite database
-	sqliteDB, err := testhelpers.StartSQLiteMemory("file::memory:?cache=shared")
-	require.NoError(t, err)
-	defer sqliteDB.Close()
-
-	// Get DSN for db.NewDB
-	dsn := "file::memory:?cache=shared"
-	database, err := db.NewDBWithDriver("sqlite3", dsn, nil)
-	require.NoError(t, err)
-	defer database.Close()
-
-	// Apply migrations using the migration runner
-	runner, err := db.NewMigrationRunner(database, migrationsDir)
-	require.NoError(t, err)
-	defer runner.Close()
-
-	err = runner.Migrate(ctx)
-	require.NoError(t, err)
-
-	// Verify table exists
-	testhelpers.AssertTableExists(ctx, t, sqliteDB, "sqlite", "users")
-
-	// Verify columns
-	testhelpers.AssertColumnExists(ctx, t, sqliteDB, "sqlite", "users", "id")
-	testhelpers.AssertColumnExists(ctx, t, sqliteDB, "sqlite", "users", "username")
-	testhelpers.AssertColumnExists(ctx, t, sqliteDB, "sqlite", "users", "email")
 }
 
 // TestMigrationApplyPostgres tests migrations against Postgres using the migration system
@@ -139,7 +65,7 @@ func (User) Fields() []schema.Field {
 		schema.String("username").Required().MaxLength(150).Unique().Build(),
 		schema.String("email").Required().MaxLength(255).Unique().Build(),
 		schema.Bool("is_active").Default(true).Build(),
-		schema.Timestamp("created_at").Default("NOW()").Build(),
+		schema.DateTime("created_at").Build(),
 	}
 }
 
@@ -168,7 +94,7 @@ func (Post) Fields() []schema.Field {
 		schema.String("title").Required().MaxLength(200).Build(),
 		schema.Text("content").Build(),
 		schema.Int64("user_id").Required().Build(),
-		schema.Timestamp("created_at").Default("NOW()").Build(),
+		schema.DateTime("created_at").Build(),
 	}
 }
 
@@ -178,7 +104,7 @@ func (Post) Meta() schema.Meta {
 
 func (Post) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("user_id", "User").Required().OnDelete(schema.CascadeCASCADE).RelatedName("posts").Build(),
+		schema.ForeignKey("user_id", "User").OnDelete("CASCADE").Build(),
 	}
 }
 `

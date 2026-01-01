@@ -1,0 +1,58 @@
+{{define "dashboard"}}
+<div class="admin-dashboard">
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">{{.Title}}</h1>
+    </div>
+
+    <div class="dashboard-widgets">
+        {{range .Widgets}}
+        <div class="dashboard-widget widget-{{.Type}}">
+            <div class="widget-header">
+                <h3 class="widget-title">{{.Title}}</h3>
+            </div>
+            <div class="widget-content">
+                {{if eq .Type "stats"}}
+                <div class="stats-widget">
+                    <div class="stats-value">{{.Content.value}}</div>
+                    <div class="stats-label">{{.Content.label}}</div>
+                    {{if .Content.comparison}}
+                    <div class="stats-trend {{if .Content.trend | hasPrefix "+"}}trend-up{{else}}trend-down{{end}}">
+                        {{.Content.trend}}
+                    </div>
+                    {{end}}
+                </div>
+                {{else if eq .Type "chart"}}
+                <div class="chart-widget">
+                    <canvas class="chart-canvas" data-type="{{.Content.type}}" data-data="{{.Content.data | toJSON}}"></canvas>
+                </div>
+                {{else if eq .Type "activity"}}
+                <div class="activity-widget">
+                    <ul class="activity-list">
+                        {{range .Content.activities}}
+                        <li class="activity-item">
+                            <span class="activity-action">{{.action}}</span>
+                            <span class="activity-model">{{.model}}</span>
+                            <span class="activity-time">{{.timestamp | timeAgo}}</span>
+                            <span class="activity-user">{{.user}}</span>
+                        </li>
+                        {{end}}
+                    </ul>
+                </div>
+                {{else if eq .Type "quick_actions"}}
+                <div class="quick-actions-widget">
+                    <div class="actions-grid">
+                        {{range .Content.actions}}
+                        <a href="{{.url}}" class="action-button">
+                            {{if .icon}}<span class="action-icon">{{.icon}}</span>{{end}}
+                            <span class="action-label">{{.label}}</span>
+                        </a>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}

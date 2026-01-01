@@ -10,7 +10,7 @@ import (
 func TestGetPaginationParams_Default(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test", nil)
 
-	page, pageSize, offset := GetPaginationParams(req, 20)
+	page, pageSize, offset := ParsePaginationParams(req, 20)
 
 	assert.Equal(t, 1, page)
 	assert.Equal(t, 20, pageSize)
@@ -20,7 +20,7 @@ func TestGetPaginationParams_Default(t *testing.T) {
 func TestGetPaginationParams_Custom(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test?page=2&page_size=10", nil)
 
-	page, pageSize, offset := GetPaginationParams(req, 20)
+	page, pageSize, offset := ParsePaginationParams(req, 20)
 
 	assert.Equal(t, 2, page)
 	assert.Equal(t, 10, pageSize)
@@ -30,7 +30,7 @@ func TestGetPaginationParams_Custom(t *testing.T) {
 func TestGetPaginationParams_InvalidPage(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test?page=0", nil)
 
-	page, pageSize, _ := GetPaginationParams(req, 20)
+	page, pageSize, _ := ParsePaginationParams(req, 20)
 
 	// Should default to 1
 	assert.Equal(t, 1, page)
@@ -40,7 +40,7 @@ func TestGetPaginationParams_InvalidPage(t *testing.T) {
 func TestGetPaginationParams_InvalidPageSize(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test?page_size=0", nil)
 
-	_, pageSize, _ := GetPaginationParams(req, 20)
+	_, pageSize, _ := ParsePaginationParams(req, 20)
 
 	// Should use default
 	assert.Equal(t, 20, pageSize)
@@ -49,7 +49,7 @@ func TestGetPaginationParams_InvalidPageSize(t *testing.T) {
 func TestGetPaginationParams_MaxPageSize(t *testing.T) {
 	req := httptest.NewRequest("GET", "/test?page_size=200", nil)
 
-	_, pageSize, _ := GetPaginationParams(req, 20)
+	_, pageSize, _ := ParsePaginationParams(req, 20)
 
 	// Should be capped at 100
 	assert.Equal(t, 100, pageSize)

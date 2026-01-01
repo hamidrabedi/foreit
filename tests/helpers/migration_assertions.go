@@ -9,8 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/migrate"
-	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/tests/testhelpers"
 )
 
 // MigrationInfo represents information about a migration
@@ -199,7 +200,7 @@ func CreateUniqueTestDB(t *testing.T, prefix string) string {
 	if prefix != "" {
 		testName = prefix + "_" + testName
 	}
-	opts := DefaultPostgresOptsWithTest(testName)
+	opts := testhelpers.DefaultPostgresOptsWithTest(testName)
 	return opts.DBName
 }
 

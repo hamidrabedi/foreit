@@ -1,213 +1,242 @@
-# Test Structure
+# Forge Testing Suite
 
-This directory contains all tests for the Forge framework, organized by test type and purpose.
+Comprehensive testing suite for the Forge framework's schema and migration system.
 
-## Directory Structure
+## Quick Start
+
+```bash
+cd tests
+go test ./...
+```
+
+## Test Organization
 
 ```
 tests/
-├── integration/                # DB / filesystem integration tests
-│   ├── migrate/                # Migration system tests
-│   │   ├── flow_test.go
-│   │   ├── reversibility_test.go
-│   │   ├── edge_cases_test.go
-│   │   ├── ecommerce_test.go
-│   │   └── postgres_features_test.go
-│   │
-│   ├── orm/                    # ORM/Query integration tests
-│   │   ├── query_integration_test.go
-│   │   └── example_test.go
-│   │
-│   └── schema/                 # Schema builder integration tests
-│       └── schema_integration_test.go
-│
-├── e2e/                        # Full system end-to-end tests
-│   └── cli/                    # CLI command tests
-│       ├── forge_init_test.go
-│       ├── migrate_up_test.go
-│       ├── migrate_rollback_test.go
-│       └── help_command_test.go
-│
-├── testdata/                   # STATIC INPUTS ONLY
-│   ├── models/                 # Test model definitions
-│   │   ├── blog.go
-│   │   ├── ecommerce.go
-│   │   └── complex.go
-│   │
-│   └── migrations/             # Sample migration files
-│       └── sample_app/
-│
-├── infra/                      # Heavy infrastructure helpers
-│   ├── docker/                 # Docker container management
-│   │   ├── postgres.go         # Postgres container lifecycle
-│   │   └── lifecycle.go        # Container lifecycle utilities
-│   │
-│   ├── database/               # Database connection helpers
-│   │   ├── local_postgres.go   # Local Postgres connection
-│   │   └── testdb.go           # Test database setup
-│   │
-│   └── filesystem/             # Filesystem sandbox helpers
-│       └── fs_helper.go        # Temp directories, file operations
-│
-├── helpers/                    # Pure test utilities (NO IO)
-│   ├── assertions.go           # Complex assertion helpers
-│   ├── sql_assertions.go       # SQL/database assertions
-│   ├── migration_assertions.go  # Migration-specific assertions
-│   ├── postgres_features.go   # Postgres-specific feature tests
-│   ├── cli_helper.go          # CLI execution helpers
-│   └── doc.go                 # Documentation
-│
-└── README.md                   # This file
+├── integration/          # Integration tests with real databases
+│   ├── migrate/         # Migration system tests (45+ tests)
+│   ├── orm/             # ORM/Query tests
+│   └── schema/          # Schema builder tests
+├── e2e/                 # End-to-end CLI tests
+│   └── cli/
+├── helpers/             # Test assertion helpers
+├── infra/               # Infrastructure setup (docker, filesystem)
+├── testhelpers/         # Test utilities
+├── testdata/            # Test fixtures and models
+│   └── models/          # Model definitions for testing
+├── TESTING.md           # Comprehensive testing guide
+└── README.md            # This file
 ```
 
-## Test Categories
+## Test Coverage
 
-### 🔴 integration/
+### Migration System (45+ tests)
 
-**Real DB, Real SQL, Temporary filesystem**
+**Generation & Change Detection:**
+- Create/drop/rename tables
+- Add/drop/rename/modify columns
+- Add/drop indexes (simple, unique, composite, GIN, GiST, functional, partial, covering)
+- Add/drop foreign keys and constraints
+- No-change detection
 
-Tests that interact with actual databases and filesystems. These are slower but test real behavior.
+**Execution:**
+- Migrate up/down
+- Migrate to specific version
+- Rollback to specific version
+- Partial rollback
 
-- Uses helpers from `infra/` for setup
-- Most migration tests belong here
-- Tests actual SQL execution and database state
+**PostgreSQL Features:**
+- GIN/GiST indexes
+- JSONB operations
+- Array types
+- Custom enum types
+- Partial/functional/covering indexes
+- UUID type
+- Numeric precision
+- Timestamp with time zone
 
-**Key packages:**
-- `integration/migrate` - Migration flow, reversibility, edge cases
-- `integration/orm` - Query builder, ORM operations
-- `integration/schema` - Schema builder integration
+**Advanced Fields:**
+- Generated columns (STORED/VIRTUAL)
+- Custom DB column names
+- Column comments
+- Database-level defaults
+- Custom constraints (CHECK)
+- Min/Max value constraints
 
-### 🟡 e2e/
+**Recovery & Status:**
+- Force recovery from dirty state
+- Migration status reporting
+- Version tracking
 
-**Runs compiled binaries, executes forge CLI**
+**Scenarios:**
+- Full e-commerce schema
+- Incremental e-commerce migrations
+- Complex schema evolution
 
-Full system tests that run the actual CLI commands. These are the slowest tests.
+### Schema System (3+ tests)
 
-- Tests real workflows end-to-end
-- Executes `forge` binary
-- Tests CLI commands: init, migrate, rollback, help
+- All field types (Int64, String, Text, Bool, DateTime, Decimal, JSON, UUID, etc.)
+- Field options (Required, Unique, MaxLength, MinValue, etc.)
+- Database options (DBColumn, DBType, DBDefault, DBComment, etc.)
+- Presentation options (VerboseName, HelpText, Editable, Serialize)
+- Complex models with multiple field types
 
-### 📦 testdata/
+### ORM System (5+ tests)
 
-**ONLY static data - NO helpers, NO logic, NO assertions**
-
-Static test data files:
-- Model definitions
-- SQL migration files
-- Example schemas
-
-**Rules:**
-- 🚫 No helper functions
-- 🚫 No test logic
-- 🚫 No assertions
-- ✅ Only data/definitions
-
-### 🛠 infra/
-
-**Heavy, stateful infrastructure**
-
-Infrastructure helpers that manage external resources:
-- Docker containers
-- Database connections
-- File system sandboxes
-
-**Packages:**
-- `infra/docker` - PostgresOpts, StartPostgresContainer
-- `infra/database` - Database connection setup
-- `infra/filesystem` - TempDirInTests, file operations
-
-### 🧰 helpers/
-
-**Pure logic utilities**
-
-Pure helper functions with no external dependencies:
-- Assertions and comparisons
-- Builders and matchers
-- Test utilities
-
-**Rules:**
-- 🚫 No database connections
-- 🚫 No filesystem operations
-- 🚫 No Docker
-- ✅ Only pure functions
-
-## Naming Rules
-
-Test file names describe **behavior**, not implementation:
-
-✅ **Good:**
-- `migration_reversibility_test.go` - Tests reversibility behavior
-- `edge_cases_test.go` - Tests edge cases
-- `flow_test.go` - Tests migration flow
-
-❌ **Bad:**
-- `migration_system_test.go` - Too vague
-- `comprehensive_test.go` - Not descriptive
-
-**Preferred patterns:**
-- `*_flow_test.go` - Tests workflow/flow
-- `*_edge_cases_test.go` - Tests edge cases
-- `*_integration_test.go` - Integration tests
-- `*_e2e_test.go` - End-to-end tests
+- Field expressions
+- Comparison expressions
+- Query building (Q objects)
+- SQL generation
+- Identifier escaping
 
 ## Running Tests
 
-### Run all tests:
+### All Tests
+
 ```bash
-go test ./tests/...
+cd tests
+go test ./...
 ```
 
-### Run specific category:
+### Specific Package
+
 ```bash
-# Integration tests only
-go test ./tests/integration/...
-
-# E2E tests only
-go test ./tests/e2e/...
-
 # Migration tests only
-go test ./tests/integration/migrate/...
+go test ./integration/migrate -v
+
+# Schema tests only
+go test ./integration/schema -v
+
+# ORM tests only
+go test ./integration/orm -v
 ```
 
-### Run with database:
+### Specific Test
+
 ```bash
-# Set Postgres connection (optional, defaults to localhost)
-export POSTGRES_HOST=localhost
-export POSTGRES_PORT=5432
-export POSTGRES_USER=postgres
-export POSTGRES_PASSWORD=123
-
-go test ./tests/integration/migrate/...
+go test ./integration/migrate -run TestGeneration_CreateTable -v
 ```
 
-## Import Guidelines
+### With Coverage
 
-When writing tests, import from the appropriate packages:
+```bash
+go test ./... -coverprofile=coverage.out
+go tool cover -html=coverage.out
+```
+
+## Prerequisites
+
+- **PostgreSQL**: Running on `localhost:5432`
+  - User: `postgres`
+  - Password: `123`
+  - Or set environment variables: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`
+- **Go**: 1.21 or higher
+
+## Test Helpers
+
+### PostgreSQL Setup
 
 ```go
-// For database setup
-import "github.com/forgego/forge/tests/infra/docker"
-opts := docker.PostgresOpts{...}
-db, dsn, cleanup, err := docker.StartPostgresContainer(ctx, opts)
-
-// For filesystem operations
-import "github.com/forgego/forge/tests/infra/filesystem"
-tempDir, cleanup := filesystem.TempDirInTests(t, "prefix_")
-
-// For assertions
-import "github.com/forgego/forge/tests/helpers"
-helpers.AssertTableExists(ctx, t, db, "postgres", "users")
-helpers.AssertMigrationState(ctx, t, database, migrationsDir, 1, false)
+opts := testhelpers.PostgresOpts{
+    UseDirect: true,
+    Host:      "localhost",
+    Port:      "5432",
+    User:      "postgres",
+    Password:  "123",
+    DBName:    fmt.Sprintf("test_%d", time.Now().UnixNano()),
+}
+postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
+require.NoError(t, err)
+defer cleanup()
 ```
 
-## Migration Notes
+### Assertions
 
-This structure was refactored from the old `pkg_*` structure. Key changes:
+```go
+// Table and column assertions
+helpers.AssertTableExists(ctx, t, db, "postgres", "table_name")
+helpers.AssertColumnExists(ctx, t, db, "postgres", "table_name", "column_name")
+helpers.AssertForeignKeyExists(ctx, t, db, "postgres", "table_name", "column_name")
 
-- `pkg_migrations/` → `integration/migrate/`
-- `pkg_query/` → `integration/orm/`
-- `pkg_schema/` → `integration/schema/`
-- `cmd_forge/` → `e2e/cli/`
-- `testhelpers/` → Split into `helpers/` and `infra/`
+// Migration state
+helpers.AssertMigrationState(ctx, t, database, migrationsDir, expectedVersion, expectDirty)
 
-All imports need to be updated to use the new package paths.
+// Row count
+helpers.AssertRowCount(ctx, t, db, "table_name", expectedCount)
+```
+
+## Test Fixtures
+
+Pre-defined model fixtures in `testdata/models/`:
+
+- **basic_models.go**: User, Product, Order
+- **relationships_models.go**: Author, Post, Tag, UserProfile (with ForeignKey, OneToOne, ManyToMany)
+- **complex_fields_models.go**: Event, Settings (with JSON, Bytes, Decimal, DateTime)
+- **postgres_features_models.go**: ProductWithJSONB, UserWithUUID, DocumentWithTimestamps, OrderWithStatusEnum
+
+## Documentation
+
+See [TESTING.md](./TESTING.md) for comprehensive testing guide including:
+- Detailed test categories
+- Writing new tests
+- Best practices
+- Troubleshooting
+
+## Contributing
+
+When adding new features:
+
+1. Write tests first (TDD)
+2. Add tests to the appropriate package (`integration/migrate`, `integration/schema`, etc.)
+3. Update documentation (this README and TESTING.md)
+4. Ensure all tests pass: `go test ./...`
+5. Check test coverage
+
+## Test Status
+
+✅ **All major features tested**
+- Schema definition and builders
+- Migration generation (all change types)
+- Migration execution (up/down/to version/rollback)
+- PostgreSQL-specific features
+- Advanced field options
+- Recovery scenarios
+- Full schema evolution scenarios
+
+## Quick Reference
+
+| Command | Description |
+|---------|-------------|
+| `go test ./...` | Run all tests |
+| `go test ./integration/migrate -v` | Run migration tests with verbose output |
+| `go test ./integration/migrate -run TestName` | Run specific test |
+| `go test ./... -short` | Run only short tests (skip slow integration tests) |
+| `go test ./... -coverprofile=coverage.out` | Generate coverage report |
+| `go test ./... -count=1` | Disable test caching |
+
+## Troubleshooting
+
+### Connection Refused
+
+Ensure PostgreSQL is running:
+```bash
+psql -h localhost -U postgres -c "SELECT 1"
+```
+
+### Slow Tests
+
+Integration tests use real databases and are slower. This is expected.
+
+### Build Errors
+
+```bash
+go mod tidy
+go mod download
+```
+
+## References
+
+- [Forge Schema Package](../forge/schema/)
+- [Forge Migration Package](../forge/migrate/)
+- [Forge DB Package](../forge/db/)
+- [Comprehensive Testing Guide](./TESTING.md)

@@ -14,17 +14,22 @@ type Expression interface {
 	Resolve(schema *ModelSchema) error
 }
 
-// FieldExpression represents a field reference (like Django's F)
+// Field represents a type-safe field reference (like Django's F)
 // T is the type of the field value
-type FieldExpression[T any] struct {
+// This is the primary type-safe field API for queries
+type Field[T any] struct {
 	fieldPath string // e.g., "price", "author__name"
 	table     string
 	fieldType reflect.Type
 }
 
+// FieldExpression is an alias for Field for backward compatibility
+// Deprecated: Use Field instead. FieldExpression will be removed in v2.0.
+type FieldExpression[T any] = Field[T]
+
 // NewField creates a type-safe field expression
-func NewField[T any](path, table string) FieldExpression[T] {
-	return FieldExpression[T]{
+func NewField[T any](path, table string) Field[T] {
+	return Field[T]{
 		fieldPath: path,
 		table:     table,
 		fieldType: reflect.TypeOf((*T)(nil)).Elem(),
@@ -32,17 +37,17 @@ func NewField[T any](path, table string) FieldExpression[T] {
 }
 
 // Path returns the field path
-func (f FieldExpression[T]) Path() string {
+func (f Field[T]) Path() string {
 	return f.fieldPath
 }
 
 // Table returns the table name
-func (f FieldExpression[T]) Table() string {
+func (f Field[T]) Table() string {
 	return f.table
 }
 
 // ToSQL converts field expression to SQL
-func (f FieldExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+func (f Field[T]) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
 	// Escape identifier - handle table prefix if needed
 	if f.table != "" && !strings.Contains(f.fieldPath, ".") {
 		escaped := EscapeIdentifier(f.table) + "." + EscapeIdentifier(f.fieldPath)
@@ -53,7 +58,7 @@ func (f FieldExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface{}, e
 }
 
 // Resolve validates the field exists in schema
-func (f FieldExpression[T]) Resolve(schema *ModelSchema) error {
+func (f Field[T]) Resolve(schema *ModelSchema) error {
 	// Validate field path exists
 	parts := splitFieldPath(f.fieldPath)
 	if len(parts) == 0 {
@@ -79,7 +84,7 @@ func (f FieldExpression[T]) Resolve(schema *ModelSchema) error {
 // Arithmetic operations
 
 // Add creates an addition expression
-func (f FieldExpression[T]) Add(other FieldExpression[T]) CombinedExpression[T] {
+func (f Field[T]) Add(other Field[T]) CombinedExpression[T] {
 	return CombinedExpression[T]{
 		Left:  f,
 		Op:    OpAdd,
@@ -88,7 +93,7 @@ func (f FieldExpression[T]) Add(other FieldExpression[T]) CombinedExpression[T] 
 }
 
 // Sub creates a subtraction expression
-func (f FieldExpression[T]) Sub(other FieldExpression[T]) CombinedExpression[T] {
+func (f Field[T]) Sub(other Field[T]) CombinedExpression[T] {
 	return CombinedExpression[T]{
 		Left:  f,
 		Op:    OpSub,
@@ -97,7 +102,7 @@ func (f FieldExpression[T]) Sub(other FieldExpression[T]) CombinedExpression[T] 
 }
 
 // Mul creates a multiplication expression
-func (f FieldExpression[T]) Mul(other FieldExpression[T]) CombinedExpression[T] {
+func (f Field[T]) Mul(other Field[T]) CombinedExpression[T] {
 	return CombinedExpression[T]{
 		Left:  f,
 		Op:    OpMul,
@@ -106,7 +111,7 @@ func (f FieldExpression[T]) Mul(other FieldExpression[T]) CombinedExpression[T] 
 }
 
 // Div creates a division expression
-func (f FieldExpression[T]) Div(other FieldExpression[T]) CombinedExpression[T] {
+func (f Field[T]) Div(other Field[T]) CombinedExpression[T] {
 	return CombinedExpression[T]{
 		Left:  f,
 		Op:    OpDiv,
@@ -117,7 +122,7 @@ func (f FieldExpression[T]) Div(other FieldExpression[T]) CombinedExpression[T] 
 // Comparison operations
 
 // Eq creates an equality comparison
-func (f FieldExpression[T]) Eq(val T) ComparisonExpression[T] {
+func (f Field[T]) Eq(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpEquals,
@@ -126,7 +131,7 @@ func (f FieldExpression[T]) Eq(val T) ComparisonExpression[T] {
 }
 
 // Ne creates a not-equal comparison
-func (f FieldExpression[T]) Ne(val T) ComparisonExpression[T] {
+func (f Field[T]) Ne(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpNotEquals,
@@ -135,7 +140,7 @@ func (f FieldExpression[T]) Ne(val T) ComparisonExpression[T] {
 }
 
 // Gt creates a greater-than comparison
-func (f FieldExpression[T]) Gt(val T) ComparisonExpression[T] {
+func (f Field[T]) Gt(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpGreater,
@@ -144,7 +149,7 @@ func (f FieldExpression[T]) Gt(val T) ComparisonExpression[T] {
 }
 
 // Gte creates a greater-than-or-equal comparison
-func (f FieldExpression[T]) Gte(val T) ComparisonExpression[T] {
+func (f Field[T]) Gte(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpGreaterOrEqual,
@@ -153,7 +158,7 @@ func (f FieldExpression[T]) Gte(val T) ComparisonExpression[T] {
 }
 
 // Lt creates a less-than comparison
-func (f FieldExpression[T]) Lt(val T) ComparisonExpression[T] {
+func (f Field[T]) Lt(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpLess,
@@ -162,7 +167,7 @@ func (f FieldExpression[T]) Lt(val T) ComparisonExpression[T] {
 }
 
 // Lte creates a less-than-or-equal comparison
-func (f FieldExpression[T]) Lte(val T) ComparisonExpression[T] {
+func (f Field[T]) Lte(val T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpLessOrEqual,
@@ -171,7 +176,7 @@ func (f FieldExpression[T]) Lte(val T) ComparisonExpression[T] {
 }
 
 // In creates an IN clause comparison
-func (f FieldExpression[T]) In(vals ...T) ComparisonExpression[T] {
+func (f Field[T]) In(vals ...T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpIn,
@@ -180,7 +185,7 @@ func (f FieldExpression[T]) In(vals ...T) ComparisonExpression[T] {
 }
 
 // IsNull creates an IS NULL comparison
-func (f FieldExpression[T]) IsNull() ComparisonExpression[T] {
+func (f Field[T]) IsNull() ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpIsNull,
@@ -189,7 +194,7 @@ func (f FieldExpression[T]) IsNull() ComparisonExpression[T] {
 }
 
 // IsNotNull creates an IS NOT NULL comparison
-func (f FieldExpression[T]) IsNotNull() ComparisonExpression[T] {
+func (f Field[T]) IsNotNull() ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpIsNotNull,
@@ -198,7 +203,7 @@ func (f FieldExpression[T]) IsNotNull() ComparisonExpression[T] {
 }
 
 // Range creates a BETWEEN comparison
-func (f FieldExpression[T]) Range(min, max T) ComparisonExpression[T] {
+func (f Field[T]) Range(min, max T) ComparisonExpression[T] {
 	return ComparisonExpression[T]{
 		Field: f,
 		Op:    OpRange,
@@ -209,7 +214,7 @@ func (f FieldExpression[T]) Range(min, max T) ComparisonExpression[T] {
 // String-specific operations (only for FieldExpression[string])
 
 // Contains creates a LIKE '%value%' comparison (string only)
-func (f FieldExpression[string]) Contains(val string) ComparisonExpression[string] {
+func (f Field[string]) Contains(val string) ComparisonExpression[string] {
 	return ComparisonExpression[string]{
 		Field: f,
 		Op:    OpContains,
@@ -218,7 +223,7 @@ func (f FieldExpression[string]) Contains(val string) ComparisonExpression[strin
 }
 
 // StartsWith creates a LIKE 'value%' comparison (string only)
-func (f FieldExpression[string]) StartsWith(val string) ComparisonExpression[string] {
+func (f Field[string]) StartsWith(val string) ComparisonExpression[string] {
 	return ComparisonExpression[string]{
 		Field: f,
 		Op:    OpStartsWith,
@@ -227,7 +232,7 @@ func (f FieldExpression[string]) StartsWith(val string) ComparisonExpression[str
 }
 
 // EndsWith creates a LIKE '%value' comparison (string only)
-func (f FieldExpression[string]) EndsWith(val string) ComparisonExpression[string] {
+func (f Field[string]) EndsWith(val string) ComparisonExpression[string] {
 	return ComparisonExpression[string]{
 		Field: f,
 		Op:    OpEndsWith,
@@ -236,7 +241,7 @@ func (f FieldExpression[string]) EndsWith(val string) ComparisonExpression[strin
 }
 
 // IContains creates an ILIKE '%value%' comparison (case-insensitive, string only)
-func (f FieldExpression[string]) IContains(val string) ComparisonExpression[string] {
+func (f Field[string]) IContains(val string) ComparisonExpression[string] {
 	return ComparisonExpression[string]{
 		Field: f,
 		Op:    OpIContains,
@@ -245,7 +250,7 @@ func (f FieldExpression[string]) IContains(val string) ComparisonExpression[stri
 }
 
 // IExact creates an ILIKE 'value' comparison (case-insensitive exact, string only)
-func (f FieldExpression[string]) IExact(val string) ComparisonExpression[string] {
+func (f Field[string]) IExact(val string) ComparisonExpression[string] {
 	return ComparisonExpression[string]{
 		Field: f,
 		Op:    OpIExact,
@@ -254,7 +259,7 @@ func (f FieldExpression[string]) IExact(val string) ComparisonExpression[string]
 }
 
 // Asc creates an ascending order field expression
-func (f FieldExpression[T]) Asc() OrderFieldExpr[T] {
+func (f Field[T]) Asc() OrderFieldExpr[T] {
 	return OrderFieldExpr[T]{
 		field:     f,
 		ascending: true,
@@ -262,7 +267,7 @@ func (f FieldExpression[T]) Asc() OrderFieldExpr[T] {
 }
 
 // Desc creates a descending order field expression
-func (f FieldExpression[T]) Desc() OrderFieldExpr[T] {
+func (f Field[T]) Desc() OrderFieldExpr[T] {
 	return OrderFieldExpr[T]{
 		field:     f,
 		ascending: false,
@@ -271,9 +276,9 @@ func (f FieldExpression[T]) Desc() OrderFieldExpr[T] {
 
 // CombinedExpression represents arithmetic operations between fields
 type CombinedExpression[T any] struct {
-	Left  FieldExpression[T]
+	Left  Field[T]
 	Op    ArithmeticOperator
-	Right FieldExpression[T]
+	Right Field[T]
 }
 
 // ArithmeticOperator represents arithmetic operations
@@ -315,7 +320,7 @@ func (c CombinedExpression[T]) Resolve(schema *ModelSchema) error {
 
 // ComparisonExpression represents comparison operations
 type ComparisonExpression[T any] struct {
-	Field FieldExpression[T]
+	Field Field[T]
 	Op    Operator
 	Value interface{}
 }
@@ -456,6 +461,112 @@ func (v ValueExpression[T]) Resolve(schema *ModelSchema) error {
 	return nil
 }
 
+// BoolExpression represents boolean combinations of expressions (AND/OR)
+type BoolExpression struct {
+	operator Connector
+	children []Expression
+}
+
+// ToSQL converts boolean expression to SQL
+func (b *BoolExpression) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+	if len(b.children) == 0 {
+		return "1=1", nil, nil
+	}
+
+	var parts []string
+	var allArgs []interface{}
+
+	for _, expr := range b.children {
+		sql, args, err := expr.ToSQL(builder)
+		if err != nil {
+			return "", nil, err
+		}
+		parts = append(parts, fmt.Sprintf("(%s)", sql))
+		allArgs = append(allArgs, args...)
+	}
+
+	combinedSQL := strings.Join(parts, " "+string(b.operator)+" ")
+	return combinedSQL, allArgs, nil
+}
+
+// Resolve validates all expressions in boolean expression
+func (b *BoolExpression) Resolve(schema *ModelSchema) error {
+	for _, expr := range b.children {
+		if err := expr.Resolve(schema); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// NotExpression represents a negated expression
+type NotExpression struct {
+	inner Expression
+}
+
+// ToSQL converts not expression to SQL
+func (n *NotExpression) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+	sql, args, err := n.inner.ToSQL(builder)
+	if err != nil {
+		return "", nil, err
+	}
+	return fmt.Sprintf("NOT (%s)", sql), args, nil
+}
+
+// Resolve validates the inner expression
+func (n *NotExpression) Resolve(schema *ModelSchema) error {
+	return n.inner.Resolve(schema)
+}
+
+// EmptyExpression represents an empty query (matches all)
+type EmptyExpression struct{}
+
+// ToSQL converts empty expression to SQL
+func (e *EmptyExpression) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+	return "1=1", nil, nil
+}
+
+// Resolve validates empty expression (always valid)
+func (e *EmptyExpression) Resolve(schema *ModelSchema) error {
+	return nil
+}
+
+// And combines multiple expressions with AND logic
+//
+// Example:
+//   qs.Filter(And(
+//       User.Name.Eq("John"),
+//       User.Age.Gt(18),
+//   ))
+func And(expressions ...Expression) Expression {
+	return &BoolExpression{
+		operator: ConnectorAnd,
+		children: expressions,
+	}
+}
+
+// Or combines multiple expressions with OR logic
+//
+// Example:
+//   qs.Filter(Or(
+//       User.Age.Gt(18),
+//       User.Role.Eq("admin"),
+//   ))
+func Or(expressions ...Expression) Expression {
+	return &BoolExpression{
+		operator: ConnectorOr,
+		children: expressions,
+	}
+}
+
+// Not negates an expression
+//
+// Example:
+//   qs.Filter(Not(User.Age.Gt(65)))
+func Not(expr Expression) Expression {
+	return &NotExpression{inner: expr}
+}
+
 // Q is for complex query composition (like Django's Q)
 type Q struct {
 	expressions []Expression
@@ -463,7 +574,24 @@ type Q struct {
 	negated     bool
 }
 
+// Note: A Q() factory function would conflict with the Q type above.
+// Use And(), Or(), Not() directly for building complex queries, or NewQ() for the Q type.
+// Example:
+//   qs.Filter(And(User.Name.Eq("John"), User.Age.Gt(18)))
+//   qs.Filter(Or(User.Age.Gt(18), User.Role.Eq("admin")))
+
 // NewQ creates a new Q object from an expression
+//
+// Deprecated: Use Q() for Django-style or Where() for explicit. NewQ will be removed in v2.0.
+// Q() provides a cleaner API that matches Django's Q object pattern.
+//
+// Migration:
+//   // Old
+//   q := orm.NewQ(expr)
+//   // New
+//   q := orm.Q(expr)
+//   // Or simply
+//   qs.Filter(expr)
 func NewQ(expr Expression) *Q {
 	return &Q{
 		expressions: []Expression{expr},
@@ -556,4 +684,196 @@ func splitFieldPath(path string) []string {
 	// Split by double underscore
 	parts := strings.Split(path, "__")
 	return parts
+}
+
+// FieldRef represents a runtime field reference (like Django's F)
+// Use this when you don't have type-safe field definitions
+type FieldRef struct {
+	path string
+}
+
+// F creates a field reference (Django-style, short)
+// For Django users familiar with F() objects
+//
+// Example:
+//   qs.Filter(F("age").Gt(18))
+func F(fieldPath string) FieldRef {
+	return FieldRef{path: fieldPath}
+}
+
+// FieldRef creates a field reference (explicit alternative)
+// For Go-first developers who prefer clarity
+//
+// Example:
+//   qs.Filter(FieldRef("age").Gt(18))
+func NewFieldRef(fieldPath string) FieldRef {
+	return FieldRef{path: fieldPath}
+}
+
+// Eq creates an equality comparison
+func (f FieldRef) Eq(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpEquals,
+		Value: value,
+	}
+}
+
+// Ne creates a not-equal comparison
+func (f FieldRef) Ne(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpNotEquals,
+		Value: value,
+	}
+}
+
+// Gt creates a greater-than comparison
+func (f FieldRef) Gt(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpGreater,
+		Value: value,
+	}
+}
+
+// Gte creates a greater-than-or-equal comparison
+func (f FieldRef) Gte(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpGreaterOrEqual,
+		Value: value,
+	}
+}
+
+// Lt creates a less-than comparison
+func (f FieldRef) Lt(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpLess,
+		Value: value,
+	}
+}
+
+// Lte creates a less-than-or-equal comparison
+func (f FieldRef) Lte(value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpLessOrEqual,
+		Value: value,
+	}
+}
+
+// In creates an IN clause comparison
+func (f FieldRef) In(values ...interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpIn,
+		Value: values,
+	}
+}
+
+// NotIn creates a NOT IN clause comparison
+func (f FieldRef) NotIn(values ...interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpNotIn,
+		Value: values,
+	}
+}
+
+// IsNull creates an IS NULL comparison
+func (f FieldRef) IsNull() Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpIsNull,
+		Value: nil,
+	}
+}
+
+// IsNotNull creates an IS NOT NULL comparison
+func (f FieldRef) IsNotNull() Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpIsNotNull,
+		Value: nil,
+	}
+}
+
+// Contains creates a LIKE '%value%' comparison (string only)
+func (f FieldRef) Contains(value string) Expression {
+	return &ComparisonExpression[string]{
+		Field: Field[string]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpContains,
+		Value: value,
+	}
+}
+
+// StartsWith creates a LIKE 'value%' comparison (string only)
+func (f FieldRef) StartsWith(value string) Expression {
+	return &ComparisonExpression[string]{
+		Field: Field[string]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpStartsWith,
+		Value: value,
+	}
+}
+
+// EndsWith creates a LIKE '%value' comparison (string only)
+func (f FieldRef) EndsWith(value string) Expression {
+	return &ComparisonExpression[string]{
+		Field: Field[string]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpEndsWith,
+		Value: value,
+	}
+}
+
+// IContains creates an ILIKE '%value%' comparison (case-insensitive, string only)
+func (f FieldRef) IContains(value string) Expression {
+	return &ComparisonExpression[string]{
+		Field: Field[string]{
+			fieldPath: f.path,
+			table:     "",
+		},
+		Op:    OpIContains,
+		Value: value,
+	}
 }

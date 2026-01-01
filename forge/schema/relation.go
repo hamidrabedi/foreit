@@ -59,47 +59,24 @@ type CustomRelation interface {
 
 // ForeignKey creates a new ForeignKey relation builder
 func ForeignKey(name, to string) *ForeignKeyBuilder {
-	return &ForeignKeyBuilder{
+	b := &ForeignKeyBuilder{
 		relation: Relation{
 			Name: name,
 			Type: RelationForeignKey,
 			To:   to,
 		},
 	}
+	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *ForeignKeyBuilder { return b })
+	return b
 }
 
 // ForeignKeyBuilder is a builder for ForeignKey relations
 type ForeignKeyBuilder struct {
+	CommonRelationMethods[*ForeignKeyBuilder]
 	relation Relation
 }
 
-func (b *ForeignKeyBuilder) RelatedName(name string) *ForeignKeyBuilder {
-	b.relation.RelatedName = name
-	return b
-}
-
-func (b *ForeignKeyBuilder) RelatedQueryName(name string) *ForeignKeyBuilder {
-	b.relation.RelatedQueryName = name
-	return b
-}
-
-func (b *ForeignKeyBuilder) OnDelete(cascade CascadeType) *ForeignKeyBuilder {
-	b.relation.OnDelete = cascade
-	return b
-}
-
-func (b *ForeignKeyBuilder) OnUpdate(cascade CascadeType) *ForeignKeyBuilder {
-	b.relation.OnUpdate = cascade
-	return b
-}
-
-func (b *ForeignKeyBuilder) LimitChoicesTo(limit interface{}) *ForeignKeyBuilder {
-	b.relation.LimitChoicesTo = limit
-	return b
-}
-
-func (b *ForeignKeyBuilder) ParentLink() *ForeignKeyBuilder {
-	b.relation.ParentLink = true
+func (b *ForeignKeyBuilder) chain() *ForeignKeyBuilder {
 	return b
 }
 
@@ -119,10 +96,7 @@ func (b *ForeignKeyBuilder) VerboseName(name string) *ForeignKeyBuilder {
 	return b
 }
 
-func (b *ForeignKeyBuilder) CascadeOnDelete() *ForeignKeyBuilder {
-	b.relation.OnDelete = CascadeCASCADE
-	return b
-}
+// CascadeOnDelete is a convenience method (inherited from CommonRelationMethods)
 
 func (b *ForeignKeyBuilder) DBConstraint(enabled bool) *ForeignKeyBuilder {
 	b.relation.DBConstraint = enabled
@@ -156,6 +130,13 @@ func (b *ForeignKeyBuilder) Build() Relation {
 	}
 	return b.relation
 }
+
+// RelatedName sets the related name (inherited from CommonRelationMethods)
+// RelatedQueryName sets the related query name (inherited from CommonRelationMethods)
+// OnDelete sets cascade on delete (inherited from CommonRelationMethods)
+// OnUpdate sets cascade on update (inherited from CommonRelationMethods)
+// LimitChoicesTo limits choices (inherited from CommonRelationMethods)
+// ParentLink marks as parent link (inherited from CommonRelationMethods)
 
 // ManyToOne is a helper that creates a ForeignKey relation
 // This is for convenience - it's the same as ForeignKey
@@ -194,37 +175,24 @@ func (b *OneToManyBuilder) Build() Relation {
 
 // OneToOne creates a new OneToOne relation builder
 func OneToOne(name, to string) *OneToOneBuilder {
-	return &OneToOneBuilder{
+	b := &OneToOneBuilder{
 		relation: Relation{
 			Name: name,
 			Type: RelationOneToOne,
 			To:   to,
 		},
 	}
+	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *OneToOneBuilder { return b })
+	return b
 }
 
 // OneToOneBuilder is a builder for OneToOne relations
 type OneToOneBuilder struct {
+	CommonRelationMethods[*OneToOneBuilder]
 	relation Relation
 }
 
-func (b *OneToOneBuilder) RelatedName(name string) *OneToOneBuilder {
-	b.relation.RelatedName = name
-	return b
-}
-
-func (b *OneToOneBuilder) OnDelete(cascade CascadeType) *OneToOneBuilder {
-	b.relation.OnDelete = cascade
-	return b
-}
-
-func (b *OneToOneBuilder) OnUpdate(cascade CascadeType) *OneToOneBuilder {
-	b.relation.OnUpdate = cascade
-	return b
-}
-
-func (b *OneToOneBuilder) ParentLink() *OneToOneBuilder {
-	b.relation.ParentLink = true
+func (b *OneToOneBuilder) chain() *OneToOneBuilder {
 	return b
 }
 
@@ -234,27 +202,24 @@ func (b *OneToOneBuilder) Build() Relation {
 
 // ManyToMany creates a new ManyToMany relation builder
 func ManyToMany(name, to string) *ManyToManyBuilder {
-	return &ManyToManyBuilder{
+	b := &ManyToManyBuilder{
 		relation: Relation{
 			Name: name,
 			Type: RelationManyToMany,
 			To:   to,
 		},
 	}
+	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *ManyToManyBuilder { return b })
+	return b
 }
 
 // ManyToManyBuilder is a builder for ManyToMany relations
 type ManyToManyBuilder struct {
+	CommonRelationMethods[*ManyToManyBuilder]
 	relation Relation
 }
 
-func (b *ManyToManyBuilder) RelatedName(name string) *ManyToManyBuilder {
-	b.relation.RelatedName = name
-	return b
-}
-
-func (b *ManyToManyBuilder) RelatedQueryName(name string) *ManyToManyBuilder {
-	b.relation.RelatedQueryName = name
+func (b *ManyToManyBuilder) chain() *ManyToManyBuilder {
 	return b
 }
 
@@ -275,10 +240,7 @@ func (b *ManyToManyBuilder) Symmetrical() *ManyToManyBuilder {
 	return b
 }
 
-func (b *ManyToManyBuilder) LimitChoicesTo(limit interface{}) *ManyToManyBuilder {
-	b.relation.LimitChoicesTo = limit
-	return b
-}
+// RelatedName, RelatedQueryName, LimitChoicesTo are inherited from CommonRelationMethods
 
 func (b *ManyToManyBuilder) Build() Relation {
 	return b.relation

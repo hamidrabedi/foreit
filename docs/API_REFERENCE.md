@@ -5,33 +5,35 @@
 ### Type-Safe Querying
 
 ```go
-// Get all active users
+// Get all active users (direct filter)
 users, err := User.Objects.Filter(
-    User.Fields.IsActive.Equals(true),
+    User.Fields.IsActive.Eq(true),
 ).All(ctx)
 
-// Complex query
+// Complex query using And/Or
 users, err := User.Objects.Filter(
-    User.Fields.IsActive.Equals(true).And(
-        User.Fields.DateJoined.Greater(time.Now().AddDate(0, -1, 0)).Or(
-            User.Fields.IsStaff.Equals(true),
+    orm.And(
+        User.Fields.IsActive.Eq(true),
+        orm.Or(
+            User.Fields.DateJoined.Gt(time.Now().AddDate(0, -1, 0)),
+            User.Fields.IsStaff.Eq(true),
         ),
     ),
 ).OrderBy("-date_joined").Limit(10).All(ctx)
 ```
 
-### FieldExpr Methods
+### Field Methods (Type-Safe)
 
 ```go
 // Equality
-User.Fields.Username.Equals("john")
-User.Fields.Age.NotEquals(18)
+User.Fields.Username.Eq("john")
+User.Fields.Age.Ne(18)
 
 // Comparison
-User.Fields.Age.Greater(18)
-User.Fields.Age.GreaterOrEqual(18)
-User.Fields.Age.Less(65)
-User.Fields.Age.LessOrEqual(65)
+User.Fields.Age.Gt(18)
+User.Fields.Age.Gte(18)
+User.Fields.Age.Lt(65)
+User.Fields.Age.Lte(65)
 
 // Null checks
 User.Fields.LastLogin.IsNull()
@@ -56,12 +58,56 @@ User.Fields.DateJoined.Month(12)
 User.Fields.DateJoined.Day(25)
 ```
 
+### Runtime Field References
+
+When you don't have type-safe fields, use `F()` or `FieldRef()`:
+
+```go
+// Django-style (short)
+qs.Filter(orm.F("age").Gt(18))
+
+// Explicit alternative
+qs.Filter(orm.FieldRef("age").Gt(18))
+
+// SQL-like Where clause
+qs.Filter(orm.Where("age", orm.OpGreater, 18))
+qs.Filter(orm.Where("name", orm.OpEquals, "John"))
+```
+
+### Boolean Expression Combiners
+
+```go
+// And - combine expressions with AND
+qs.Filter(orm.And(
+    User.Fields.Name.Eq("John"),
+    User.Fields.Age.Gt(18),
+))
+
+// Or - combine expressions with OR
+qs.Filter(orm.Or(
+    User.Fields.Age.Gt(18),
+    User.Fields.Role.Eq("admin"),
+))
+
+// Not - negate an expression
+qs.Exclude(orm.Not(User.Fields.Age.Gt(65)))
+
+// Complex combinations
+qs.Filter(orm.And(
+    User.Fields.Name.Eq("John"),
+    orm.Or(
+        User.Fields.Age.Gt(18),
+        User.Fields.Role.Eq("admin"),
+    ),
+))
+```
+
 ### QuerySet Methods
 
 ```go
 // Filtering
-qs := User.Objects.Filter(User.Fields.IsActive.Equals(true))
-qs = qs.Exclude(User.Fields.IsDeleted.Equals(true))
+qs := User.Objects.Filter(User.Fields.IsActive.Eq(true))
+qs = qs.Exclude(User.Fields.IsDeleted.Eq(true))
 
 // Ordering
 qs = qs.OrderBy("username", "-date_joined")  // - means DESC
@@ -118,8 +164,8 @@ err := qs.BulkCreate(ctx, []*User{user1, user2})
 affected, err := qs.Delete(ctx)
 
 // Set operations
-activeUsers := User.Objects.Filter(User.Fields.IsActive.Equals(true))
-staffUsers := User.Objects.Filter(User.Fields.IsStaff.Equals(true))
+activeUsers := User.Objects.Filter(User.Fields.IsActive.Eq(true))
+staffUsers := User.Objects.Filter(User.Fields.IsStaff.Eq(true))
 
 allUsers := activeUsers.Union(staffUsers)
 commonUsers := activeUsers.Intersection(staffUsers)
@@ -175,22 +221,35 @@ err := user.Delete(ctx)  // Instance method
 qs := User.Objects.Filter(User.Fields.IsActive.Equals(true))
 ```
 
-## QueryExpr API
+## Expression API
 
 ```go
-// Build complex queries
-q := User.Fields.IsActive.Equals(true).
-    And(User.Fields.IsStaff.Equals(true)).
-    Or(User.Fields.DateJoined.Greater(lastMonth))
+// Build complex queries using And/Or/Not functions
+expr := orm.And(
+    User.Fields.IsActive.Eq(true),
+    User.Fields.IsStaff.Eq(true),
+)
+
+// Or combine
+expr = orm.Or(
+    User.Fields.IsActive.Eq(true),
+    User.Fields.DateJoined.Gt(lastMonth),
+)
 
 // Negation
-q = q.Not()
+expr = orm.Not(User.Fields.Age.Gt(65))
 
-// Combine queries
-q1 := User.Fields.IsActive.Equals(true)
-q2 := User.Fields.IsStaff.Equals(true)
-q := q1.And(q2)
-q = q1.Or(q2)
+// Complex combinations
+expr = orm.And(
+    User.Fields.Name.Eq("John"),
+    orm.Or(
+        User.Fields.Age.Gt(18),
+        User.Fields.Role.Eq("admin"),
+    ),
+)
+
+// Use in queries
+qs.Filter(expr)
 ```
 
 ## Aggregates
@@ -247,7 +306,7 @@ users, _ := User.Objects.SelectRelated("profile").All(ctx)
 
 // Filter by relation
 posts, _ := Post.Objects.Filter(
-    Post.Fields.Author.Equals(user.ID),
+    Post.Fields.Author.Eq(user.ID),
 ).All(ctx)
 ```
 

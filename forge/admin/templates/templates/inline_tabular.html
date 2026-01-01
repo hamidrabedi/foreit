@@ -1,48 +1,58 @@
 {{define "inline_tabular"}}
-<div class="inline-group inline-tabular">
-    <h3 class="inline-title">{{.Name}}</h3>
-    
+<div class="inline-group inline-tabular" id="{{.Name}}-group" data-inline-name="{{.Name}}" data-max-num="{{.MaxNum}}">
+    <h3 class="inline-title">{{.Title}}</h3>
+
     <div class="inline-table-container">
         <table class="inline-table">
             <thead>
                 <tr>
-                    <th class="delete-column"></th>
+                    <th class="delete-column">Del</th>
                     {{range .Fields}}
-                        <th>{{.Label}}</th>
+                    <th>{{.Label}}</th>
                     {{end}}
                 </tr>
             </thead>
             <tbody class="inline-forms">
-                {{range .Instances}}
-                    <tr class="inline-form-row">
-                        <td class="delete-column">
-                            <input type="checkbox" name="{{$.Name}}-DELETE" value="{{.ID}}">
-                        </td>
-                        {{range $.Fields}}
-                            <td>
-                                <input type="text" name="{{$.Name}}-{{.Name}}" value="{{.Value}}" class="form-control">
-                            </td>
+                {{range $i, $row := .Rows}}
+                <tr class="inline-form-row {{if $row.Delete}}deleted{{end}}" id="{{$.Name}}-{{$i}}">
+                    <td class="delete-column">
+                        <input type="checkbox" name="{{$.Name}}-{{$i}}-DELETE" value="{{$row.ID}}">
+                        {{if $row.ID}}
+                        <input type="hidden" name="{{$.Name}}-{{$i}}-id" value="{{$row.ID}}">
                         {{end}}
-                    </tr>
+                    </td>
+                    {{range $row.Fields}}
+                    <td>
+                        {{.Render}}
+                        {{if .Errors}}
+                        <ul class="field-errors">
+                            {{range .Errors}}<li>{{.}}</li>{{end}}
+                        </ul>
+                        {{end}}
+                    </td>
+                    {{end}}
+                </tr>
                 {{end}}
-                {{range .ExtraForms}}
-                    <tr class="inline-form-row empty-form">
-                        <td class="delete-column"></td>
-                        {{range $.Fields}}
-                            <td>
-                                <input type="text" name="{{$.Name}}-{{.Name}}" class="form-control">
-                            </td>
-                        {{end}}
-                    </tr>
+
+                {{range $i, $row := .ExtraForms}}
+                {{$idx := add (len $.Rows) $i}}
+                <tr class="inline-form-row empty-form" id="{{$.Name}}-{{$idx}}">
+                    <td class="delete-column"></td>
+                    {{range $row.Fields}}
+                    <td>
+                        {{.Render}}
+                    </td>
+                    {{end}}
+                </tr>
                 {{end}}
             </tbody>
         </table>
     </div>
-    
+
     {{if .CanAddMore}}
-        <button type="button" class="btn btn-sm btn-add-inline" onclick="addInlineForm('{{.Name}}')">
-            Add another {{.Name}}
-        </button>
+    <button type="button" class="btn btn-sm btn-add-inline" onclick="addInlineForm('{{.Name}}')">
+        Add another {{.Title}}
+    </button>
     {{end}}
 </div>
 {{end}}

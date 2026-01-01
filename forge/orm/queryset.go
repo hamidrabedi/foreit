@@ -42,6 +42,9 @@ type QuerySet[T any] interface {
 	Values(fields ...any) ValuesQuerySet[T]
 	ValuesList(fields ...any) ValuesListQuerySet[T]
 
+	// Project - type-safe projection to a different type
+	// Note: Use Project[T, P](qs) function instead of method
+
 	// Execution
 	All(ctx context.Context) ([]*T, error)
 	Get(ctx context.Context) (*T, error)
@@ -80,22 +83,37 @@ func (o OrderField) IsAscending() bool {
 	return o.Ascending
 }
 
-// NewOrderField creates an order field
-func NewOrderField(field string, ascending bool) OrderField {
-	return OrderField{
-		Field:     field,
-		Ascending: ascending,
-	}
-}
-
 // Asc creates an ascending order field
 func Asc(field string) OrderField {
-	return NewOrderField(field, true)
+	return OrderField{
+		Field:     field,
+		Ascending: true,
+	}
 }
 
 // Desc creates a descending order field
 func Desc(field string) OrderField {
-	return NewOrderField(field, false)
+	return OrderField{
+		Field:     field,
+		Ascending: false,
+	}
+}
+
+// NewOrderField creates an order field with explicit direction.
+//
+// Deprecated: Use Asc(field) or Desc(field) instead for clarity. NewOrderField will be removed in v3.0.
+// Migration:
+//   // Old
+//   order := orm.NewOrderField("created_at", true)
+//   order := orm.NewOrderField("created_at", false)
+//   // New
+//   order := orm.Asc("created_at")
+//   order := orm.Desc("created_at")
+func NewOrderField(field string, ascending bool) OrderField {
+	if ascending {
+		return Asc(field)
+	}
+	return Desc(field)
 }
 
 // BaseQuerySet is the implementation
@@ -113,6 +131,7 @@ type BaseQuerySet[T any] struct {
 	deferFields     []string
 	selectRelated   []string
 	prefetchRelated []string
+	preloaded       map[string]bool // Track which relations are preloaded (N+1 prevention)
 	aggregates      []Aggregate
 	annotations     []AnnotationExpr // Using existing AnnotationExpr type
 	db              interface{}      // *db.DB
@@ -135,6 +154,7 @@ func NewQuerySet[T any](tableName string) (QuerySet[T], error) {
 		conditions: []Expression{},
 		excludes:   []Expression{},
 		orderBy:    []OrderField{},
+		preloaded:  make(map[string]bool),
 	}, nil
 }
 
@@ -154,7 +174,7 @@ func (qs *BaseQuerySet[T]) getDB(ctx context.Context) (*sql.DB, error) {
 
 // clone creates a deep copy
 func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
-	return &BaseQuerySet[T]{
+	clone := &BaseQuerySet[T]{
 		table:           qs.table,
 		schema:          qs.schema,
 		conditions:      append([]Expression{}, qs.conditions...),
@@ -168,14 +188,25 @@ func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 		deferFields:     append([]string{}, qs.deferFields...),
 		selectRelated:   append([]string{}, qs.selectRelated...),
 		prefetchRelated: append([]string{}, qs.prefetchRelated...),
+		preloaded:       make(map[string]bool),
 		aggregates:      append([]Aggregate{}, qs.aggregates...),
 		annotations:     append([]AnnotationExpr{}, qs.annotations...),
 		db:              qs.db,
 	}
+	// Copy preloaded map
+	for k, v := range qs.preloaded {
+		clone.preloaded[k] = v
+	}
+	return clone
 }
 
 // Filter adds a filter condition
 func (qs *BaseQuerySet[T]) Filter(expr Expression) QuerySet[T] {
+	// Check for nil queryset or schema
+	if qs == nil || qs.schema == nil {
+		panic("cannot filter: queryset or schema is nil")
+	}
+
 	// Validate expression
 	if err := expr.Resolve(qs.schema); err != nil {
 		panic(fmt.Sprintf("invalid filter expression: %v", err))
@@ -320,11 +351,15 @@ func (qs *BaseQuerySet[T]) SelectRelated(relations ...any) QuerySet[T] {
 }
 
 // PrefetchRelated adds relations to prefetch - accepts both string and RelationExpression
+// Marks relations as preloaded to prevent N+1 queries
 func (qs *BaseQuerySet[T]) PrefetchRelated(relations ...any) QuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(relations))
 	for i, relation := range relations {
-		paths[i] = extractRelationPathFromAny(relation)
+		path := extractRelationPathFromAny(relation)
+		paths[i] = path
+		// Mark as preloaded
+		clone.preloaded[path] = true
 	}
 	clone.prefetchRelated = append(clone.prefetchRelated, paths...)
 	return clone
@@ -365,6 +400,9 @@ func (qs *BaseQuerySet[T]) ValuesList(fields ...any) ValuesListQuerySet[T] {
 	clone.selectFields = paths
 	return &BaseValuesListQuerySet[T]{base: clone}
 }
+
+// Project is implemented via the Project function in projection.go
+// Usage: Project[User, UserProjection](qs)
 
 // UpdateBuilder returns an UpdateBuilder
 func (qs *BaseQuerySet[T]) UpdateBuilder() (*UpdateBuilder[T], error) {
@@ -613,7 +651,18 @@ func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldM
 	return scanArgs
 }
 
-// Get retrieves a single object
+// Get retrieves a single model instance from the filtered queryset.
+// Returns an error if zero or more than one instance is found.
+//
+// This is different from Manager.Get() which retrieves by primary key ID.
+// Use QuerySet.Get() when filtering, use Manager.Get() when you know the ID.
+//
+// Use First() if you want the first of many results, or want a different error
+// when no instances are found. Get() requires exactly one match.
+//
+// Example:
+//   user, err := qs.Filter(User.Email.Eq("john@example.com")).Get(ctx)
+//   // Returns error if 0 or >1 users found
 func (qs *BaseQuerySet[T]) Get(ctx context.Context) (*T, error) {
 	results, err := qs.Limit(2).All(ctx)
 	if err != nil {
@@ -631,7 +680,18 @@ func (qs *BaseQuerySet[T]) Get(ctx context.Context) (*T, error) {
 	return results[0], nil
 }
 
-// First retrieves the first object
+// First retrieves the first model instance from the filtered queryset.
+// Returns an error if no instances are found.
+//
+// This is ordered by the queryset's ordering (via OrderBy()), or natural
+// database order if no ordering is specified.
+//
+// Use Get() if you require exactly one match (errors if 0 or >1).
+// Use First() if you want the first of potentially many results.
+//
+// Example:
+//   user, err := qs.Filter(User.Age.Gt(18)).OrderBy(User.CreatedAt.Desc()).First(ctx)
+//   // Returns first user over 18, ordered by creation date (newest first)
 func (qs *BaseQuerySet[T]) First(ctx context.Context) (*T, error) {
 	results, err := qs.Limit(1).All(ctx)
 	if err != nil {

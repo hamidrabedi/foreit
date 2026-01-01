@@ -86,9 +86,36 @@ func (w *Writer) WriteRelations(def *ModelDefinition, outputDir string) error {
 		return fmt.Errorf("failed to create gen directory: %w", err)
 	}
 
-	// TODO: Implement relation generation
-	// This will generate RelationExpr definitions for type-safe relation access
-	// Similar to FieldExpr but for relationships
+	// Generate RelationExpr file
+	filename := filepath.Join(genDir, utils.ToSnake(def.Name)+"_relations.gen.go")
+	f, err := os.Create(filename)
+	if err != nil {
+		return fmt.Errorf("failed to create relations file: %w", err)
+	}
+	defer f.Close()
+
+	t := template.New("relations").Funcs(template.FuncMap{
+		"ToSnake":  utils.ToSnake,
+		"ToCamel":  utils.ToCamel,
+		"ToPascal": utils.ToPascal,
+	})
+
+	t, err = t.Parse(relationTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse relation template: %w", err)
+	}
+
+	// Prepare template data
+	data := map[string]interface{}{
+		"Package":   def.Package,
+		"ModelName": def.Name,
+		"Relations": def.Relations,
+	}
+
+	if err := t.Execute(f, data); err != nil {
+		return fmt.Errorf("failed to execute relation template: %w", err)
+	}
+
 	return nil
 }
 

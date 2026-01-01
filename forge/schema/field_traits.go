@@ -1,38 +1,45 @@
 package schema
 
 // FieldTrait represents a capability that a field type can have
-// This uses the Strategy pattern to handle type-specific behaviors
-type FieldTrait interface {
-	// Apply applies the trait to the field builder
-	Apply(builder *UnifiedFieldBuilder)
+// Traits are used for documentation and runtime validation
+type FieldTrait string
+
+const (
+	TraitNumeric  FieldTrait = "numeric"  // Supports MinValue, MaxValue, AutoIncrement
+	TraitString   FieldTrait = "string"    // Supports MinLength, MaxLength, Choices
+	TraitTemporal FieldTrait = "temporal"  // Supports AutoNow, AutoNowAdd
+	TraitDecimal  FieldTrait = "decimal"   // Supports MaxDigits, DecimalPlaces
+)
+
+// HasTrait checks if a field type has a specific trait
+func HasTrait(fieldType FieldType, trait FieldTrait) bool {
+	info := GetFieldTypeInfo(fieldType)
+	for _, t := range info.Traits {
+		if t == trait {
+			return true
+		}
+	}
+	return false
 }
 
-// NumericTrait provides numeric field capabilities (MinValue, MaxValue, AutoIncrement)
-type NumericTrait struct{}
-
-func (t *NumericTrait) Apply(builder *UnifiedFieldBuilder) {
-	// Numeric traits are applied via builder methods
+// SupportsNumericOperations checks if a field type supports numeric operations
+func SupportsNumericOperations(fieldType FieldType) bool {
+	return HasTrait(fieldType, TraitNumeric)
 }
 
-// StringTrait provides string field capabilities (MinLength, MaxLength, Choices)
-type StringTrait struct{}
-
-func (t *StringTrait) Apply(builder *UnifiedFieldBuilder) {
-	// String traits are applied via builder methods
+// SupportsStringOperations checks if a field type supports string operations
+func SupportsStringOperations(fieldType FieldType) bool {
+	return HasTrait(fieldType, TraitString)
 }
 
-// TemporalTrait provides temporal field capabilities (AutoNow, AutoNowAdd)
-type TemporalTrait struct{}
-
-func (t *TemporalTrait) Apply(builder *UnifiedFieldBuilder) {
-	// Temporal traits are applied via builder methods
+// SupportsTemporalOperations checks if a field type supports temporal operations
+func SupportsTemporalOperations(fieldType FieldType) bool {
+	return HasTrait(fieldType, TraitTemporal)
 }
 
-// DecimalTrait provides decimal field capabilities (MaxDigits, DecimalPlaces)
-type DecimalTrait struct{}
-
-func (t *DecimalTrait) Apply(builder *UnifiedFieldBuilder) {
-	// Decimal traits are applied via builder methods
+// SupportsDecimalOperations checks if a field type supports decimal operations
+func SupportsDecimalOperations(fieldType FieldType) bool {
+	return HasTrait(fieldType, TraitDecimal)
 }
 
 // FieldTypeInfo contains metadata about a field type
@@ -47,64 +54,67 @@ func GetFieldTypeInfo(fieldType FieldType) FieldTypeInfo {
 	infos := map[FieldType]FieldTypeInfo{
 		TypeInt64: {
 			Type:   TypeInt64,
-			Traits: []FieldTrait{&NumericTrait{}},
+			Traits: []FieldTrait{TraitNumeric},
 		},
 		TypeInt32: {
 			Type:   TypeInt32,
-			Traits: []FieldTrait{&NumericTrait{}},
+			Traits: []FieldTrait{TraitNumeric},
 		},
 		TypeString: {
 			Type:   TypeString,
-			Traits: []FieldTrait{&StringTrait{}},
+			Traits: []FieldTrait{TraitString},
 		},
 		TypeText: {
 			Type:   TypeText,
-			Traits: []FieldTrait{&StringTrait{}},
+			Traits: []FieldTrait{TraitString},
 		},
 		TypeEmail: {
 			Type:   TypeEmail,
-			Traits: []FieldTrait{&StringTrait{}},
+			Traits: []FieldTrait{TraitString},
 		},
 		TypeURL: {
 			Type:   TypeURL,
-			Traits: []FieldTrait{&StringTrait{}},
+			Traits: []FieldTrait{TraitString},
 		},
 		TypeBool: {
-			Type: TypeBool,
+			Type:   TypeBool,
+			Traits: []FieldTrait{},
 		},
 		TypeTime: {
 			Type:   TypeTime,
-			Traits: []FieldTrait{&TemporalTrait{}},
+			Traits: []FieldTrait{TraitTemporal},
 		},
 		TypeDate: {
 			Type:   TypeDate,
-			Traits: []FieldTrait{&TemporalTrait{}},
+			Traits: []FieldTrait{TraitTemporal},
 		},
 		TypeDateTime: {
 			Type:   TypeDateTime,
-			Traits: []FieldTrait{&TemporalTrait{}},
+			Traits: []FieldTrait{TraitTemporal},
 		},
 		TypeFloat32: {
 			Type:   TypeFloat32,
-			Traits: []FieldTrait{&NumericTrait{}},
+			Traits: []FieldTrait{TraitNumeric},
 		},
 		TypeFloat64: {
 			Type:   TypeFloat64,
-			Traits: []FieldTrait{&NumericTrait{}},
+			Traits: []FieldTrait{TraitNumeric},
 		},
 		TypeDecimal: {
 			Type:   TypeDecimal,
-			Traits: []FieldTrait{&NumericTrait{}, &DecimalTrait{}},
+			Traits: []FieldTrait{TraitNumeric, TraitDecimal},
 		},
 		TypeUUID: {
-			Type: TypeUUID,
+			Type:   TypeUUID,
+			Traits: []FieldTrait{},
 		},
 		TypeJSON: {
-			Type: TypeJSON,
+			Type:   TypeJSON,
+			Traits: []FieldTrait{},
 		},
 		TypeBytes: {
 			Type:   TypeBytes,
-			Traits: []FieldTrait{&StringTrait{}}, // Bytes can have length constraints
+			Traits: []FieldTrait{TraitString}, // Bytes can have length constraints
 		},
 	}
 

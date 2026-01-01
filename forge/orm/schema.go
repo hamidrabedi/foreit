@@ -299,6 +299,101 @@ func (fa *FieldAccessor[T]) AllRelations() []string {
 	return relations
 }
 
+// ValidatePath validates that a field path exists in the schema
+func (ms *ModelSchema) ValidatePath(path string) error {
+	_, _, err := ms.ResolvePath(path)
+	return err
+}
+
+// ResolvePath resolves a field path and returns field info and target schema
+// Supports relation traversal: "author__email"
+func (ms *ModelSchema) ResolvePath(path string) (*FieldInfo, *ModelSchema, error) {
+	parts := splitFieldPathSchema(path)
+	if len(parts) == 0 {
+		return nil, nil, fmt.Errorf("empty field path")
+	}
+
+	// Check first part exists as field or relation
+	field := ms.GetField(parts[0])
+	if field != nil {
+		// Simple field path
+		if len(parts) == 1 {
+			return field, ms, nil
+		}
+		return nil, nil, fmt.Errorf("field %s cannot be traversed further", parts[0])
+	}
+
+	// Check if it's a relation
+	relation := ms.GetRelation(parts[0])
+	if relation == nil {
+		return nil, nil, fmt.Errorf("field or relation %s not found", parts[0])
+	}
+
+	// For now, return error for relation traversal
+	// Full implementation would resolve the target model schema
+	if len(parts) > 1 {
+		return nil, nil, fmt.Errorf("relation traversal not yet fully implemented for path %s", path)
+	}
+
+	return nil, nil, fmt.Errorf("path %s resolves to a relation, not a field", path)
+}
+
+// GetPathType returns the type information for a field path
+func (ms *ModelSchema) GetPathType(path string) (reflect.Type, error) {
+	fieldInfo, _, err := ms.ResolvePath(path)
+	if err != nil {
+		return nil, err
+	}
+	return fieldInfo.Type, nil
+}
+
+// GetAllowedLookups returns allowed lookups for a field (for security whitelisting)
+func (ms *ModelSchema) GetAllowedLookups(fieldPath string) ([]string, error) {
+	field, _, err := ms.ResolvePath(fieldPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Return default lookups based on field type
+	lookups := getDefaultLookupsForType(field.Type)
+	return lookups, nil
+}
+
+// getDefaultLookupsForType returns default lookups for a field type
+func getDefaultLookupsForType(fieldType reflect.Type) []string {
+	// This is a simplified version
+	// In practice, this would check the actual reflect.Type
+	switch fieldType.Kind() {
+	case reflect.String:
+		return []string{"exact", "in", "contains", "icontains", "startswith", "endswith"}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64:
+		return []string{"exact", "in", "gt", "gte", "lt", "lte"}
+	case reflect.Bool:
+		return []string{"exact"}
+	default:
+		return []string{"exact", "in"}
+	}
+}
+
+// GetRelationDepth calculates the depth of a relation path
+func (ms *ModelSchema) GetRelationDepth(path string) (int, error) {
+	parts := splitFieldPathSchema(path)
+	if len(parts) == 0 {
+		return 0, fmt.Errorf("invalid path")
+	}
+
+	// Count relations (all parts except the last)
+	depth := len(parts) - 1
+	return depth, nil
+}
+
+// splitFieldPathSchema splits a field path by "__" (schema package version)
+func splitFieldPathSchema(path string) []string {
+	return strings.Split(path, "__")
+}
+
 // Helper to convert field path to SQL (handles double underscore)
 func fieldPathToSQL(path string) string {
 	// Replace double underscore with single for SQL

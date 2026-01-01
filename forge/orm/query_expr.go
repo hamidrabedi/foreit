@@ -41,7 +41,35 @@ type QueryExpr struct {
 	negated  bool
 }
 
+// Where creates a simple field condition (SQL-like, explicit)
+// This is the recommended way to create conditions when you don't have type-safe fields
+//
+// Example:
+//   qs.Filter(Where("age", OpGreater, 18))
+//   qs.Filter(Where("name", OpEquals, "John"))
+func Where(field string, op Operator, value interface{}) Expression {
+	return &ComparisonExpression[interface{}]{
+		Field: Field[interface{}]{
+			fieldPath: field,
+			table:     "",
+		},
+		Op:    op,
+		Value: value,
+	}
+}
+
 // NewFieldQueryExpr creates a simple QueryExpr for field = value
+//
+// Deprecated: Use Where() for explicit SQL-like conditions or field expression methods for type-safe queries.
+// NewFieldQueryExpr will be removed in v2.0.
+//
+// Migration:
+//   // Old
+//   expr := orm.NewFieldQueryExpr("age", orm.OpGreater, 18)
+//   // New - Option 1: Where (explicit)
+//   expr := orm.Where("age", orm.OpGreater, 18)
+//   // New - Option 2: Type-safe (best)
+//   expr := User.Age.Gt(18)
 func NewFieldQueryExpr(field string, op Operator, value interface{}) QueryExpr {
 	return QueryExpr{
 		field: field,

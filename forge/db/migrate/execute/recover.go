@@ -2,46 +2,185 @@ package execute
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
 // Recovery handles migration recovery operations
-// TODO: Implement automatic dirty state recovery
-// TODO: Implement migration integrity validation
-// TODO: Implement partial migration rollback
-type Recovery struct{}
+type Recovery struct {
+	db *sql.DB
+}
 
 // NewRecovery creates a new recovery handler
-func NewRecovery() *Recovery {
-	return &Recovery{}
+func NewRecovery(db *sql.DB) *Recovery {
+	return &Recovery{
+		db: db,
+	}
+}
+
+// RecoveryMigrationInfo represents basic migration information for recovery
+type RecoveryMigrationInfo struct {
+	Version uint
+	Dirty   bool
+}
+
+// DirtyMigration represents a dirty migration that needs recovery
+type DirtyMigration struct {
+	Version     uint
+	Applied     bool
+	ErrorMsg    string
+	Statements  []string
 }
 
 // RecoverDirtyState attempts to recover from a dirty migration state
-// TODO: Implement automatic dirty state recovery
-// This should:
-// 1. Query the schema_migrations table to check dirty flag
-// 2. Detect which statements were successfully executed
-// 3. Attempt to automatically fix the state or provide detailed recovery steps
-func (r *Recovery) RecoverDirtyState(ctx context.Context, db interface{}, migrationsDir string) error {
-	// Check if database is in dirty state
-	// This would query the schema_migrations table to check dirty flag
-	// For now, return instructions
+func (r *Recovery) RecoverDirtyState(ctx context.Context, migrationsDir string) (*DirtyMigration, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
 
-	return fmt.Errorf("database is in dirty state - manual recovery required:\n" +
-		"1. Check the last applied migration in schema_migrations table\n" +
-		"2. Verify the database state matches the migration\n" +
-		"3. If migration partially applied, manually fix the schema\n" +
-		"4. Mark migration as clean: UPDATE schema_migrations SET dirty = false WHERE version = <version>")
+	// Query the schema_migrations table to check for dirty migrations
+	var version uint
+	var dirty bool
+	
+	query := `SELECT version, dirty FROM schema_migrations ORDER BY version DESC LIMIT 1`
+	err := r.db.QueryRowContext(ctx, query).Scan(&version, &dirty)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("no migrations found in schema_migrations table")
+		}
+		return nil, fmt.Errorf("failed to query migration status: %w", err)
+	}
+
+	if !dirty {
+		return nil, nil // No dirty migration
+	}
+
+	// Found a dirty migration
+	dirtyMigration := &DirtyMigration{
+		Version: version,
+		Applied: true,
+		ErrorMsg: fmt.Sprintf("Migration %d is marked as dirty", version),
+	}
+
+	return dirtyMigration, nil
+}
+
+// MarkMigrationClean marks a migration as clean (not dirty)
+func (r *Recovery) MarkMigrationClean(ctx context.Context, version uint) error {
+	if r.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	query := `UPDATE schema_migrations SET dirty = false WHERE version = $1`
+	_, err := r.db.ExecContext(ctx, query, version)
+	if err != nil {
+		return fmt.Errorf("failed to mark migration as clean: %w", err)
+	}
+
+	return nil
+}
+
+// GetDirtyMigrationInfo retrieves detailed information about a dirty migration
+func (r *Recovery) GetDirtyMigrationInfo(ctx context.Context) (*RecoveryMigrationInfo, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	info := &RecoveryMigrationInfo{}
+	query := `SELECT version, dirty FROM schema_migrations ORDER BY version DESC LIMIT 1`
+	err := r.db.QueryRowContext(ctx, query).Scan(&info.Version, &info.Dirty)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return &RecoveryMigrationInfo{Version: 0, Dirty: false}, nil
+		}
+		return nil, fmt.Errorf("failed to get migration status: %w", err)
+	}
+
+	return info, nil
 }
 
 // ValidateMigrationIntegrity validates that migration files haven't been modified
-// TODO: Implement migration integrity validation
-// This should check checksums of applied migrations against stored checksums
-func (r *Recovery) ValidateMigrationIntegrity(migrationsDir string, appliedMigrations map[string]string) error {
-	// This would check checksums of applied migrations
-	// For now, return nil (checksum validation is handled elsewhere)
-	return nil
+func (r *Recovery) ValidateMigrationIntegrity(migrationsDir string) (map[uint]string, error) {
+	// Read all migration files and compute their checksums
+	checksums := make(map[uint]string)
+	
+	files, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read migrations directory: %w", err)
+	}
+
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+
+		// Parse version from filename (format: YYYYMMDDHHMMSS_name.up.sql)
+		name := file.Name()
+		if !strings.HasSuffix(name, ".up.sql") {
+			continue
+		}
+
+		var version uint
+		_, err := fmt.Sscanf(name, "%d_", &version)
+		if err != nil {
+			continue
+		}
+
+		// Compute checksum
+		filePath := filepath.Join(migrationsDir, name)
+		checksum, err := computeFileChecksum(filePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compute checksum for %s: %w", name, err)
+		}
+
+		checksums[version] = checksum
+	}
+
+	return checksums, nil
+}
+
+// computeFileChecksum computes SHA256 checksum of a file
+func computeFileChecksum(filePath string) (string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+// CompareChecksums compares current file checksums with stored checksums
+func (r *Recovery) CompareChecksums(migrationsDir string, storedChecksums map[uint]string) ([]uint, error) {
+	currentChecksums, err := r.ValidateMigrationIntegrity(migrationsDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var modified []uint
+	for version, storedChecksum := range storedChecksums {
+		currentChecksum, exists := currentChecksums[version]
+		if !exists {
+			modified = append(modified, version)
+			continue
+		}
+
+		if currentChecksum != storedChecksum {
+			modified = append(modified, version)
+		}
+	}
+
+	return modified, nil
 }
 
 // GetRecoverySteps returns recovery steps for a failed migration
@@ -75,17 +214,115 @@ func (r *Recovery) GetRecoverySteps(version string, errorMsg string) []string {
 }
 
 // RollbackPartialMigration attempts to rollback a partially applied migration
-// TODO: Implement automatic partial migration rollback
-// This should:
-// 1. Detect which statements were successfully executed by parsing database state
-// 2. Execute only the corresponding down statements
-// 3. Handle transaction boundaries correctly
-// 4. Support both transactional and non-transactional migrations
-func (r *Recovery) RollbackPartialMigration(ctx context.Context, version string, downSQL string) error {
-	// This would attempt to execute the down migration
-	// For now, return instructions
-	return fmt.Errorf("partial migration detected - manual rollback required:\n"+
-		"1. Review the down migration SQL for version %s\n"+
-		"2. Execute the down migration manually\n"+
-		"3. Mark migration as clean in schema_migrations table", version)
+func (r *Recovery) RollbackPartialMigration(ctx context.Context, version uint, downSQL string) error {
+	if r.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	// Start a transaction for rollback
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Split downSQL into individual statements
+	statements := splitSQL(downSQL)
+
+	// Execute each statement
+	for i, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		_, err := tx.ExecContext(ctx, stmt)
+		if err != nil {
+			return fmt.Errorf("failed to execute down statement %d: %w\nStatement: %s", i+1, err, stmt)
+		}
+	}
+
+	// Remove the migration from schema_migrations
+	_, err = tx.ExecContext(ctx, `DELETE FROM schema_migrations WHERE version = $1`, version)
+	if err != nil {
+		return fmt.Errorf("failed to remove migration from schema_migrations: %w", err)
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit rollback transaction: %w", err)
+	}
+
+	return nil
+}
+
+// splitSQL splits SQL text into individual statements
+func splitSQL(sql string) []string {
+	// Simple split by semicolon
+	// Note: This is a basic implementation and may not handle all cases
+	// (e.g., semicolons in strings or comments)
+	statements := strings.Split(sql, ";")
+	
+	result := make([]string, 0, len(statements))
+	for _, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt != "" {
+			result = append(result, stmt)
+		}
+	}
+	
+	return result
+}
+
+// ForceCleanState forces the database to a clean state (use with caution!)
+func (r *Recovery) ForceCleanState(ctx context.Context, version uint) error {
+	if r.db == nil {
+		return fmt.Errorf("database connection is nil")
+	}
+
+	query := `UPDATE schema_migrations SET dirty = false WHERE version = $1`
+	result, err := r.db.ExecContext(ctx, query, version)
+	if err != nil {
+		return fmt.Errorf("failed to force clean state: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no migration found with version %d", version)
+	}
+
+	return nil
+}
+
+// GetAppliedMigrations retrieves all applied migrations
+func (r *Recovery) GetAppliedMigrations(ctx context.Context) ([]RecoveryMigrationInfo, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database connection is nil")
+	}
+
+	query := `SELECT version, dirty FROM schema_migrations ORDER BY version ASC`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query applied migrations: %w", err)
+	}
+	defer rows.Close()
+
+	var migrations []RecoveryMigrationInfo
+	for rows.Next() {
+		var m RecoveryMigrationInfo
+		if err := rows.Scan(&m.Version, &m.Dirty); err != nil {
+			return nil, fmt.Errorf("failed to scan migration: %w", err)
+		}
+		migrations = append(migrations, m)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating migrations: %w", err)
+	}
+
+	return migrations, nil
 }

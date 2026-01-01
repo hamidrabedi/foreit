@@ -36,8 +36,8 @@ func NewUpdateBuilder[T any](qs updatableQuerySet[T]) (*UpdateBuilder[T], error)
 	}, nil
 }
 
-// Set sets a field value with type checking
-// Use SetValue for type-safe setting
+// Set sets a field value with type checking (dynamic API)
+// Use SetField for type-safe setting
 func (ub *UpdateBuilder[T]) Set(fieldName string, value interface{}) *UpdateBuilder[T] {
 	// Validate field exists and type matches
 	fieldInfo := ub.schema.GetField(fieldName)
@@ -54,6 +54,21 @@ func (ub *UpdateBuilder[T]) Set(fieldName string, value interface{}) *UpdateBuil
 	}
 
 	ub.updates[fieldName] = value
+	return ub
+}
+
+// SetFieldValue sets a field value using a type-safe FieldExpression (type-safe API)
+// This provides compile-time type checking
+// Usage: SetFieldValue(ub, User.Fields.Email, "new@example.com")
+func SetFieldValue[T any, V any](ub *UpdateBuilder[T], field FieldExpression[V], value V) *UpdateBuilder[T] {
+	// Validate field exists in schema
+	fieldInfo := ub.schema.GetField(field.Path())
+	if fieldInfo == nil {
+		panic(fmt.Sprintf("field %s not found on model", field.Path()))
+	}
+
+	// Type is already validated by FieldExpression[V] generic constraint
+	ub.updates[field.Path()] = value
 	return ub
 }
 

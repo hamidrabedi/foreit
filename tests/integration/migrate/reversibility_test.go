@@ -10,8 +10,9 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/tests/helpers"
+	"github.com/forgego/forge/tests/testhelpers"
 )
 
 // TestMigrationUpDown tests that migrations can be applied and rolled back
@@ -19,7 +20,7 @@ func TestMigrationUpDown(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -27,13 +28,13 @@ func TestMigrationUpDown(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "reversibility_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
@@ -129,7 +130,7 @@ func TestMigrationRollbackSequence(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -137,13 +138,13 @@ func TestMigrationRollbackSequence(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "reversibility_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
@@ -227,7 +228,7 @@ func TestMigrationReapplyAfterRollback(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -235,13 +236,13 @@ func TestMigrationReapplyAfterRollback(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "reversibility_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
@@ -307,7 +308,7 @@ func TestMigrationDownWithData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -315,13 +316,13 @@ func TestMigrationDownWithData(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "reversibility_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))
@@ -381,7 +382,7 @@ func TestMigrationPartialRollback(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -389,13 +390,13 @@ func TestMigrationPartialRollback(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, dsn, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, dsn, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
 
 	// Create a temporary directory for migrations under tests/tmp (returns relative path)
-	tempDir, cleanupTemp := helpers.TempDirInTests(t, "reversibility_")
+	tempDir, cleanupTemp := testhelpers.TempDirInTests(t, "reversibility_")
 	defer cleanupTemp()
 	migrationsDir := filepath.Join(tempDir, "migrations")
 	require.NoError(t, os.MkdirAll(migrationsDir, 0755))

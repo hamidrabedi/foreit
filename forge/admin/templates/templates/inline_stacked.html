@@ -1,44 +1,63 @@
 {{define "inline_stacked"}}
-<div class="inline-group inline-stacked">
-    <h3 class="inline-title">{{.Name}}</h3>
-    
+<div class="inline-group inline-stacked" id="{{.Name}}-group" data-inline-name="{{.Name}}" data-max-num="{{.MaxNum}}">
+    <h3 class="inline-title">{{.Title}}</h3>
+
     <div class="inline-forms">
-        {{range .Instances}}
-            <div class="inline-form">
-                <div class="inline-form-header">
-                    <h4>{{.Label}}</h4>
-                    <input type="checkbox" name="{{$.Name}}-DELETE" value="{{.ID}}">
-                    <label>Delete</label>
-                </div>
-                <div class="inline-form-fields">
-                    {{range $.Fields}}
-                        <div class="form-field">
-                            <label>{{.Label}}</label>
-                            <input type="text" name="{{$.Name}}-{{.Name}}" value="{{.Value}}" class="form-control">
-                        </div>
+        {{range $i, $row := .Rows}}
+        <div class="inline-form {{if $row.Delete}}deleted{{end}}" id="{{$.Name}}-{{$i}}">
+            <div class="inline-form-header">
+                <h4>{{$.Title}} #{{add $i 1}}</h4>
+                <div class="delete-checkbox">
+                    <input type="checkbox" name="{{$.Name}}-{{$i}}-DELETE" id="id_{{$.Name}}-{{$i}}-DELETE"
+                        value="{{$row.ID}}">
+                    <label for="id_{{$.Name}}-{{$i}}-DELETE">Delete</label>
+                    {{if $row.ID}}
+                    <input type="hidden" name="{{$.Name}}-{{$i}}-id" value="{{$row.ID}}">
                     {{end}}
                 </div>
             </div>
+            <div class="inline-form-fields">
+                {{range .Fields}}
+                <div class="form-field">
+                    <label class="form-label">{{.Label}}</label>
+                    <div class="form-widget">
+                        {{.Render}}
+                    </div>
+                    {{if .Errors}}
+                    <ul class="field-errors">
+                        {{range .Errors}}<li>{{.}}</li>{{end}}
+                    </ul>
+                    {{end}}
+                </div>
+                {{end}}
+            </div>
+        </div>
         {{end}}
-        
-        {{range .ExtraForms}}
-            <div class="inline-form empty-form">
-                <div class="inline-form-fields">
-                    {{range $.Fields}}
-                        <div class="form-field">
-                            <label>{{.Label}}</label>
-                            <input type="text" name="{{$.Name}}-{{.Name}}" class="form-control">
-                        </div>
-                    {{end}}
-                </div>
+
+        {{range $i, $row := .ExtraForms}}
+        {{$idx := add (len $.Rows) $i}}
+        <div class="inline-form empty-form" id="{{$.Name}}-{{$idx}}">
+            <div class="inline-form-header">
+                <h4>New {{$.Title}}</h4>
             </div>
+            <div class="inline-form-fields">
+                {{range .Fields}}
+                <div class="form-field">
+                    <label class="form-label">{{.Label}}</label>
+                    <div class="form-widget">
+                        {{.Render}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+        </div>
         {{end}}
     </div>
-    
+
     {{if .CanAddMore}}
-        <button type="button" class="btn btn-sm btn-add-inline" onclick="addInlineForm('{{.Name}}')">
-            Add another {{.Name}}
-        </button>
+    <button type="button" class="btn btn-sm btn-add-inline" onclick="addInlineForm('{{.Name}}')">
+        Add another {{.Title}}
+    </button>
     {{end}}
 </div>
 {{end}}

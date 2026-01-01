@@ -1,13 +1,13 @@
 /**
  * Sidebar configuration for forge documentation
- * Simplified structure with Getting Started and Full Guides
+ * Multi-persona navigation structure for different user types
  */
 
 // @ts-check
 
 /** @type {import('@docusaurus/plugin-content-docs').SidebarsConfig} */
 const sidebars = {
-  // Getting Started sidebar - Concepts, Quick Start, and Core Logic
+  // Getting Started sidebar - For beginners
   gettingStarted: [
     {
       type: 'doc',
@@ -31,6 +31,7 @@ const sidebars = {
         'getting-started/installation',
         'getting-started/hello-world',
         'getting-started/first-api',
+        'getting-started/first-app',
         'getting-started/project-structure',
         'getting-started/quickstart',
       ],
@@ -44,7 +45,7 @@ const sidebars = {
     },
   ],
 
-  // Full Guides sidebar - All guides, API reference, examples, advanced, and contributing
+  // Full Guides sidebar - For practitioners
   fullGuides: [
     {
       type: 'category',
@@ -103,10 +104,21 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'Deep Dives',
+      items: [
+        'deep-dives/architecture',
+        'deep-dives/design-principles',
+        'deep-dives/features-overview',
+        'deep-dives/schema-system',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Contributing',
       items: [
         'contributing/architecture',
         'contributing/development',
+        'contributing/implementations',
         'contributing/changelog',
         'contributing/roadmap',
       ],

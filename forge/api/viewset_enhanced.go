@@ -178,7 +178,7 @@ func (vs *EnhancedBaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get pagination parameters
-	page, pageSize, _ := GetPaginationParams(r, 20)
+	page, pageSize, _ := ParsePaginationParams(r, 20)
 
 	// Get queryset using reflection
 	querysetValue := reflect.ValueOf(vs.Queryset)

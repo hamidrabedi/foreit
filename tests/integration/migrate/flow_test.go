@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/migrate"
-	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/tests/infra/docker"
 	"github.com/forgego/forge/tests/infra/filesystem"
 )

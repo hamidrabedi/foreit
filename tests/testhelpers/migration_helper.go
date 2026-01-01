@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/migrate"
-	"github.com/forgego/forge/orm"
 )
 
 // MigrationInfo represents information about a migration

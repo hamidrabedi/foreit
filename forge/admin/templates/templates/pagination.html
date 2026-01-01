@@ -1,0 +1,26 @@
+{{define "pagination"}}
+<div class="admin-pagination">
+    <span class="pagination-info">
+        Page {{.Page}} of {{.TotalPages}} (Total {{.TotalCount}} items)
+    </span>
+    <nav class="pagination-nav">
+        {{if gt .Page 1}}
+        <a href="?{{set_param $.Request " page" (sub .Page 1)}}" class="btn btn-sm">Previous</a>
+        {{end}}
+
+        <div class="pagination-pages">
+            {{range $i := Iterate .TotalPages}}
+            {{$pageNum := add $i 1}}
+            <a href="?{{set_param $.Request " page" $pageNum}}"
+                class="pagination-link {{if eq $.Page $pageNum}}active{{end}}">
+                {{$pageNum}}
+            </a>
+            {{end}}
+        </div>
+
+        {{if lt .Page .TotalPages}}
+        <a href="?{{set_param $.Request " page" (add .Page 1)}}" class="btn btn-sm">Next</a>
+        {{end}}
+    </nav>
+</div>
+{{end}}

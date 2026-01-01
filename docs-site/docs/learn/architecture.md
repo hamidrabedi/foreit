@@ -67,33 +67,35 @@ forge follows these design principles:
 5. **Security by Default** - Built-in protections
 6. **Code Generation** - AST-based generation for type-safe code
 
-## Architecture Layers
+## System Architecture
+
+### High-Level Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Application                      │
-│  (Schema Definitions, Models, Views, Controllers)        │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Code Generation Layer                        │
-│  (AST Parser → SQL Generation → Go Code Generation)      │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Framework API Layer                          │
-│  (QuerySet, Manager, FieldExpr, QueryExpr)               │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Database Layer                               │
-│  (SQL Builder, Parameter Binding, Transactions)          │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Infrastructure Layer                         │
-│  (HTTP Router, Middleware, Security, Config, Logging)     │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                          │
+│  User Models, Views, Controllers, Routes                      │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  Code Generation Layer                        │
+│  AST Parser → Schema Analysis → Code Generator                │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    Framework API Layer                        │
+│  Admin, API, ORM, Identity, Filter                            │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    Database Layer                             │
+│  SQL Builder, Query Execution, Transactions, Migrations       │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│                  Infrastructure Layer                         │
+│  HTTP Server, Security, Logging, Config, Server               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ## Component Architecture
@@ -332,6 +334,10 @@ type BaseViewSet struct {
 
 ## Next Steps
 
+For complete architecture documentation, see the [Architecture Deep Dive](/docs/deep-dives/architecture).
+
+You may also want to explore:
+- [Design Principles](/docs/deep-dives/design-principles) - Framework design principles
+- [Features Overview](/docs/deep-dives/features-overview) - Complete feature list
 - [API Architecture](/docs/learn/api-architecture) - REST API framework architecture
 - [User System Architecture](/docs/learn/user-system-architecture) - User system design
-- [Schema Architecture](/docs/learn/schema-architecture) - Schema system details

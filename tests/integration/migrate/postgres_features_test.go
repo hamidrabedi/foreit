@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/forgego/forge/tests/helpers"
+	"github.com/forgego/forge/tests/testhelpers"
 )
 
 // TestGINIndexCreation tests creating GIN indexes for JSONB columns
@@ -18,7 +19,7 @@ func TestGINIndexCreation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -26,7 +27,7 @@ func TestGINIndexCreation(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -55,7 +56,7 @@ func TestGiSTIndexCreation(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -63,7 +64,7 @@ func TestGiSTIndexCreation(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -97,7 +98,7 @@ func TestJSONBColumnOperations(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -105,7 +106,7 @@ func TestJSONBColumnOperations(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -169,7 +170,7 @@ func TestArrayColumnTypes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -177,7 +178,7 @@ func TestArrayColumnTypes(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -228,7 +229,7 @@ func TestCustomPostgreSQLTypes(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -236,7 +237,7 @@ func TestCustomPostgreSQLTypes(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -276,7 +277,7 @@ func TestPartialIndex(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -284,7 +285,7 @@ func TestPartialIndex(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -317,7 +318,7 @@ func TestFunctionalIndex(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -325,7 +326,7 @@ func TestFunctionalIndex(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -357,7 +358,7 @@ func TestCoveringIndex(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -365,7 +366,7 @@ func TestCoveringIndex(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -398,7 +399,7 @@ func TestUUIDType(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -406,7 +407,7 @@ func TestUUIDType(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -447,7 +448,7 @@ func TestNumericPrecision(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -455,7 +456,7 @@ func TestNumericPrecision(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()
@@ -497,7 +498,7 @@ func TestTimestampWithTimeZone(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	opts := helpers.PostgresOpts{
+	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
 		Host:      "localhost",
 		Port:      "5432",
@@ -505,7 +506,7 @@ func TestTimestampWithTimeZone(t *testing.T) {
 		Password:  "123",
 		DBName:    fmt.Sprintf("test_%s_%d", t.Name(), time.Now().UnixNano()),
 	}
-	postgresDB, _, cleanup, err := helpers.StartPostgresContainer(ctx, opts)
+	postgresDB, _, cleanup, err := testhelpers.StartPostgresContainer(ctx, opts)
 	require.NoError(t, err)
 	defer cleanup()
 	defer postgresDB.Close()

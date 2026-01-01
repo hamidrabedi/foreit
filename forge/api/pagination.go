@@ -27,8 +27,10 @@ type PaginatedResponse struct {
 	Results  interface{} `json:"results"`
 }
 
-// GetPaginationParams extracts pagination parameters from request
-func GetPaginationParams(r *http.Request, defaultPageSize int) (page, pageSize, offset int) {
+// ParsePaginationParams extracts pagination parameters from an HTTP request.
+// It returns page number, page size, and calculated offset.
+// Invalid values are replaced with defaults.
+func ParsePaginationParams(r *http.Request, defaultPageSize int) (page, pageSize, offset int) {
 	page = forgehttp.GetQueryInt(r, "page", 1)
 	pageSize = forgehttp.GetQueryInt(r, "page_size", defaultPageSize)
 
@@ -47,6 +49,19 @@ func GetPaginationParams(r *http.Request, defaultPageSize int) (page, pageSize, 
 
 	offset = (page - 1) * pageSize
 	return page, pageSize, offset
+}
+
+// GetPaginationParams extracts pagination parameters from request.
+//
+// Deprecated: Use ParsePaginationParams() for clarity (parsing vs getting).
+// GetPaginationParams will be removed in v3.0.
+// Migration:
+//   // Old
+//   page, size, offset := api.GetPaginationParams(r, 20)
+//   // New
+//   page, size, offset := api.ParsePaginationParams(r, 20)
+func GetPaginationParams(r *http.Request, defaultPageSize int) (page, pageSize, offset int) {
+	return ParsePaginationParams(r, defaultPageSize)
 }
 
 // NewPagination creates a new Pagination instance

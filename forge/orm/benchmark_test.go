@@ -98,7 +98,7 @@ func BenchmarkQuerySet_BuildSQL(b *testing.B) {
 	qs = qs.
 		Filter(priceField.Gt(10.0)).
 		Filter(availableField.Eq(true)).
-		OrderBy(NewOrderField("price", false)).
+		OrderBy(Desc("price")).
 		Limit(10).
 		Offset(0)
 
@@ -137,7 +137,7 @@ func BenchmarkQuerySet_Chaining(b *testing.B) {
 		_ = qs.
 			Filter(priceField.Gt(10.0)).
 			Filter(availableField.Eq(true)).
-			OrderBy(NewOrderField("price", false)).
+			OrderBy(Desc("price")).
 			Limit(10).
 			Offset(0)
 	}

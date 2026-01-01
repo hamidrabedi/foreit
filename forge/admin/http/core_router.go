@@ -5,12 +5,14 @@ import (
 	admintemplates "github.com/forgego/forge/admin/templates"
 	"github.com/forgego/forge/server"
 	httplib "github.com/forgego/forge/server"
+	"github.com/gorilla/csrf"
 )
 
 // CoreRouter provides routing for the new core admin system
 type CoreRouter struct {
 	handler  *CoreHandler
 	registry *admin.Registry
+	csrfKey  []byte
 }
 
 // NewCoreRouter creates a new core admin router
@@ -28,12 +30,25 @@ func NewCoreRouter(registry *admin.Registry, templateDir string, sessionManager 
 	return &CoreRouter{
 		handler:  NewCoreHandler(registry, renderer, sessionManager),
 		registry: registry,
+		csrfKey:  []byte("32-byte-long-auth-key-for-admin-"), // Default for dev
 	}
+}
+
+// WithCSRFKey sets the CSRF key
+func (r *CoreRouter) WithCSRFKey(key []byte) *CoreRouter {
+	r.csrfKey = key
+	return r
 }
 
 // RegisterRoutes registers all admin routes on the HTTP router
 func (r *CoreRouter) RegisterRoutes(router *httplib.Router, path string) {
+	// Create CSRF middleware
+	CSRF := csrf.Protect(r.csrfKey, csrf.Path("/"))
+
 	router.Route(path, func(subRouter *httplib.Router) {
+		// Apply CSRF to admin only
+		subRouter.Use(CSRF)
+
 		// Admin index
 		subRouter.Get("/", r.handler.HandleIndex())
 

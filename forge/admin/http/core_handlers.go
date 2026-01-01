@@ -7,10 +7,12 @@ import (
 	"strconv"
 
 	"github.com/forgego/forge/admin"
-	adminutils "github.com/forgego/forge/admin/utils"
 	admintemplates "github.com/forgego/forge/admin/templates"
+	adminutils "github.com/forgego/forge/admin/utils"
+	"github.com/forgego/forge/admin/views"
 	"github.com/forgego/forge/server"
 	httplib "github.com/forgego/forge/server"
+	"github.com/gorilla/csrf"
 )
 
 // CoreHandler provides HTTP handlers for the new core admin system
@@ -29,10 +31,41 @@ func NewCoreHandler(registry *admin.Registry, renderer *admintemplates.Renderer,
 	}
 }
 
+// HandleIndex handles the admin root index page
+func (h *CoreHandler) HandleIndex() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		allAdmins := h.registry.GetAll()
+		models := make([]map[string]interface{}, 0, len(allAdmins))
+		for name := range allAdmins {
+			models = append(models, map[string]interface{}{
+				"Name": name,
+				"URL":  fmt.Sprintf("/admin/%s/", name),
+			})
+		}
+
+		templateData := map[string]interface{}{
+			"Title":     "Admin Dashboard",
+			"SiteTitle": "Admin",
+			"SiteURL":   "/admin",
+			"Models":    models,
+			"User":      h.sessionManager.Get(r, "user"),
+		}
+
+		if r.Header.Get("Accept") == "application/json" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(templateData)
+			return
+		}
+
+		if err := h.renderer.Render(w, "index", templateData); err != nil {
+			http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
+		}
+	}
+}
+
 // HandleList handles list view requests using the new core system
 func (h *CoreHandler) HandleList(modelName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Use type registry to get type-safe admin
 		handler, err := GetAdminHandler(modelName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -40,51 +73,37 @@ func (h *CoreHandler) HandleList(modelName string) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		page := httplib.GetQueryInt(r, "page", 1)
-		pageSize := httplib.GetQueryInt(r, "page_size", 20)
-		search := httplib.GetQueryString(r, "search", "")
+		user := h.sessionManager.Get(r, "user")
 
-		// Get filters from query params
-		filters := make(map[string]interface{})
-		for key, values := range r.URL.Query() {
-			if key != "page" && key != "page_size" && key != "search" {
-				if len(values) > 0 {
-					filters[key] = values[0]
-				}
-			}
-		}
-
-		// Call type-safe handler
-		data, err := handler.HandleList(ctx, page, pageSize, search, filters)
+		data, err := handler.HandleList(ctx, w, r, user)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		// Render template or return JSON based on Accept header
 		if r.Header.Get("Accept") == "application/json" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(data)
 		} else {
-			// Render HTML template
 			h.renderListView(w, r, modelName, data)
 		}
 	}
 }
 
-// renderListView renders the list view template
 func (h *CoreHandler) renderListView(w http.ResponseWriter, r *http.Request, modelName string, data interface{}) {
-	_ = r // May be used for user context later
 	templateData := map[string]interface{}{
-		"Title":      fmt.Sprintf("%s List", modelName),
-		"SiteTitle":  "Admin",
-		"SiteURL":    "/admin",
-		"ModelName":  modelName,
-		"Data":       data,
+		"Title":     fmt.Sprintf("%s List", modelName),
+		"SiteTitle": "Admin",
+		"SiteURL":   "/admin",
+		"ModelName": modelName,
+		"Data":      data,
 		"Breadcrumbs": []map[string]interface{}{
 			{"Label": "Home", "URL": "/admin"},
 			{"Label": modelName, "URL": ""},
 		},
+		"CSRFToken": csrf.TemplateField(r),
+		"User":      h.sessionManager.Get(r, "user"),
+		"Request":   r,
 	}
 
 	if err := h.renderer.Render(w, "list", templateData); err != nil {
@@ -109,7 +128,8 @@ func (h *CoreHandler) HandleDetail(modelName string) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		data, err := handler.HandleDetail(ctx, id)
+		user := h.sessionManager.Get(r, "user")
+		data, err := handler.HandleDetail(ctx, w, r, user, id)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusNotFound)
 			return
@@ -124,23 +144,51 @@ func (h *CoreHandler) HandleDetail(modelName string) http.HandlerFunc {
 	}
 }
 
-// renderDetailView renders the detail view template
 func (h *CoreHandler) renderDetailView(w http.ResponseWriter, r *http.Request, modelName string, id int64, data interface{}) {
 	templateData := map[string]interface{}{
-		"Title":     fmt.Sprintf("%s #%d", modelName, id),
-		"SiteTitle": "Admin",
-		"SiteURL":   "/admin",
-		"ModelName": modelName,
+		"Title":      fmt.Sprintf("%s #%d", modelName, id),
+		"SiteTitle":  "Admin",
+		"SiteURL":    "/admin",
+		"ModelName":  modelName,
 		"InstanceID": id,
-		"Data":      data,
+		"Data":       data,
 		"Breadcrumbs": []map[string]interface{}{
 			{"Label": "Home", "URL": "/admin"},
 			{"Label": modelName, "URL": fmt.Sprintf("/admin/%s/", modelName)},
 			{"Label": fmt.Sprintf("#%d", id), "URL": ""},
 		},
+		"CSRFToken": csrf.TemplateField(r),
+		"User":      h.sessionManager.Get(r, "user"),
 	}
 
 	if err := h.renderer.Render(w, "detail", templateData); err != nil {
+		http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
+	}
+}
+
+func (h *CoreHandler) renderFormView(w http.ResponseWriter, r *http.Request, modelName string, data interface{}, isNew bool) {
+	title := fmt.Sprintf("Change %s", modelName)
+	if isNew {
+		title = fmt.Sprintf("Add %s", modelName)
+	}
+
+	templateData := map[string]interface{}{
+		"Title":     title,
+		"SiteTitle": "Admin",
+		"SiteURL":   "/admin",
+		"ModelName": modelName,
+		"Data":      data,
+		"IsNew":     isNew,
+		"Breadcrumbs": []map[string]interface{}{
+			{"Label": "Home", "URL": "/admin"},
+			{"Label": modelName, "URL": fmt.Sprintf("/admin/%s/", modelName)},
+			{"Label": title, "URL": ""},
+		},
+		"CSRFToken": csrf.TemplateField(r),
+		"User":      h.sessionManager.Get(r, "user"),
+	}
+
+	if err := h.renderer.Render(w, "form", templateData); err != nil {
 		http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
 	}
 }
@@ -156,73 +204,43 @@ func (h *CoreHandler) HandleCreate(modelName string) http.HandlerFunc {
 	}
 }
 
-// handleCreateGet handles GET request for create form
 func (h *CoreHandler) handleCreateGet(w http.ResponseWriter, r *http.Request, modelName string) {
-	_, err := h.registry.Get(modelName)
+	handler, err := GetAdminHandler(modelName)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Model %s not found", modelName), http.StatusNotFound)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	// Use views to render form
-	// This would need to be implemented with proper type handling
-	templateData := map[string]interface{}{
-		"Title":     fmt.Sprintf("Add %s", modelName),
-		"SiteTitle": "Admin",
-		"SiteURL":   "/admin",
-		"ModelName": modelName,
-		"IsNew":     true,
-		"Breadcrumbs": []map[string]interface{}{
-			{"Label": "Home", "URL": "/admin"},
-			{"Label": modelName, "URL": fmt.Sprintf("/admin/%s/", modelName)},
-			{"Label": "Add", "URL": ""},
-		},
-	}
-
-	if err := h.renderer.Render(w, "form", templateData); err != nil {
-		http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
-	}
+	ctx := r.Context()
+	user := h.sessionManager.Get(r, "user")
+	data, _ := handler.HandleCreate(ctx, w, r, user, nil)
+	h.renderFormView(w, r, modelName, data, true)
 }
 
-// handleCreatePost handles POST request for create form
 func (h *CoreHandler) handleCreatePost(w http.ResponseWriter, r *http.Request, modelName string) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-		return
-	}
-
 	handler, err := GetAdminHandler(modelName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	formData := make(map[string]interface{})
-	for key, values := range r.Form {
-		if len(values) > 0 {
-			formData[key] = values[0]
-		}
-	}
-
 	ctx := r.Context()
-	instance, err := handler.HandleCreate(ctx, formData)
+	user := h.sessionManager.Get(r, "user")
+	data, err := handler.HandleCreate(ctx, w, r, user, nil)
 	if err != nil {
-		adminutils.Error(ctx, r, fmt.Sprintf("Failed to create: %v", err))
+		if _, ok := err.(views.ValidationError); ok {
+			h.renderFormView(w, r, modelName, data, true)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Check for ResponseAddHook (using reflection to access hooks)
-	// Note: Full hook integration requires type-safe access which is complex
-	// For now, hooks are called from within views where type is known
-
-	// Show success message
 	adminutils.Success(ctx, r, fmt.Sprintf("%s was added successfully.", modelName))
-
-	// Redirect to detail page
+	instance := adminutils.GetFieldValue(data, "Instance")
 	id := adminutils.GetIDFromInstance(instance)
 	if id > 0 {
-		http.Redirect(w, r, fmt.Sprintf("/admin/%s/%d/", modelName, id), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("/admin/%s/%v/", modelName, id), http.StatusSeeOther)
 	} else {
 		http.Redirect(w, r, fmt.Sprintf("/admin/%s/", modelName), http.StatusSeeOther)
 	}
@@ -246,7 +264,6 @@ func (h *CoreHandler) HandleUpdate(modelName string) http.HandlerFunc {
 	}
 }
 
-// handleUpdateGet handles GET request for update form
 func (h *CoreHandler) handleUpdateGet(w http.ResponseWriter, r *http.Request, modelName string, id int64) {
 	handler, err := GetAdminHandler(modelName)
 	if err != nil {
@@ -255,69 +272,36 @@ func (h *CoreHandler) handleUpdateGet(w http.ResponseWriter, r *http.Request, mo
 	}
 
 	ctx := r.Context()
-	instance, err := handler.HandleDetail(ctx, id)
+	user := h.sessionManager.Get(r, "user")
+	data, err := handler.HandleDetail(ctx, w, r, user, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	templateData := map[string]interface{}{
-		"Title":     fmt.Sprintf("Change %s", modelName),
-		"SiteTitle": "Admin",
-		"SiteURL":   "/admin",
-		"ModelName": modelName,
-		"InstanceID": id,
-		"Instance": instance,
-		"IsNew":     false,
-		"Breadcrumbs": []map[string]interface{}{
-			{"Label": "Home", "URL": "/admin"},
-			{"Label": modelName, "URL": fmt.Sprintf("/admin/%s/", modelName)},
-			{"Label": fmt.Sprintf("#%d", id), "URL": fmt.Sprintf("/admin/%s/%d/", modelName, id)},
-			{"Label": "Change", "URL": ""},
-		},
-	}
-
-	if err := h.renderer.Render(w, "form", templateData); err != nil {
-		http.Error(w, fmt.Sprintf("Template error: %v", err), http.StatusInternalServerError)
-	}
+	h.renderFormView(w, r, modelName, data, false)
 }
 
-// handleUpdatePost handles POST request for update form
 func (h *CoreHandler) handleUpdatePost(w http.ResponseWriter, r *http.Request, modelName string, id int64) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
-		return
-	}
-
 	handler, err := GetAdminHandler(modelName)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	formData := make(map[string]interface{})
-	for key, values := range r.Form {
-		if len(values) > 0 {
-			formData[key] = values[0]
-		}
-	}
-
 	ctx := r.Context()
-	_, err := handler.HandleUpdate(ctx, id, formData)
+	user := h.sessionManager.Get(r, "user")
+	data, err := handler.HandleUpdate(ctx, w, r, user, id, nil)
 	if err != nil {
-		adminutils.Error(ctx, r, fmt.Sprintf("Failed to update: %v", err))
+		if _, ok := err.(views.ValidationError); ok {
+			h.renderFormView(w, r, modelName, data, false)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Check for ResponseChangeHook (using reflection to access hooks)
-	// Note: Full hook integration requires type-safe access which is complex
-	// For now, hooks are called from within views where type is known
-
-	// Show success message
-	adminutils.Success(ctx, r, fmt.Sprintf("%s was changed successfully.", modelName))
-
-	// Redirect to detail page
+	adminutils.Success(ctx, r, fmt.Sprintf("%s was updated successfully.", modelName))
 	http.Redirect(w, r, fmt.Sprintf("/admin/%s/%d/", modelName, id), http.StatusSeeOther)
 }
 
@@ -331,59 +315,37 @@ func (h *CoreHandler) HandleDelete(modelName string) http.HandlerFunc {
 			return
 		}
 
-		handler, err := GetAdminHandler(modelName)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+		if r.Method == http.MethodGet {
+			h.handleDeleteGet(w, r, modelName, id)
+		} else if r.Method == http.MethodPost {
+			h.handleDeletePost(w, r, modelName, id)
 		}
+	}
+}
 
-	ctx := r.Context()
+func (h *CoreHandler) handleDeleteGet(w http.ResponseWriter, r *http.Request, modelName string, id int64) {
+	templateData := map[string]interface{}{
+		"Title":     "Are you sure?",
+		"ModelName": modelName,
+		"ObjectID":  id,
+		"CSRFToken": csrf.TemplateField(r),
+	}
+	h.renderer.Render(w, "delete_confirmation", templateData)
+}
 
-	if err := handler.HandleDelete(ctx, id); err != nil {
-		adminutils.Error(ctx, r, fmt.Sprintf("Failed to delete: %v", err))
+func (h *CoreHandler) handleDeletePost(w http.ResponseWriter, r *http.Request, modelName string, id int64) {
+	handler, err := GetAdminHandler(modelName)
+	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Show success message
-	adminutils.Success(ctx, r, fmt.Sprintf("%s was deleted successfully.", modelName))
+	ctx := r.Context()
+	if err := handler.HandleDelete(ctx, id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	// Redirect to list page
+	adminutils.Success(r.Context(), r, fmt.Sprintf("Successfully deleted %s.", modelName))
 	http.Redirect(w, r, fmt.Sprintf("/admin/%s/", modelName), http.StatusSeeOther)
-	}
-}
-
-// HandleIndex handles admin index/dashboard
-func (h *CoreHandler) HandleIndex() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		allAdmins := h.registry.GetAll()
-
-		models := make([]map[string]interface{}, 0, len(allAdmins))
-		for name, admin := range allAdmins {
-			models = append(models, map[string]interface{}{
-				"name":        name,
-				"verboseName": name,
-				"modelType":   admin.ModelType().String(),
-				"url":         fmt.Sprintf("/admin/%s/", name),
-			})
-		}
-
-		templateData := map[string]interface{}{
-			"Title":     "Admin Dashboard",
-			"SiteTitle": "Admin",
-			"SiteURL":   "/admin",
-			"Models":    models,
-		}
-
-		if r.Header.Get("Accept") == "application/json" {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(templateData)
-		} else {
-			if err := h.renderer.Render(w, "index", templateData); err != nil {
-				// Fallback to JSON if template not found
-				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(templateData)
-			}
-		}
-	}
 }

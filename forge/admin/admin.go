@@ -118,12 +118,10 @@ func (a *Admin[T]) autoConfigureFromSchema() {
 
 	// Auto-configure list display if not set
 	if len(a.config.ListDisplay) == 0 {
-		// Use first few fields that should be displayed
 		fieldMapper := adminschema.NewFieldMapper()
 		for _, field := range a.fields {
 			if fieldMapper.ShouldDisplayInList(field.SchemaField) {
-				// Add to list display (would need to create field expressions)
-				// This is a placeholder - actual implementation would create proper field expressions
+				a.config.ListDisplay = append(a.config.ListDisplay, field.Name)
 			}
 		}
 	}
@@ -133,7 +131,7 @@ func (a *Admin[T]) autoConfigureFromSchema() {
 		// Use string fields for search
 		for _, field := range a.fields {
 			if field.Type == schema.TypeString || field.Type == schema.TypeText || field.Type == schema.TypeEmail {
-				// Add to search fields (would need to create field expressions)
+				a.config.SearchFields = append(a.config.SearchFields, field.Name)
 			}
 		}
 	}

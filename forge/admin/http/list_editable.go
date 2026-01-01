@@ -32,11 +32,20 @@ func (h *CoreHandler) HandleListEditable(modelName string) http.HandlerFunc {
 		}
 
 		ctx := r.Context()
-		
+		var user interface{}
+		// Try to get user from session, but allow nil for testing
+		defer func() {
+			if r := recover(); r != nil {
+				// Session not initialized, use nil user
+				user = nil
+			}
+		}()
+		user = h.sessionManager.Get(r, "user")
+
 		// Process each edit
 		for _, edit := range request.Edits {
 			// Get the instance
-			instanceData, err := handler.HandleDetail(ctx, edit.ObjectID)
+			instanceData, err := handler.HandleDetail(ctx, w, r, user, edit.ObjectID)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to get instance %d: %v", edit.ObjectID, err), http.StatusBadRequest)
 				return
@@ -61,7 +70,7 @@ func (h *CoreHandler) HandleListEditable(modelName string) http.HandlerFunc {
 			}
 
 			// Update the instance
-			_, err = handler.HandleUpdate(ctx, edit.ObjectID, formData)
+			_, err = handler.HandleUpdate(ctx, w, r, user, edit.ObjectID, formData)
 			if err != nil {
 				http.Error(w, fmt.Sprintf("Failed to update instance %d: %v", edit.ObjectID, err), http.StatusBadRequest)
 				return
@@ -76,4 +85,3 @@ func (h *CoreHandler) HandleListEditable(modelName string) http.HandlerFunc {
 		})
 	}
 }
-

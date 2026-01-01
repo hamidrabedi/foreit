@@ -15,3 +15,6 @@ var managerTemplate string
 
 //go:embed templates/queryset.tmpl
 var querysetTemplate string
+
+//go:embed templates/relations.tmpl
+var relationTemplate string

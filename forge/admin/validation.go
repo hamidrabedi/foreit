@@ -3,7 +3,9 @@ package admin
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 
+	"github.com/forgego/forge/schema"
 	validation "github.com/forgego/forge/validate"
 )
 
@@ -11,40 +13,84 @@ import (
 func ValidateForm[T any](admin *Admin[T], instance *T, formData FormData, isNew bool) map[string]string {
 	errors := make(map[string]string)
 
-	// Get form view to validate
-	// Note: This requires views package - using simplified validation for now
-	_ = isNew    // Avoid unused variable
-	_ = admin    // Avoid unused variable
-	_ = instance // Avoid unused variable
-	// formView := NewFormView(admin, instance, isNew)
-	// form := formView.Form()
+	validator := validation.NewValidator()
+	fieldValidator := validation.NewFieldValidator(validator)
 
-	// Validate each field in formData
-	// Simplified validation - check required fields from config
-	for fieldName, value := range formData {
-		_ = value     // Use value in validation
-		_ = fieldName // Use fieldName
-		// Full validation would check against admin config fieldsets
-		// For now, just ensure formData is not empty
-		if value == nil || value == "" {
-			errors[fieldName] = fmt.Sprintf("%s is required", fieldName)
+	// Get all fields
+	discoveredFields := admin.Fields()
+
+	for _, fieldInfo := range discoveredFields {
+		// Skip if AutoNow, AutoNowAdd, AutoIncrement
+		if fieldInfo.AutoNow || fieldInfo.AutoNowAdd || fieldInfo.AutoIncrement {
+			continue
+		}
+
+		// Skip if explicitly ReadOnly in config or schema
+		if fieldInfo.ReadOnly {
+			continue
+		}
+
+		value, exists := formData[fieldInfo.Name]
+
+		if !exists {
+			value = nil
+		} else {
+			// Convert string values to appropriate types for validation
+			value = convertValue(value, fieldInfo.Type)
+		}
+
+		if err := fieldValidator.ValidateField(fieldInfo.SchemaField, value); err != nil {
+			msg := err.Error()
+			// Strip field name prefix if present
+			prefix := fmt.Sprintf("%s: ", fieldInfo.Name)
+			if len(msg) > len(prefix) && msg[:len(prefix)] == prefix {
+				msg = msg[len(prefix):]
+			}
+			errors[fieldInfo.Name] = msg
 		}
 	}
 
 	return errors
 }
 
-// getFieldNameFromFormField extracts field name from FormField
-func getFieldNameFromFormField[T any](field FormField[T]) string {
-	// Access expr field using reflection
-	val := reflect.ValueOf(field)
-	exprField := val.FieldByName("expr")
-	if exprField.IsValid() && exprField.CanInterface() {
-		if expr, ok := exprField.Interface().(FieldExpr[T, interface{}]); ok {
-			return expr.Name()
+// convertValue converts string values to appropriate types for validation
+func convertValue(value interface{}, fieldType schema.FieldType) interface{} {
+	if value == nil {
+		return nil
+	}
+
+	strVal, isString := value.(string)
+	if !isString {
+		return value
+	}
+
+	switch fieldType {
+	case schema.TypeInt64, schema.TypeInt32:
+		if i, err := strconv.ParseInt(strVal, 10, 64); err == nil {
+			if fieldType == schema.TypeInt32 {
+				return int32(i)
+			}
+			return i
+		}
+	case schema.TypeFloat64, schema.TypeFloat32, schema.TypeDecimal:
+		if f, err := strconv.ParseFloat(strVal, 64); err == nil {
+			if fieldType == schema.TypeFloat32 {
+				return float32(f)
+			}
+			return f
+		}
+	case schema.TypeBool:
+		if b, err := strconv.ParseBool(strVal); err == nil {
+			return b
 		}
 	}
-	return "field"
+
+	return value
+}
+
+// getFieldNameFromFormField extracts field name from FormField
+func getFieldNameFromFormField[T any](field FormField[T]) string {
+	return field.Name()
 }
 
 // isFieldRequired checks if field is required

@@ -38,9 +38,24 @@ func (m *Manager[T]) SetDB(database *db.DB) {
 	m.db = database
 }
 
-// GetFieldAccessor returns a field accessor for this model
-func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
+// FieldAccessor returns a field accessor for type-safe field operations.
+// The field accessor provides a way to reference model fields in a type-safe manner
+// for building queries and expressions.
+func (m *Manager[T]) FieldAccessor() (*FieldAccessor[T], error) {
 	return NewFieldAccessor[T]()
+}
+
+// GetFieldAccessor returns a field accessor for this model.
+//
+// Deprecated: Use FieldAccessor() instead (Go convention: getters don't have Get prefix).
+// GetFieldAccessor will be removed in v3.0.
+// Migration:
+//   // Old
+//   fa, err := manager.GetFieldAccessor()
+//   // New
+//   fa, err := manager.FieldAccessor()
+func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
+	return m.FieldAccessor()
 }
 
 // Filter returns a QuerySet for filtering
@@ -51,19 +66,26 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 	}
 
 	if m.db != nil {
-		qs = qs.SetDB(m.db).(QuerySet[T])
+		qs = qs.SetDB(m.db)
 	}
 
 	return qs.Filter(expr), nil
 }
 
-// Get retrieves a model by ID
+// Get retrieves a single model instance by its primary key ID.
+// Returns an error if the instance is not found.
+//
+// This is different from QuerySet.Get() which retrieves from a filtered queryset.
+// Use Manager.Get() when you know the primary key, use QuerySet.Get() when filtering.
+//
+// Example:
+//   user, err := userManager.Get(ctx, 42)  // Get user with ID 42
 func (m *Manager[T]) Get(ctx context.Context, id int64) (*T, error) {
 	if m.db == nil {
 		return nil, errors.NewNotImplementedError("Manager.Get() - database connection not set")
 	}
 
-	fa, err := m.GetFieldAccessor()
+	fa, err := m.FieldAccessor()
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +112,7 @@ func (m *Manager[T]) All(ctx context.Context) ([]*T, error) {
 	}
 
 	if m.db != nil {
-		qs = qs.SetDB(m.db).(QuerySet[T])
+		qs = qs.SetDB(m.db)
 	}
 
 	return qs.All(ctx)
@@ -425,7 +447,7 @@ func (m *Manager[T]) UpdateFields(ctx context.Context, id int64, updates UpdateM
 	}
 
 	// Get QuerySet and use UpdateBuilder
-	fa, err := m.GetFieldAccessor()
+	fa, err := m.FieldAccessor()
 	if err != nil {
 		return err
 	}

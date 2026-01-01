@@ -66,18 +66,27 @@ func NewDB(dsn string) (*DB, error) {
 	return &DB{DB: sqlDB, Driver: "sqlite3"}, nil
 }
 
-// Rebind modifies the query based on the driver
-// specifically mapping Postgres $N placeholders to SQLite ?N
-func (db *DB) Rebind(query string) string {
+// RebindPlaceholders converts PostgreSQL $N placeholders to SQLite ?N format.
+// This is useful when writing database-agnostic code that generates SQL with
+// PostgreSQL-style placeholders but needs to run on SQLite.
+func (db *DB) RebindPlaceholders(query string) string {
 	if db.Driver == "sqlite3" || db.Driver == "sqlite" {
-		// Simple byte-loop replacement efficient enough for SQL strings
-		// or just use regexp? Regexp is cleaner but slower.
-		// Given complexity, let's use regexp in memory.
-		// Actually, we can use a simpler approach if we trust input.
-		// But let's stick to regex to be safe.
 		return rebindPostgresToSQLite(query)
 	}
 	return query
+}
+
+// Rebind modifies the query based on the driver
+// specifically mapping Postgres $N placeholders to SQLite ?N
+//
+// Deprecated: Use RebindPlaceholders() for clarity. Rebind will be removed in v3.0.
+// Migration:
+//   // Old
+//   sql := db.Rebind(query)
+//   // New
+//   sql := db.RebindPlaceholders(query)
+func (db *DB) Rebind(query string) string {
+	return db.RebindPlaceholders(query)
 }
 
 var paramRegex = regexp.MustCompile(`\$([0-9]+)`)

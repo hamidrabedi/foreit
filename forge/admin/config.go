@@ -2,6 +2,11 @@ package admin
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/forgego/forge/orm"
 )
@@ -49,7 +54,8 @@ type Config[T any] struct {
 	GetPrepopulatedFields func(ctx context.Context, instance *T, isNew bool) map[string][]string
 
 	// Related models
-	Inlines []Inline[T, interface{}]
+	Inlines          []Inline[T, interface{}]
+	RelationManagers []interface{} // RelationManager instances
 
 	// Actions
 	Actions []Action[T]
@@ -122,8 +128,8 @@ type FormField[T any] interface {
 
 // Ordering represents field ordering
 type Ordering[T any] struct {
-	field       interface{} // Field name (string) or FieldExpr
-	descending  bool
+	field      interface{} // Field name (string) or FieldExpr
+	descending bool
 }
 
 // OrderBy creates an ordering
@@ -188,7 +194,7 @@ func (f Fieldset[T]) WithDescription(desc string) Fieldset[T] {
 type Inline[T any, R any] struct {
 	model       R
 	manager     *orm.Manager[R]
-	parentField interface{} // Field name (string) or FieldExpr
+	parentField interface{}   // Field name (string) or FieldExpr
 	fields      []interface{} // Field names or FieldExpr
 	extra       int
 	maxNum      int
@@ -272,6 +278,306 @@ func (i Inline[T, R]) GetParentField() interface{} {
 // GetStyle returns the inline style
 func (i Inline[T, R]) GetStyle() InlineStyle {
 	return i.style
+}
+
+// GetInstances returns related instances for a parent
+func (i Inline[T, R]) GetInstances(ctx context.Context, parent *T) ([]interface{}, error) {
+	// Query related instances
+	fieldName := i.GetParentFieldName()
+	if fieldName == "" {
+		return nil, fmt.Errorf("invalid parent field configuration")
+	}
+
+	expr := genericExpression{
+		field: fieldName,
+		op:    orm.OpEquals,
+		value: getID(parent),
+	}
+
+	qs, err := i.manager.Filter(expr)
+	if err != nil {
+		return nil, err
+	}
+
+	instances, err := qs.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]interface{}, len(instances))
+	for idx, inst := range instances {
+		result[idx] = inst
+	}
+	return result, nil
+}
+
+// SaveInstances saves related instances from form data
+func (i Inline[T, R]) SaveInstances(ctx context.Context, parent *T, r *http.Request) error {
+	modelName := i.GetModelName()
+
+	// Determine how many forms were submitted
+	// This is a simplified version of Django's ManagementForm
+	// We iterate through indices until we don't find any more
+	for idx := 0; ; idx++ {
+		prefix := fmt.Sprintf("%s-%d", modelName, idx)
+
+		// Check if this row exists in the form (at least one field or the DELETE checkbox)
+		found := false
+		for key := range r.PostForm {
+			if strings.HasPrefix(key, prefix) {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			break
+		}
+
+		// Check for deletion
+		deleteVal := r.PostFormValue(prefix + "-DELETE")
+		if deleteVal != "" {
+			// If it's an existing instance, delete it
+			idStr := deleteVal
+			if idStr != "" && idStr != "on" { // value might be the ID
+				id, _ := strconv.ParseInt(idStr, 10, 64)
+				if id > 0 {
+					var zero R
+					instance := &zero
+					setID(instance, id)
+					if err := i.manager.Delete(ctx, instance); err != nil {
+						return fmt.Errorf("failed to delete inline instance %d: %w", id, err)
+					}
+				}
+			}
+			continue
+		}
+
+		// Populate instance
+		var zero R
+		instance := &zero
+
+		// Check if it's an existing instance (look for hidden ID field if we had one, or use the DELETE's value)
+		// For now, let's assume we might have a hidden ID field or we can find it in the prefix
+		// Actually, let's look for prefix + "-ID"
+		idField := r.PostFormValue(prefix + "-id")
+		isNew := true
+		if idField != "" {
+			id, _ := strconv.ParseInt(idField, 10, 64)
+			if id > 0 {
+				existing, err := i.manager.Get(ctx, id)
+				if err == nil {
+					instance = existing
+					isNew = false
+				}
+			}
+		}
+
+		// Set parent field
+		parentFieldName := i.GetParentFieldName()
+		if err := setParentField(instance, parentFieldName, parent); err != nil {
+			return fmt.Errorf("failed to set parent field on inline %d: %w", idx, err)
+		}
+
+		// Set other fields from form data
+		fieldsChanged := false
+		for _, field := range i.fields {
+			fieldName := ""
+			if name, ok := field.(string); ok {
+				fieldName = name
+			} else {
+				// Try Name()
+				val := reflect.ValueOf(field)
+				method := val.MethodByName("Name")
+				if method.IsValid() {
+					results := method.Call(nil)
+					if len(results) > 0 {
+						fieldName = results[0].String()
+					}
+				}
+			}
+
+			if fieldName == "" {
+				continue
+			}
+
+			if val, ok := r.PostForm[prefix+"-"+fieldName]; ok && len(val) > 0 {
+				if err := setFieldValue(instance, fieldName, val[0]); err != nil {
+					// Log error or return?
+				}
+				fieldsChanged = true
+			}
+		}
+
+		// Save if it's new, or if it changed (always save for now if not deleting)
+		if isNew {
+			// Only save new if some fields were filled
+			if fieldsChanged {
+				if err := i.manager.Create(ctx, instance); err != nil {
+					return fmt.Errorf("failed to create inline instance %d: %w", idx, err)
+				}
+			}
+		} else {
+			if err := i.manager.Update(ctx, instance); err != nil {
+				return fmt.Errorf("failed to update inline instance %d: %w", idx, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// GetParentFieldName returns the parent field name
+func (i Inline[T, R]) GetParentFieldName() string {
+	if name, ok := i.parentField.(string); ok {
+		return name
+	}
+	// Try reflection for Name() method
+	val := reflect.ValueOf(i.parentField)
+	method := val.MethodByName("Name")
+	if method.IsValid() {
+		results := method.Call(nil)
+		if len(results) > 0 {
+			return results[0].String()
+		}
+	}
+	return ""
+}
+
+// GetModelName returns the name of the related model
+func (i Inline[T, R]) GetModelName() string {
+	var zero R
+	typ := reflect.TypeOf(zero)
+	if typ.Kind() == reflect.Ptr {
+		typ = typ.Elem()
+	}
+	return typ.Name()
+}
+
+// InlineInterface allows type-neutral access to inlines
+type InlineInterface[T any] interface {
+	GetStyle() InlineStyle
+	GetFields() []interface{}
+	GetExtra() int
+	GetMaxNum() int
+	GetInstances(ctx context.Context, parent *T) ([]interface{}, error)
+	SaveInstances(ctx context.Context, parent *T, r *http.Request) error
+	GetModelName() string
+}
+
+// Internal helpers copied from inlines package to avoid circular dependency
+type genericExpression struct {
+	field string
+	op    orm.Operator
+	value interface{}
+}
+
+func (e genericExpression) ToSQL(builder *orm.SQLBuilder) (string, []interface{}, error) {
+	placeholder := builder.AddArg(e.value)
+	return fmt.Sprintf("%s %s %s", orm.EscapeIdentifier(e.field), e.op, placeholder), []interface{}{e.value}, nil
+}
+
+func (e genericExpression) Resolve(schema *orm.ModelSchema) error {
+	return nil
+}
+
+func getID(instance interface{}) interface{} {
+	val := reflect.ValueOf(instance)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return nil
+	}
+	field := val.FieldByName("ID")
+	if !field.IsValid() {
+		field = val.FieldByName("id")
+	}
+	if field.IsValid() {
+		return field.Interface()
+	}
+	return nil
+}
+
+func setID(instance interface{}, id int64) {
+	val := reflect.ValueOf(instance)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return
+	}
+	field := val.FieldByName("ID")
+	if !field.IsValid() {
+		field = val.FieldByName("id")
+	}
+	if field.IsValid() && field.CanSet() {
+		field.SetInt(id)
+	}
+}
+
+func setParentField(instance interface{}, fieldName string, parent interface{}) error {
+	val := reflect.ValueOf(instance)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	field := val.FieldByName(fieldName)
+	if !field.IsValid() {
+		return fmt.Errorf("field %s not found", fieldName)
+	}
+	if !field.CanSet() {
+		return fmt.Errorf("field %s cannot be set", fieldName)
+	}
+
+	parentVal := reflect.ValueOf(parent)
+	if field.Type().Kind() == reflect.Ptr && parentVal.Type().Kind() != reflect.Ptr {
+		parentVal = parentVal.Addr()
+	}
+
+	if parentVal.Type().AssignableTo(field.Type()) {
+		field.Set(parentVal)
+		return nil
+	}
+
+	// If it's an ID field
+	if field.Kind() == reflect.Int64 {
+		parentID := getID(parent)
+		if id, ok := parentID.(int64); ok {
+			field.SetInt(id)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("cannot assign %T to %s (type %v)", parent, fieldName, field.Type())
+}
+
+func setFieldValue(instance interface{}, fieldName string, value string) error {
+	val := reflect.ValueOf(instance)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+	field := val.FieldByName(fieldName)
+	if !field.IsValid() || !field.CanSet() {
+		// Try lowercase
+		field = val.FieldByName(strings.Title(fieldName))
+		if !field.IsValid() || !field.CanSet() {
+			return fmt.Errorf("field %s not found or not settable", fieldName)
+		}
+	}
+
+	switch field.Kind() {
+	case reflect.String:
+		field.SetString(value)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		i, _ := strconv.ParseInt(value, 10, 64)
+		field.SetInt(i)
+	case reflect.Bool:
+		field.SetBool(value == "on" || value == "true")
+	case reflect.Float32, reflect.Float64:
+		f, _ := strconv.ParseFloat(value, 64)
+		field.SetFloat(f)
+	}
+	return nil
 }
 
 // Action represents a bulk action

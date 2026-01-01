@@ -74,7 +74,21 @@ func GetAllModels() map[string]*ModelInfo {
 	return result
 }
 
-// GetRegistry returns the global registry instance
-func GetRegistry() *ModelRegistry {
+// Global returns the global model registry instance.
+// Use this to access the framework's model registry for registration,
+// lookup, and iteration over all registered models.
+func Global() *ModelRegistry {
 	return globalRegistry
+}
+
+// GetRegistry returns the global model registry.
+//
+// Deprecated: Use Global() instead to avoid package name redundancy. GetRegistry will be removed in v3.0.
+// Migration:
+//   // Old
+//   registry := registry.GetRegistry()
+//   // New
+//   registry := registry.Global()
+func GetRegistry() *ModelRegistry {
+	return Global()
 }

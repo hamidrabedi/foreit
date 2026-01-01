@@ -37,7 +37,7 @@ func TestManager_GetFieldAccessor(t *testing.T) {
 	manager, err := NewManager[testModel]("test_table")
 	require.NoError(t, err)
 
-	fa, err := manager.GetFieldAccessor()
+	fa, err := manager.FieldAccessor()
 	require.NoError(t, err)
 	assert.NotNil(t, fa)
 }

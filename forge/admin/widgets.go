@@ -7,6 +7,12 @@ import (
 	"time"
 )
 
+// Choice represents a choice option for select widgets
+type Choice[V any] struct {
+	Value V
+	Label string
+}
+
 // Widget represents a form widget
 type Widget interface {
 	Render(name string, value interface{}, attrs map[string]string) template.HTML

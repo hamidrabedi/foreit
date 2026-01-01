@@ -87,7 +87,7 @@ func TestQuerySet_Integration_OrderBy(t *testing.T) {
 		return
 	}
 
-	ordered := qs.OrderBy(NewOrderField("price", false))
+	ordered := qs.OrderBy(Desc("price"))
 	assert.NotNil(t, ordered)
 
 	// buildSQL is not exported, test through public API
@@ -122,7 +122,7 @@ func TestQuerySet_Integration_ComplexQuery(t *testing.T) {
 	complex := qs.
 		Filter(priceField.Gt(10.0)).
 		Filter(availableField.Eq(true)).
-		OrderBy(NewOrderField("price", false)).
+		OrderBy(Desc("price")).
 		Limit(5)
 
 	assert.NotNil(t, complex)

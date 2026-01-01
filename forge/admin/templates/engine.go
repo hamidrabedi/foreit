@@ -2,9 +2,11 @@ package templates
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -90,6 +92,53 @@ func (e *Engine) registerDefaultFuncs() {
 	e.funcMap["escape"] = template.HTMLEscapeString
 	e.funcMap["safe"] = func(s string) template.HTML {
 		return template.HTML(s)
+	}
+	e.funcMap["set_param"] = func(r *http.Request, key string, value interface{}) string {
+		if r == nil {
+			return ""
+		}
+		q := r.URL.Query()
+		q.Set(key, fmt.Sprintf("%v", value))
+		return q.Encode()
+	}
+	e.funcMap["strip_param"] = func(r *http.Request, key string) string {
+		if r == nil {
+			return ""
+		}
+		q := r.URL.Query()
+		q.Del(key)
+		return q.Encode()
+	}
+	e.funcMap["dict"] = func(values ...interface{}) (map[string]interface{}, error) {
+		if len(values)%2 != 0 {
+			return nil, fmt.Errorf("invalid dict call")
+		}
+		dict := make(map[string]interface{}, len(values)/2)
+		for i := 0; i < len(values); i += 2 {
+			key, ok := values[i].(string)
+			if !ok {
+				return nil, fmt.Errorf("dict keys must be strings")
+			}
+			dict[key] = values[i+1]
+		}
+		return dict, nil
+	}
+	e.funcMap["Iterate"] = func(n int) []int {
+		if n < 0 {
+			return nil
+		}
+		res := make([]int, n)
+		for i := range res {
+			res[i] = i
+		}
+		return res
+	}
+	e.funcMap["json"] = func(v interface{}) (template.JS, error) {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return "", err
+		}
+		return template.JS(b), nil
 	}
 }
 

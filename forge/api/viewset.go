@@ -45,7 +45,7 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Get pagination parameters
-	page, pageSize, _ := GetPaginationParams(r, 20)
+	page, pageSize, _ := ParsePaginationParams(r, 20)
 
 	// Get queryset using reflection
 	querysetValue := reflect.ValueOf(vs.Queryset)

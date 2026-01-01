@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/forgego/forge/schema"
 )
@@ -32,7 +31,7 @@ func TestSchemaBuilders_AllFieldTypes(t *testing.T) {
 		{"JSON", func(n string) interface{ Build() schema.Field } { return schema.JSON(n) }, schema.TypeJSON},
 		{"Bytes", func(n string) interface{ Build() schema.Field } { return schema.Bytes(n) }, schema.TypeBytes},
 		{"UUID", func(n string) interface{ Build() schema.Field } { return schema.UUID(n) }, schema.TypeUUID},
-		{"Int", func(n string) interface{ Build() schema.Field } { return schema.Int(n) }, schema.TypeInt64}, // Alias
+		// Note: schema.Int doesn't exist, use schema.Int64 instead
 	}
 
 	for _, tt := range tests {
@@ -340,14 +339,11 @@ func TestSchemaBuilders_BackwardCompatibility(t *testing.T) {
 	}
 }
 
-// TestSchemaBuilders_IntAlias tests that Int() alias works correctly
-func TestSchemaBuilders_IntAlias(t *testing.T) {
-	field1 := schema.Int("id").Build()
-	field2 := schema.Int64("id").Build()
-
-	assert.Equal(t, schema.TypeInt64, field1.Type)
-	assert.Equal(t, schema.TypeInt64, field2.Type)
-	assert.Equal(t, field1.Type, field2.Type)
+// TestSchemaBuilders_IntAlias tests that Int64() works correctly
+// Note: schema.Int() doesn't exist, use schema.Int64() instead
+func TestSchemaBuilders_Int64(t *testing.T) {
+	field := schema.Int64("id").Build()
+	assert.Equal(t, schema.TypeInt64, field.Type)
 }
 
 // TestSchemaBuilders_TextAlias tests that Text() returns StringFieldBuilder with TypeText

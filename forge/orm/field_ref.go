@@ -6,8 +6,8 @@ type FieldPath interface {
 	Path() string
 }
 
-// extractPathFromAny extracts the field path from any type (string or FieldExpression)
-func extractPathFromAny(field any) string {
+// ExtractPathFromAny extracts the field path from any type (string or FieldExpression)
+func ExtractPathFromAny(field any) string {
 	switch v := field.(type) {
 	case string:
 		return v
@@ -44,6 +44,15 @@ func (o OrderFieldExpr[T]) IsAscending() bool {
 // Field returns the underlying field expression
 func (o OrderFieldExpr[T]) Field() FieldExpression[T] {
 	return o.field
+}
+
+// Path returns the string representation of the ordering (e.g. "-created_at")
+func (o OrderFieldExpr[T]) Path() string {
+	path := o.field.Path()
+	if !o.ascending {
+		return "-" + path
+	}
+	return path
 }
 
 // RelationPath is an interface for types that can provide a relation path string

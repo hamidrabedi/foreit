@@ -2,85 +2,94 @@ package inventory
 
 import (
 	"context"
-	
+
 	"github.com/forgego/forge/admin"
-	"github.com/forgego/forge/db"
 )
 
 // RegisterAdmin registers inventory models with the admin interface
-func RegisterAdmin(ctx context.Context, registry *admin.Registry, database *db.DB) {
+func RegisterAdmin(ctx context.Context) {
 	// Warehouse admin
-	warehouseConfig := &admin.ModelConfig{
-		Name:             "Warehouse",
-		PluralName:       "Warehouses",
-		Icon:             "🏭",
-		ListDisplay:      []string{"id", "name", "code", "city", "country_code", "is_active", "is_primary", "priority"},
-		ListFilter:       []string{"is_active", "is_primary", "country_code"},
-		SearchFields:     []string{"name", "code", "city", "address_line1"},
-		OrderBy:          []string{"-is_primary", "-priority", "name"},
-		PerPage:          20,
-		Actions:          []string{"delete", "activate", "deactivate"},
-		ExportFormats:    []string{"csv", "json"},
-	}
-	registry.Register("Warehouse", &Warehouse{}, warehouseConfig)
-	
+	admin.Register(&admin.Config[Warehouse]{
+		Icon: "Warehouse",
+		ListDisplay: []admin.Field{
+			WarehouseFields.Name,
+			WarehouseFields.Code,
+			WarehouseFields.City,
+			WarehouseFields.CountryCode,
+			WarehouseFields.IsActive,
+			WarehouseFields.IsPrimary,
+		},
+		ListFilter: []admin.Field{
+			WarehouseFields.IsActive,
+			WarehouseFields.IsPrimary,
+			WarehouseFields.CountryCode,
+		},
+	})
+
 	// Stock admin
-	stockConfig := &admin.ModelConfig{
-		Name:             "Stock",
-		PluralName:       "Stock",
-		Icon:             "📊",
-		ListDisplay:      []string{"id", "product_variant_id", "warehouse_id", "quantity", "reserved_quantity", "available_quantity", "reorder_point", "is_active"},
-		ListFilter:       []string{"warehouse_id", "is_active"},
-		SearchFields:     []string{"bin_location"},
-		OrderBy:          []string{"warehouse_id", "quantity"},
-		PerPage:          20,
-		Actions:          []string{"delete", "adjust", "count", "export"},
-		ExportFormats:    []string{"csv", "json", "xlsx"},
-		BulkActions:      true,
-	}
-	registry.Register("Stock", &Stock{}, stockConfig)
-	
+	admin.Register(&admin.Config[Stock]{
+		Icon: "Activity",
+		ListDisplay: []admin.Field{
+			StockFields.ProductVariantID,
+			StockFields.WarehouseID,
+			StockFields.Quantity,
+			StockFields.ReservedQuantity,
+			StockFields.IsActive,
+		},
+		ListFilter: []admin.Field{
+			StockFields.WarehouseID,
+			StockFields.IsActive,
+		},
+	})
+
 	// StockMovement admin
-	movementConfig := &admin.ModelConfig{
-		Name:             "Stock Movement",
-		PluralName:       "Stock Movements",
-		Icon:             "📈",
-		ListDisplay:      []string{"id", "product_variant_id", "warehouse_id", "type", "quantity", "quantity_before", "quantity_after", "reference_number", "movement_date"},
-		ListFilter:       []string{"type", "warehouse_id", "movement_date"},
-		SearchFields:     []string{"reference_number", "reference_type", "reason"},
-		OrderBy:          []string{"-movement_date", "-created_at"},
-		PerPage:          20,
-		Actions:          []string{"export"},
-		ExportFormats:    []string{"csv", "json"},
-	}
-	registry.Register("StockMovement", &StockMovement{}, movementConfig)
-	
+	admin.Register(&admin.Config[StockMovement]{
+		Icon: "TrendingUp",
+		ListDisplay: []admin.Field{
+			StockMovementFields.ProductVariantID,
+			StockMovementFields.WarehouseID,
+			StockMovementFields.Type,
+			StockMovementFields.Quantity,
+			StockMovementFields.MovementDate,
+		},
+		ListFilter: []admin.Field{
+			StockMovementFields.Type,
+			StockMovementFields.WarehouseID,
+			StockMovementFields.MovementDate,
+		},
+	})
+
 	// StockAlert admin
-	alertConfig := &admin.ModelConfig{
-		Name:             "Stock Alert",
-		PluralName:       "Stock Alerts",
-		Icon:             "⚠️",
-		ListDisplay:      []string{"id", "product_variant_id", "warehouse_id", "alert_type", "current_quantity", "threshold", "status", "created_at"},
-		ListFilter:       []string{"alert_type", "status", "warehouse_id"},
-		SearchFields:     []string{"product_variant_id"},
-		OrderBy:          []string{"-created_at"},
-		PerPage:          20,
-		Actions:          []string{"acknowledge", "resolve", "dismiss"},
-		BulkActions:      true,
-	}
-	registry.Register("StockAlert", &StockAlert{}, alertConfig)
-	
+	admin.Register(&admin.Config[StockAlert]{
+		Icon: "AlertTriangle",
+		ListDisplay: []admin.Field{
+			StockAlertFields.ProductVariantID,
+			StockAlertFields.WarehouseID,
+			StockAlertFields.AlertType,
+			StockAlertFields.CurrentQuantity,
+			StockAlertFields.Status,
+		},
+		ListFilter: []admin.Field{
+			StockAlertFields.AlertType,
+			StockAlertFields.Status,
+			StockAlertFields.WarehouseID,
+		},
+	})
+
 	// StockTransfer admin
-	transferConfig := &admin.ModelConfig{
-		Name:             "Stock Transfer",
-		PluralName:       "Stock Transfers",
-		Icon:             "↔️",
-		ListDisplay:      []string{"id", "transfer_number", "from_warehouse_id", "to_warehouse_id", "product_variant_id", "quantity", "status", "created_at"},
-		ListFilter:       []string{"status", "from_warehouse_id", "to_warehouse_id"},
-		SearchFields:     []string{"transfer_number", "tracking_number"},
-		OrderBy:          []string{"-created_at"},
-		PerPage:          20,
-		Actions:          []string{"approve", "ship", "complete", "cancel"},
-	}
-	registry.Register("StockTransfer", &StockTransfer{}, transferConfig)
+	admin.Register(&admin.Config[StockTransfer]{
+		Icon: "Repeat",
+		ListDisplay: []admin.Field{
+			StockTransferFields.TransferNumber,
+			StockTransferFields.FromWarehouseID,
+			StockTransferFields.ToWarehouseID,
+			StockTransferFields.Quantity,
+			StockTransferFields.Status,
+		},
+		ListFilter: []admin.Field{
+			StockTransferFields.Status,
+			StockTransferFields.FromWarehouseID,
+			StockTransferFields.ToWarehouseID,
+		},
+	})
 }

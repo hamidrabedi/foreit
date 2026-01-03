@@ -36,7 +36,7 @@ func (p *ASTParser) ParseDirectory(dir string) ([]*ModelDefinition, error) {
 		}
 
 		// Skip generated files
-		if strings.HasSuffix(path, ".gen.go") {
+		if strings.HasSuffix(path, ".gen.go") || strings.HasSuffix(path, "gen.go") {
 			return nil
 		}
 

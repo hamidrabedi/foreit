@@ -1,9 +1,0 @@
-{{define "inline"}}
-{{if eq .Style "tabular"}}
-{{template "inline_tabular" .}}
-{{else if eq .Style "stacked"}}
-{{template "inline_stacked" .}}
-{{else}}
-{{template "inline_tabular" .}}
-{{end}}
-{{end}}

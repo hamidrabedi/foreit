@@ -2,9 +2,9 @@ package inventory
 
 import (
 	"context"
-	
-	"github.com/forgego/forge/schema"
+
 	"github.com/forgego/forge/registry"
+	"github.com/forgego/forge/schema"
 )
 
 // Warehouse represents a physical warehouse or storage location
@@ -22,22 +22,22 @@ func (Warehouse) Fields() []schema.Field {
 			HelpText("Warehouse code for reference").Build(),
 		
 		// Contact
-		schema.String("contact_name").MaxLength(200).Null().Build(),
-		schema.String("contact_email").MaxLength(255).Null().Build(),
-		schema.String("contact_phone").MaxLength(20).Null().Build(),
+		schema.String("contact_name").MaxLength(200).Optional().Build(),
+		schema.String("contact_email").MaxLength(255).Optional().Build(),
+		schema.String("contact_phone").MaxLength(20).Optional().Build(),
 		
 		// Address
 		schema.String("address_line1").Required().MaxLength(255).Build(),
-		schema.String("address_line2").MaxLength(255).Null().Build(),
+		schema.String("address_line2").MaxLength(255).Optional().Build(),
 		schema.String("city").Required().MaxLength(100).Build(),
-		schema.String("state").MaxLength(100).Null().Build(),
+		schema.String("state").MaxLength(100).Optional().Build(),
 		schema.String("postal_code").Required().MaxLength(20).Build(),
 		schema.String("country_code").Required().MaxLength(2).Build(),
 		schema.String("country_name").Required().MaxLength(100).Build(),
 		
 		// Geolocation
-		schema.Float64("latitude").Null().Build(),
-		schema.Float64("longitude").Null().Build(),
+		schema.Float64("latitude").Optional().Build(),
+		schema.Float64("longitude").Optional().Build(),
 		
 		// Settings
 		schema.Bool("is_active").Default(true).Build(),
@@ -47,7 +47,7 @@ func (Warehouse) Fields() []schema.Field {
 			HelpText("Fulfillment priority (higher = preferred)").Build(),
 		
 		// Capacity
-		schema.Int32("total_capacity").Null().
+		schema.Int32("total_capacity").Optional().
 			HelpText("Total storage capacity (units)").Build(),
 		
 		// Timestamps
@@ -109,7 +109,7 @@ func (Stock) Fields() []schema.Field {
 			HelpText("Quantity to reorder").Build(),
 		
 		// Location
-		schema.String("bin_location").MaxLength(100).Null().
+		schema.String("bin_location").MaxLength(100).Optional().
 			HelpText("Physical location in warehouse (e.g., A-12-3)").Build(),
 		
 		// Status
@@ -119,7 +119,7 @@ func (Stock) Fields() []schema.Field {
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("last_counted_at").Null().
+		schema.Time("last_counted_at").Optional().
 			HelpText("Last physical count").Build(),
 	}
 }
@@ -143,14 +143,14 @@ func (Stock) Meta() schema.Meta {
 
 func (Stock) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_variant_id", "ProductVariant", "product_variant").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("product_variant_id", "ProductVariant").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_records"),
-		schema.ForeignKey("warehouse_id", "Warehouse", "warehouse").
-			OnDelete(schema.Cascade).
+			RelatedName("stock_records").Build(),
+		schema.ForeignKey("warehouse_id", "Warehouse").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_records"),
+			RelatedName("stock_records").Build(),
 	}
 }
 
@@ -192,33 +192,33 @@ func (StockMovement) Fields() []schema.Field {
 			HelpText("Quantity after movement").Build(),
 		
 		// Reference
-		schema.String("reference_type").MaxLength(50).Null().
+		schema.String("reference_type").MaxLength(50).Optional().
 			HelpText("Reference type: order, return, transfer, etc.").Build(),
-		schema.Int64("reference_id").Null().
+		schema.Int64("reference_id").Optional().
 			HelpText("ID of related record (order_id, transfer_id, etc.)").Build(),
-		schema.String("reference_number").MaxLength(100).Null().
+		schema.String("reference_number").MaxLength(100).Optional().
 			HelpText("Human-readable reference number").Build(),
 		
 		// Transfer (if applicable)
-		schema.Int64("from_warehouse_id").Null().
+		schema.Int64("from_warehouse_id").Optional().
 			HelpText("Source warehouse for transfers").Build(),
-		schema.Int64("to_warehouse_id").Null().
+		schema.Int64("to_warehouse_id").Optional().
 			HelpText("Destination warehouse for transfers").Build(),
 		
 		// Additional information
-		schema.String("reason").MaxLength(255).Null().
+		schema.String("reason").MaxLength(255).Optional().
 			HelpText("Reason for movement").Build(),
-		schema.Text("notes").Null().Build(),
+		schema.Text("notes").Optional().Build(),
 		
 		// User tracking
-		schema.Int64("user_id").Null().
+		schema.Int64("user_id").Optional().
 			HelpText("User who performed the movement").Build(),
-		schema.String("user_name").MaxLength(200).Null().Build(),
+		schema.String("user_name").MaxLength(200).Optional().Build(),
 		
 		// Cost (for accounting)
-		schema.Float64("unit_cost").Null().
+		schema.Float64("unit_cost").Optional().
 			HelpText("Cost per unit at time of movement").Build(),
-		schema.Float64("total_cost").Null().
+		schema.Float64("total_cost").Optional().
 			HelpText("Total cost of movement").Build(),
 		
 		// Timestamps
@@ -247,26 +247,26 @@ func (StockMovement) Meta() schema.Meta {
 
 func (StockMovement) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("stock_id", "Stock", "stock").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("stock_id", "Stock").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("movements"),
-		schema.ForeignKey("product_variant_id", "ProductVariant", "product_variant").
-			OnDelete(schema.Cascade).
+			RelatedName("movements").Build(),
+		schema.ForeignKey("product_variant_id", "ProductVariant").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_movements"),
-		schema.ForeignKey("warehouse_id", "Warehouse", "warehouse").
-			OnDelete(schema.Cascade).
+			RelatedName("stock_movements").Build(),
+		schema.ForeignKey("warehouse_id", "Warehouse").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_movements"),
-		schema.ForeignKey("from_warehouse_id", "Warehouse", "from_warehouse").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("outbound_transfers"),
-		schema.ForeignKey("to_warehouse_id", "Warehouse", "to_warehouse").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("inbound_transfers"),
+			RelatedName("stock_movements").Build(),
+		schema.ForeignKey("from_warehouse_id", "Warehouse").
+			OnDelete(schema.CascadeSET_NULL).
+			Optional().
+			RelatedName("outbound_transfers").Build(),
+		schema.ForeignKey("to_warehouse_id", "Warehouse").
+			OnDelete(schema.CascadeSET_NULL).
+			Optional().
+			RelatedName("inbound_transfers").Build(),
 	}
 }
 
@@ -310,19 +310,19 @@ func (StockAlert) Fields() []schema.Field {
 			HelpText("Status: active, acknowledged, resolved, dismissed").Build(),
 		
 		// Resolution
-		schema.Int64("resolved_by_user_id").Null().Build(),
-		schema.String("resolved_by_user_name").MaxLength(200).Null().Build(),
-		schema.Text("resolution_notes").Null().Build(),
+		schema.Int64("resolved_by_user_id").Optional().Build(),
+		schema.String("resolved_by_user_name").MaxLength(200).Optional().Build(),
+		schema.Text("resolution_notes").Optional().Build(),
 		
 		// Notification
 		schema.Bool("notification_sent").Default(false).Build(),
-		schema.Time("notification_sent_at").Null().Build(),
+		schema.Time("notification_sent_at").Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("acknowledged_at").Null().Build(),
-		schema.Time("resolved_at").Null().Build(),
+		schema.Time("acknowledged_at").Optional().Build(),
+		schema.Time("resolved_at").Optional().Build(),
 	}
 }
 
@@ -344,18 +344,18 @@ func (StockAlert) Meta() schema.Meta {
 
 func (StockAlert) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("stock_id", "Stock", "stock").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("stock_id", "Stock").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("alerts"),
-		schema.ForeignKey("product_variant_id", "ProductVariant", "product_variant").
-			OnDelete(schema.Cascade).
+			RelatedName("alerts").Build(),
+		schema.ForeignKey("product_variant_id", "ProductVariant").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_alerts"),
-		schema.ForeignKey("warehouse_id", "Warehouse", "warehouse").
-			OnDelete(schema.Cascade).
+			RelatedName("stock_alerts").Build(),
+		schema.ForeignKey("warehouse_id", "Warehouse").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("stock_alerts"),
+			RelatedName("stock_alerts").Build(),
 	}
 }
 
@@ -393,25 +393,25 @@ func (StockTransfer) Fields() []schema.Field {
 			HelpText("Status: pending, in_transit, completed, cancelled").Build(),
 		
 		// Tracking
-		schema.String("tracking_number").MaxLength(255).Null().Build(),
-		schema.String("carrier").MaxLength(100).Null().Build(),
+		schema.String("tracking_number").MaxLength(255).Optional().Build(),
+		schema.String("carrier").MaxLength(100).Optional().Build(),
 		
 		// Notes
-		schema.Text("notes").Null().Build(),
-		schema.Text("reason").Null().Build(),
+		schema.Text("notes").Optional().Build(),
+		schema.Text("reason").Optional().Build(),
 		
 		// User tracking
-		schema.Int64("requested_by_user_id").Null().Build(),
-		schema.String("requested_by_user_name").MaxLength(200).Null().Build(),
-		schema.Int64("approved_by_user_id").Null().Build(),
-		schema.String("approved_by_user_name").MaxLength(200).Null().Build(),
+		schema.Int64("requested_by_user_id").Optional().Build(),
+		schema.String("requested_by_user_name").MaxLength(200).Optional().Build(),
+		schema.Int64("approved_by_user_id").Optional().Build(),
+		schema.String("approved_by_user_name").MaxLength(200).Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("shipped_at").Null().Build(),
-		schema.Time("completed_at").Null().Build(),
-		schema.Time("cancelled_at").Null().Build(),
+		schema.Time("shipped_at").Optional().Build(),
+		schema.Time("completed_at").Optional().Build(),
+		schema.Time("cancelled_at").Optional().Build(),
 	}
 }
 
@@ -433,18 +433,18 @@ func (StockTransfer) Meta() schema.Meta {
 
 func (StockTransfer) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("from_warehouse_id", "Warehouse", "from_warehouse").
-			OnDelete(schema.Protect).
+		schema.ForeignKey("from_warehouse_id", "Warehouse").
+			OnDelete(schema.CascadePROTECT).
 			Required().
-			RelatedName("outbound_stock_transfers"),
-		schema.ForeignKey("to_warehouse_id", "Warehouse", "to_warehouse").
-			OnDelete(schema.Protect).
+			RelatedName("outbound_stock_transfers").Build(),
+		schema.ForeignKey("to_warehouse_id", "Warehouse").
+			OnDelete(schema.CascadePROTECT).
 			Required().
-			RelatedName("inbound_stock_transfers"),
-		schema.ForeignKey("product_variant_id", "ProductVariant", "product_variant").
-			OnDelete(schema.Protect).
+			RelatedName("inbound_stock_transfers").Build(),
+		schema.ForeignKey("product_variant_id", "ProductVariant").
+			OnDelete(schema.CascadePROTECT).
 			Required().
-			RelatedName("transfers"),
+			RelatedName("transfers").Build(),
 	}
 }
 

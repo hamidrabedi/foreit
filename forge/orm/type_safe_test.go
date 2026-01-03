@@ -20,15 +20,15 @@ func TestUnifiedAPI(t *testing.T) {
 	// Test that RelationExpression implements RelationPath
 	var _ RelationPath = NewRelationExpression("author")
 
-	// Test extractPathFromAny with string
-	if path := extractPathFromAny("name"); path != "name" {
-		t.Errorf("extractPathFromAny(string) = %v, want %v", path, "name")
+	// Test ExtractPathFromAny with string
+	if path := ExtractPathFromAny("name"); path != "name" {
+		t.Errorf("ExtractPathFromAny(string) = %v, want %v", path, "name")
 	}
 
-	// Test extractPathFromAny with FieldExpression
+	// Test ExtractPathFromAny with FieldExpression
 	field := NewField[string]("email", "users")
-	if path := extractPathFromAny(field); path != "email" {
-		t.Errorf("extractPathFromAny(FieldExpression) = %v, want %v", path, "email")
+	if path := ExtractPathFromAny(field); path != "email" {
+		t.Errorf("ExtractPathFromAny(FieldExpression) = %v, want %v", path, "email")
 	}
 
 	// Test extractOrderFieldPath with OrderField

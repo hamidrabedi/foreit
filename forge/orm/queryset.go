@@ -297,7 +297,7 @@ func (qs *BaseQuerySet[T]) Distinct(fields ...any) QuerySet[T] {
 	if len(fields) > 0 {
 		paths := make([]string, len(fields))
 		for i, field := range fields {
-			paths[i] = extractPathFromAny(field)
+			paths[i] = ExtractPathFromAny(field)
 		}
 		clone.distinctFields = paths
 	} else {
@@ -311,7 +311,7 @@ func (qs *BaseQuerySet[T]) Select(fields ...any) QuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(fields))
 	for i, field := range fields {
-		paths[i] = extractPathFromAny(field)
+		paths[i] = ExtractPathFromAny(field)
 	}
 	clone.selectFields = paths
 	return clone
@@ -322,7 +322,7 @@ func (qs *BaseQuerySet[T]) Only(fields ...any) QuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(fields))
 	for i, field := range fields {
-		paths[i] = extractPathFromAny(field)
+		paths[i] = ExtractPathFromAny(field)
 	}
 	clone.onlyFields = paths
 	return clone
@@ -333,7 +333,7 @@ func (qs *BaseQuerySet[T]) Defer(fields ...any) QuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(fields))
 	for i, field := range fields {
-		paths[i] = extractPathFromAny(field)
+		paths[i] = ExtractPathFromAny(field)
 	}
 	clone.deferFields = paths
 	return clone
@@ -384,7 +384,7 @@ func (qs *BaseQuerySet[T]) Values(fields ...any) ValuesQuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(fields))
 	for i, field := range fields {
-		paths[i] = extractPathFromAny(field)
+		paths[i] = ExtractPathFromAny(field)
 	}
 	clone.selectFields = paths
 	return &BaseValuesQuerySet[T]{base: clone}
@@ -395,7 +395,7 @@ func (qs *BaseQuerySet[T]) ValuesList(fields ...any) ValuesListQuerySet[T] {
 	clone := qs.clone()
 	paths := make([]string, len(fields))
 	for i, field := range fields {
-		paths[i] = extractPathFromAny(field)
+		paths[i] = ExtractPathFromAny(field)
 	}
 	clone.selectFields = paths
 	return &BaseValuesListQuerySet[T]{base: clone}

@@ -2,9 +2,9 @@ package marketing
 
 import (
 	"context"
-	
-	"github.com/forgego/forge/schema"
+
 	"github.com/forgego/forge/registry"
+	"github.com/forgego/forge/schema"
 )
 
 // Coupon represents discount codes and promotions
@@ -21,7 +21,7 @@ func (Coupon) Fields() []schema.Field {
 			HelpText("Coupon code (e.g., SAVE20)").Build(),
 		schema.String("name").Required().MaxLength(200).
 			HelpText("Internal name for coupon").Build(),
-		schema.Text("description").Null().
+		schema.Text("description").Optional().
 			HelpText("Description shown to customers").Build(),
 		
 		// Discount type
@@ -31,13 +31,13 @@ func (Coupon) Fields() []schema.Field {
 			HelpText("Discount value (percentage or fixed amount)").Build(),
 		
 		// Constraints
-		schema.Float64("minimum_purchase_amount").Null().
+		schema.Float64("minimum_purchase_amount").Optional().
 			HelpText("Minimum cart value to apply coupon").Build(),
-		schema.Float64("maximum_discount_amount").Null().
+		schema.Float64("maximum_discount_amount").Optional().
 			HelpText("Cap on discount amount for percentage coupons").Build(),
 		
 		// Usage limits
-		schema.Int32("usage_limit").Null().
+		schema.Int32("usage_limit").Optional().
 			HelpText("Total number of times coupon can be used (null = unlimited)").Build(),
 		schema.Int32("usage_limit_per_customer").Default(1).
 			HelpText("Max uses per customer").Build(),
@@ -46,23 +46,23 @@ func (Coupon) Fields() []schema.Field {
 		
 		// Applicability
 		schema.Bool("applies_to_all_products").Default(true).Build(),
-		schema.String("product_ids").MaxLength(500).Null().
+		schema.String("product_ids").MaxLength(500).Optional().
 			HelpText("Comma-separated product IDs (if not all products)").Build(),
-		schema.String("category_ids").MaxLength(500).Null().
+		schema.String("category_ids").MaxLength(500).Optional().
 			HelpText("Comma-separated category IDs").Build(),
-		schema.String("excluded_product_ids").MaxLength(500).Null().Build(),
+		schema.String("excluded_product_ids").MaxLength(500).Optional().Build(),
 		
 		// Customer restrictions
 		schema.Bool("applies_to_all_customers").Default(true).Build(),
-		schema.String("customer_group_ids").MaxLength(500).Null().
+		schema.String("customer_group_ids").MaxLength(500).Optional().
 			HelpText("Comma-separated customer group IDs").Build(),
-		schema.String("customer_email_list").Text().Null().
+		schema.Text("customer_email_list").Optional().
 			HelpText("Specific email addresses (one per line)").Build(),
 		
 		// Validity period
 		schema.Time("valid_from").Required().
 			HelpText("Start date/time").Build(),
-		schema.Time("valid_until").Null().
+		schema.Time("valid_until").Optional().
 			HelpText("End date/time (null = no expiry)").Build(),
 		
 		// Status
@@ -145,18 +145,18 @@ func (CouponUsage) Meta() schema.Meta {
 
 func (CouponUsage) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("coupon_id", "Coupon", "coupon").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("coupon_id", "Coupon").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("usage_records"),
-		schema.ForeignKey("order_id", "Order", "order").
-			OnDelete(schema.Cascade).
+			RelatedName("usage_records").Build(),
+		schema.ForeignKey("order_id", "Order").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("coupon_usage"),
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Cascade).
+			RelatedName("coupon_usage").Build(),
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("coupon_usage"),
+			RelatedName("coupon_usage").Build(),
 	}
 }
 
@@ -179,7 +179,7 @@ func (Review) Fields() []schema.Field {
 		schema.Int64("id").Primary().AutoIncrement().Build(),
 		schema.Int64("product_id").Required().Build(),
 		schema.Int64("customer_id").Required().Build(),
-		schema.Int64("order_id").Null().
+		schema.Int64("order_id").Optional().
 			HelpText("Order where product was purchased (verified purchase)").Build(),
 		
 		// Review content
@@ -206,21 +206,21 @@ func (Review) Fields() []schema.Field {
 		schema.Int32("not_helpful_count").Default(0).Build(),
 		
 		// Response
-		schema.Text("merchant_response").Null().
+		schema.Text("merchant_response").Optional().
 			HelpText("Response from store owner").Build(),
-		schema.Time("merchant_response_at").Null().Build(),
-		schema.Int64("merchant_response_by_user_id").Null().Build(),
+		schema.Time("merchant_response_at").Optional().Build(),
+		schema.Int64("merchant_response_by_user_id").Optional().Build(),
 		
 		// Reporting
 		schema.Int32("report_count").Default(0).
 			HelpText("Number of times review was reported").Build(),
-		schema.Text("report_reasons").Null().
+		schema.Text("report_reasons").Optional().
 			HelpText("Reasons for reports (JSON)").Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("approved_at").Null().Build(),
+		schema.Time("approved_at").Optional().Build(),
 	}
 }
 
@@ -246,18 +246,18 @@ func (Review) Meta() schema.Meta {
 
 func (Review) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_id", "Product", "product").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("product_id", "Product").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("reviews"),
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Cascade).
+			RelatedName("reviews").Build(),
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("reviews"),
-		schema.ForeignKey("order_id", "Order", "order").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("reviews"),
+			RelatedName("reviews").Build(),
+		schema.ForeignKey("order_id", "Order").
+			OnDelete(schema.CascadeSET_NULL).
+			Optional().
+			RelatedName("reviews").Build(),
 	}
 }
 
@@ -292,8 +292,8 @@ func (ReviewImage) Fields() []schema.Field {
 		schema.Int64("review_id").Required().Build(),
 		
 		schema.String("image_url").Required().MaxLength(500).Build(),
-		schema.String("thumbnail_url").MaxLength(500).Null().Build(),
-		schema.String("alt_text").MaxLength(255).Null().Build(),
+		schema.String("thumbnail_url").MaxLength(500).Optional().Build(),
+		schema.String("alt_text").MaxLength(255).Optional().Build(),
 		
 		schema.Int32("sort_order").Default(0).Build(),
 		
@@ -315,10 +315,10 @@ func (ReviewImage) Meta() schema.Meta {
 
 func (ReviewImage) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("review_id", "Review", "review").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("review_id", "Review").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("images"),
+			RelatedName("images").Build(),
 	}
 }
 
@@ -335,12 +335,12 @@ func (ReviewHelpfulness) Fields() []schema.Field {
 	return []schema.Field{
 		schema.Int64("id").Primary().AutoIncrement().Build(),
 		schema.Int64("review_id").Required().Build(),
-		schema.Int64("customer_id").Null().Build(),
+		schema.Int64("customer_id").Optional().Build(),
 		
 		schema.Bool("is_helpful").Required().
 			HelpText("True = helpful, False = not helpful").Build(),
 		
-		schema.String("ip_address").MaxLength(45).Null().
+		schema.String("ip_address").MaxLength(45).Optional().
 			HelpText("For anonymous votes").Build(),
 		
 		schema.Time("created_at").AutoNowAdd().Build(),
@@ -366,14 +366,14 @@ func (ReviewHelpfulness) Meta() schema.Meta {
 
 func (ReviewHelpfulness) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("review_id", "Review", "review").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("review_id", "Review").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("helpfulness_votes"),
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Cascade).
-			Null().
-			RelatedName("review_helpfulness_votes"),
+			RelatedName("helpfulness_votes").Build(),
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadeCASCADE).
+			Optional().
+			RelatedName("review_helpfulness_votes").Build(),
 	}
 }
 
@@ -401,10 +401,10 @@ func (ProductQuestion) Fields() []schema.Field {
 		schema.Text("question").Required().Build(),
 		
 		// Answer
-		schema.Text("answer").Null().Build(),
-		schema.Time("answered_at").Null().Build(),
-		schema.Int64("answered_by_user_id").Null().Build(),
-		schema.String("answered_by_user_name").MaxLength(200).Null().Build(),
+		schema.Text("answer").Optional().Build(),
+		schema.Time("answered_at").Optional().Build(),
+		schema.Int64("answered_by_user_id").Optional().Build(),
+		schema.String("answered_by_user_name").MaxLength(200).Optional().Build(),
 		
 		// Status
 		schema.String("status").Required().MaxLength(20).Default("pending").
@@ -436,14 +436,14 @@ func (ProductQuestion) Meta() schema.Meta {
 
 func (ProductQuestion) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_id", "Product", "product").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("product_id", "Product").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("questions"),
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Cascade).
+			RelatedName("questions").Build(),
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("questions"),
+			RelatedName("questions").Build(),
 	}
 }
 

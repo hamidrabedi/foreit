@@ -1,8 +1,0 @@
-{{define "notifications"}}
-<!-- Flash messages container (hidden, will be processed by JavaScript) -->
-{{if .Messages}}
-{{range .Messages}}
-<div data-flash-message="{{.Message}}" data-flash-type="{{.Level}}" style="display: none;"></div>
-{{end}}
-{{end}}
-{{end}}

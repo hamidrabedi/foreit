@@ -24,9 +24,9 @@ Before installing forge, make sure you have:
 
 ## Install forge CLI
 
-The forge CLI tool is used to create projects, generate code, run migrations, and start your development server.
+The forge CLI tool is your main interface for creating projects, generating code, running migrations, and starting your development server.
 
-### Option 1: Build from Source
+### Option 1: Build from Source (Recommended for development)
 
 Clone the repository and build:
 
@@ -36,7 +36,11 @@ cd forge/newforge
 go build -o forge ./cli/cmd
 ```
 
-Add `forge` to your PATH, or use it directly from the build directory.
+Add `forge` to your PATH:
+```bash
+# Add to your shell profile (~/.bashrc, ~/.zshrc, etc.)
+export PATH="$PATH:/path/to/forge/newforge"
+```
 
 ### Option 2: Install via go install
 
@@ -46,15 +50,20 @@ go install github.com/forgego/forge/newforge/cli/cmd@latest
 
 Make sure `$GOPATH/bin` or `$HOME/go/bin` is in your PATH.
 
+### Option 3: Download Binary (Coming Soon)
+
+We'll have pre-built binaries available for download soon.
+
 ### Verify Installation
 
 Check that forge is installed correctly:
 
 ```bash
 forge --version
+forge help
 ```
 
-You should see the version number.
+You should see the version number and available commands.
 
 ## Set Up PostgreSQL
 

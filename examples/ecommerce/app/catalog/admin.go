@@ -4,111 +4,141 @@ import (
 	"context"
 
 	"github.com/forgego/forge/admin"
-	"github.com/forgego/forge/db"
 )
 
 // RegisterAdmin registers catalog models with the admin interface
-func RegisterAdmin(ctx context.Context, registry *admin.Registry, database *db.DB) {
+func RegisterAdmin(ctx context.Context) {
 	// Category admin
-	categoryConfig := &admin.ModelConfig{
-		Name:          "Category",
-		PluralName:    "Categories",
-		Icon:          "📁",
-		ListDisplay:   []string{"id", "name", "parent_id", "sort_order", "is_active", "created_at"},
-		ListFilter:    []string{"is_active", "parent_id", "level"},
-		SearchFields:  []string{"name", "slug", "description"},
-		OrderBy:       []string{"sort_order", "name"},
-		PerPage:       20,
-		Actions:       []string{"delete", "activate", "deactivate"},
-		ExportFormats: []string{"csv", "json"},
-	}
-	registry.Register("Category", &Category{}, categoryConfig)
+	admin.Register(&admin.Config[Category]{
+		Icon: "FolderTree",
+		ListDisplay: []admin.Field{
+			CategoryFields.Name,
+			CategoryFields.ParentID,
+			CategoryFields.SortOrder,
+			CategoryFields.IsActive,
+			CategoryFields.CreatedAt,
+		},
+		ListFilter: []admin.Field{
+			CategoryFields.IsActive,
+			CategoryFields.ParentID,
+			CategoryFields.Level,
+		},
+		SearchFields: []admin.Field{
+			CategoryFields.Name,
+			CategoryFields.Slug,
+			CategoryFields.Description,
+		},
+		Ordering: []admin.Field{
+			CategoryFields.SortOrder,
+			CategoryFields.Name,
+		},
+	})
 
 	// Brand admin
-	brandConfig := &admin.ModelConfig{
-		Name:          "Brand",
-		PluralName:    "Brands",
-		Icon:          "🏷️",
-		ListDisplay:   []string{"id", "name", "slug", "website_url", "is_active", "created_at"},
-		ListFilter:    []string{"is_active"},
-		SearchFields:  []string{"name", "slug", "description"},
-		OrderBy:       []string{"name"},
-		PerPage:       20,
-		Actions:       []string{"delete", "activate", "deactivate"},
-		ExportFormats: []string{"csv", "json"},
-	}
-	registry.Register("Brand", &Brand{}, brandConfig)
+	admin.Register(&admin.Config[Brand]{
+		Icon: "Tag",
+		ListDisplay: []admin.Field{
+			BrandFields.Name,
+			BrandFields.Slug,
+			BrandFields.WebsiteURL,
+			BrandFields.IsActive,
+			BrandFields.CreatedAt,
+		},
+		ListFilter: []admin.Field{
+			BrandFields.IsActive,
+		},
+		SearchFields: []admin.Field{
+			BrandFields.Name,
+			BrandFields.Slug,
+			BrandFields.Description,
+		},
+		Ordering: []admin.Field{
+			BrandFields.Name,
+		},
+	})
 
 	// Product admin
-	productConfig := &admin.ModelConfig{
-		Name:          "Product",
-		PluralName:    "Products",
-		Icon:          "📦",
-		ListDisplay:   []string{"id", "name", "sku", "price", "category_id", "brand_id", "stock_quantity", "is_active", "created_at"},
-		ListFilter:    []string{"is_active", "is_featured", "category_id", "brand_id"},
-		SearchFields:  []string{"name", "sku", "description"},
-		OrderBy:       []string{"-created_at"},
-		PerPage:       20,
-		Actions:       []string{"delete", "activate", "deactivate", "feature", "unfeature", "export"},
-		ExportFormats: []string{"csv", "json", "xml"},
-		BulkActions:   true,
-	}
-	registry.Register("Product", &Product{}, productConfig)
+	admin.Register(&admin.Config[Product]{
+		Icon: "Package",
+		ListDisplay: []admin.Field{
+			ProductFields.Name,
+			ProductFields.SKU,
+			ProductFields.Price,
+			ProductFields.StockQuantity,
+			ProductFields.IsActive,
+			ProductFields.CreatedAt,
+		},
+		ListFilter: []admin.Field{
+			ProductFields.IsActive,
+			ProductFields.IsFeatured,
+			ProductFields.CategoryID,
+			ProductFields.BrandID,
+		},
+		SearchFields: []admin.Field{
+			ProductFields.Name,
+			ProductFields.SKU,
+			ProductFields.Description,
+		},
+		Ordering: []admin.Field{
+			ProductFields.CreatedAt.Desc(),
+		},
+		Actions: []admin.Action[Product]{
+			{
+				Name:  "activate",
+				Label: "Activate Products",
+				Handler: func(ctx context.Context, instances []*Product) error {
+					for _, p := range instances {
+						p.IsActive = true
+						// Save would be handled by a manager call or similar depending on ORM context
+					}
+					return nil
+				},
+			},
+			{
+				Name:  "deactivate",
+				Label: "Deactivate Products",
+				Handler: func(ctx context.Context, instances []*Product) error {
+					for _, p := range instances {
+						p.IsActive = false
+					}
+					return nil
+				},
+			},
+		},
+	})
 
 	// ProductVariant admin
-	variantConfig := &admin.ModelConfig{
-		Name:          "Product Variant",
-		PluralName:    "Product Variants",
-		Icon:          "🔖",
-		ListDisplay:   []string{"id", "product_id", "name", "sku", "price", "stock_quantity", "is_active"},
-		ListFilter:    []string{"is_active", "product_id"},
-		SearchFields:  []string{"name", "sku"},
-		OrderBy:       []string{"product_id", "sort_order"},
-		PerPage:       20,
-		Actions:       []string{"delete", "activate", "deactivate"},
-		ExportFormats: []string{"csv", "json"},
-	}
-	registry.Register("ProductVariant", &ProductVariant{}, variantConfig)
+	admin.Register(&admin.Config[ProductVariant]{
+		Icon: "Layers",
+		ListDisplay: []admin.Field{
+			ProductVariantFields.Name,
+			ProductVariantFields.SKU,
+			ProductVariantFields.Price,
+			ProductVariantFields.StockQuantity,
+			ProductVariantFields.IsActive,
+		},
+		ListFilter: []admin.Field{
+			ProductVariantFields.IsActive,
+			ProductVariantFields.ProductID,
+		},
+		SearchFields: []admin.Field{
+			ProductVariantFields.Name,
+			ProductVariantFields.SKU,
+		},
+	})
 
 	// ProductImage admin
-	imageConfig := &admin.ModelConfig{
-		Name:         "Product Image",
-		PluralName:   "Product Images",
-		Icon:         "🖼️",
-		ListDisplay:  []string{"id", "product_id", "variant_id", "alt_text", "is_primary", "sort_order"},
-		ListFilter:   []string{"is_primary", "product_id"},
-		SearchFields: []string{"alt_text"},
-		OrderBy:      []string{"product_id", "sort_order"},
-		PerPage:      20,
-		Actions:      []string{"delete"},
-	}
-	registry.Register("ProductImage", &ProductImage{}, imageConfig)
-
-	// ProductAttribute admin
-	attributeConfig := &admin.ModelConfig{
-		Name:         "Product Attribute",
-		PluralName:   "Product Attributes",
-		Icon:         "⚙️",
-		ListDisplay:  []string{"id", "name", "code", "type", "is_filterable", "is_visible", "sort_order"},
-		ListFilter:   []string{"type", "is_filterable", "is_visible"},
-		SearchFields: []string{"name", "code"},
-		OrderBy:      []string{"sort_order", "name"},
-		PerPage:      20,
-		Actions:      []string{"delete"},
-	}
-	registry.Register("ProductAttribute", &ProductAttribute{}, attributeConfig)
-
-	// ProductAttributeValue admin
-	attrValueConfig := &admin.ModelConfig{
-		Name:         "Product Attribute Value",
-		PluralName:   "Product Attribute Values",
-		Icon:         "📝",
-		ListDisplay:  []string{"id", "product_id", "attribute_id", "value", "created_at"},
-		ListFilter:   []string{"product_id", "attribute_id"},
-		SearchFields: []string{"value"},
-		OrderBy:      []string{"product_id", "attribute_id"},
-		PerPage:      20,
-		Actions:      []string{"delete"},
-	}
-	registry.Register("ProductAttributeValue", &ProductAttributeValue{}, attrValueConfig)
+	admin.Register(&admin.Config[ProductImage]{
+		Icon: "Image",
+		ListDisplay: []admin.Field{
+			ProductImageFields.ProductID,
+			ProductImageFields.AltText,
+			ProductImageFields.IsPrimary,
+			ProductImageFields.SortOrder,
+		},
+		ListFilter: []admin.Field{
+			ProductImageFields.IsPrimary,
+			ProductImageFields.ProductID,
+		},
+	})
 }

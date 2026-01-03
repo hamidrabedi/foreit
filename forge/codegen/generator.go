@@ -35,37 +35,22 @@ func (g *Generator) Generate() error {
 		return fmt.Errorf("failed to parse schemas: %w", err)
 	}
 
-	// Generate code for each model
-	for _, def := range definitions {
-		if err := g.generateModel(def); err != nil {
-			return fmt.Errorf("failed to generate code for %s: %w", def.Name, err)
-		}
+	if len(definitions) == 0 {
+		fmt.Println("No schema definitions found")
+		return nil
+	}
+
+	// Generate all models in a single gen.go file
+	if err := g.generateCombined(definitions); err != nil {
+		return fmt.Errorf("failed to generate combined code: %w", err)
 	}
 
 	return nil
 }
 
-// generateModel generates code for a single model
-func (g *Generator) generateModel(def *ModelDefinition) error {
-	// Generate model struct
-	if err := g.writer.WriteModel(def, g.outputDir); err != nil {
-		return err
-	}
-
-	// Generate fields (FieldExpr definitions)
-	if err := g.writer.WriteFields(def, g.outputDir); err != nil {
-		return err
-	}
-
-	// Generate relations (RelationExpr definitions)
-	if err := g.writer.WriteRelations(def, g.outputDir); err != nil {
-		return err
-	}
-
-	// Manager and QuerySet are now generic types, no need to generate them
-	// They are accessed via query.Manager[T] and query.BaseQuerySet[T]
-
-	return nil
+// generateCombined generates all models in a single gen.go file
+func (g *Generator) generateCombined(definitions []*ModelDefinition) error {
+	return g.writer.WriteCombined(definitions, g.outputDir)
 }
 
 // ModelDefinition represents a parsed model definition

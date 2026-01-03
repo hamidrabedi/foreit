@@ -51,6 +51,13 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 		return fmt.Errorf("failed to get output flag: %w", err)
 	}
 
+	// If outputDir is not specified and modelsDir is "app", default to "app" as well
+	if outputDir == "" && modelsDir == "app" {
+		outputDir = "app"
+	} else if outputDir == "" {
+		outputDir = modelsDir
+	}
+
 	// If scanning "app/" directory, look for submodules
 	if modelsDir == "app" || strings.HasSuffix(modelsDir, "/app") {
 		fmt.Printf("Scanning apps in %s...\n", modelsDir)

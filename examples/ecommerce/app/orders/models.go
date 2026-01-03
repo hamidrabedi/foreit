@@ -2,9 +2,9 @@ package orders
 
 import (
 	"context"
-	
-	"github.com/forgego/forge/schema"
+
 	"github.com/forgego/forge/registry"
+	"github.com/forgego/forge/schema"
 )
 
 // Cart represents a shopping cart
@@ -15,13 +15,13 @@ type Cart struct {
 func (Cart) Fields() []schema.Field {
 	return []schema.Field{
 		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("customer_id").Null().
+		schema.Int64("customer_id").Optional().
 			HelpText("Customer (null for guest carts)").Build(),
 		
 		// Guest cart identification
-		schema.String("session_id").MaxLength(255).Null().
+		schema.String("session_id").MaxLength(255).Optional().
 			HelpText("Session ID for guest carts").Build(),
-		schema.String("guest_email").MaxLength(255).Null().Build(),
+		schema.String("guest_email").MaxLength(255).Optional().Build(),
 		
 		// Pricing
 		schema.Float64("subtotal").Default(0.0).
@@ -33,8 +33,8 @@ func (Cart) Fields() []schema.Field {
 			HelpText("Cart total").Build(),
 		
 		// Coupon
-		schema.Int64("coupon_id").Null().Build(),
-		schema.String("coupon_code").MaxLength(50).Null().Build(),
+		schema.Int64("coupon_id").Optional().Build(),
+		schema.String("coupon_code").MaxLength(50).Optional().Build(),
 		
 		// Status
 		schema.String("status").Required().MaxLength(20).Default("active").
@@ -44,8 +44,8 @@ func (Cart) Fields() []schema.Field {
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("last_activity_at").Null().Build(),
-		schema.Time("converted_at").Null().
+		schema.Time("last_activity_at").Optional().Build(),
+		schema.Time("converted_at").Optional().
 			HelpText("When cart was converted to order").Build(),
 	}
 }
@@ -67,14 +67,14 @@ func (Cart) Meta() schema.Meta {
 
 func (Cart) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Cascade).
-			Null().
-			RelatedName("carts"),
-		schema.ForeignKey("coupon_id", "Coupon", "coupon").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("carts"),
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadeCASCADE).
+			Optional().
+			RelatedName("carts").Build(),
+		schema.ForeignKey("coupon_id", "Coupon").
+			OnDelete(schema.CascadeSET_NULL).
+			Optional().
+			RelatedName("carts").Build(),
 	}
 }
 
@@ -98,7 +98,7 @@ func (CartItem) Fields() []schema.Field {
 		schema.Int64("id").Primary().AutoIncrement().Build(),
 		schema.Int64("cart_id").Required().Build(),
 		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Null().Build(),
+		schema.Int64("variant_id").Optional().Build(),
 		
 		// Quantity and pricing
 		schema.Int32("quantity").Required().Default(1).Build(),
@@ -110,9 +110,9 @@ func (CartItem) Fields() []schema.Field {
 			HelpText("Line total (quantity * unit_price - discount + tax)").Build(),
 		
 		// Product snapshot (for price changes)
-		schema.String("product_name").MaxLength(255).Null().Build(),
-		schema.String("variant_name").MaxLength(255).Null().Build(),
-		schema.String("image_url").MaxLength(500).Null().Build(),
+		schema.String("product_name").MaxLength(255).Optional().Build(),
+		schema.String("variant_name").MaxLength(255).Optional().Build(),
+		schema.String("image_url").MaxLength(500).Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
@@ -139,18 +139,18 @@ func (CartItem) Meta() schema.Meta {
 
 func (CartItem) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("cart_id", "Cart", "cart").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("cart_id", "Cart").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("items"),
-		schema.ForeignKey("product_id", "Product", "product").
-			OnDelete(schema.Cascade).
+			RelatedName("items").Build(),
+		schema.ForeignKey("product_id", "Product").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("cart_items"),
-		schema.ForeignKey("variant_id", "ProductVariant", "variant").
-			OnDelete(schema.Cascade).
-			Null().
-			RelatedName("cart_items"),
+			RelatedName("cart_items").Build(),
+		schema.ForeignKey("variant_id", "ProductVariant").
+			OnDelete(schema.CascadeCASCADE).
+			Optional().
+			RelatedName("cart_items").Build(),
 	}
 }
 
@@ -186,7 +186,7 @@ func (Order) Fields() []schema.Field {
 		schema.String("customer_email").Required().MaxLength(255).Build(),
 		schema.String("customer_first_name").Required().MaxLength(100).Build(),
 		schema.String("customer_last_name").Required().MaxLength(100).Build(),
-		schema.String("customer_phone").MaxLength(20).Null().Build(),
+		schema.String("customer_phone").MaxLength(20).Optional().Build(),
 		
 		// Pricing
 		schema.Float64("subtotal").Required().
@@ -198,8 +198,8 @@ func (Order) Fields() []schema.Field {
 			HelpText("Order total").Build(),
 		
 		// Coupon
-		schema.Int64("coupon_id").Null().Build(),
-		schema.String("coupon_code").MaxLength(50).Null().Build(),
+		schema.Int64("coupon_id").Optional().Build(),
+		schema.String("coupon_code").MaxLength(50).Optional().Build(),
 		schema.Float64("coupon_discount").Default(0.0).Build(),
 		
 		// Status
@@ -211,62 +211,62 @@ func (Order) Fields() []schema.Field {
 			HelpText("Fulfillment: unfulfilled, partial, fulfilled").Build(),
 		
 		// Addresses
-		schema.Int64("shipping_address_id").Null().Build(),
-		schema.Int64("billing_address_id").Null().Build(),
+		schema.Int64("shipping_address_id").Optional().Build(),
+		schema.Int64("billing_address_id").Optional().Build(),
 		
 		// Shipping address snapshot
-		schema.String("shipping_first_name").MaxLength(100).Null().Build(),
-		schema.String("shipping_last_name").MaxLength(100).Null().Build(),
-		schema.String("shipping_company").MaxLength(200).Null().Build(),
-		schema.String("shipping_address_line1").MaxLength(255).Null().Build(),
-		schema.String("shipping_address_line2").MaxLength(255).Null().Build(),
-		schema.String("shipping_city").MaxLength(100).Null().Build(),
-		schema.String("shipping_state").MaxLength(100).Null().Build(),
-		schema.String("shipping_postal_code").MaxLength(20).Null().Build(),
-		schema.String("shipping_country_code").MaxLength(2).Null().Build(),
-		schema.String("shipping_country_name").MaxLength(100).Null().Build(),
-		schema.String("shipping_phone").MaxLength(20).Null().Build(),
+		schema.String("shipping_first_name").MaxLength(100).Optional().Build(),
+		schema.String("shipping_last_name").MaxLength(100).Optional().Build(),
+		schema.String("shipping_company").MaxLength(200).Optional().Build(),
+		schema.String("shipping_address_line1").MaxLength(255).Optional().Build(),
+		schema.String("shipping_address_line2").MaxLength(255).Optional().Build(),
+		schema.String("shipping_city").MaxLength(100).Optional().Build(),
+		schema.String("shipping_state").MaxLength(100).Optional().Build(),
+		schema.String("shipping_postal_code").MaxLength(20).Optional().Build(),
+		schema.String("shipping_country_code").MaxLength(2).Optional().Build(),
+		schema.String("shipping_country_name").MaxLength(100).Optional().Build(),
+		schema.String("shipping_phone").MaxLength(20).Optional().Build(),
 		
 		// Billing address snapshot
-		schema.String("billing_first_name").MaxLength(100).Null().Build(),
-		schema.String("billing_last_name").MaxLength(100).Null().Build(),
-		schema.String("billing_company").MaxLength(200).Null().Build(),
-		schema.String("billing_address_line1").MaxLength(255).Null().Build(),
-		schema.String("billing_address_line2").MaxLength(255).Null().Build(),
-		schema.String("billing_city").MaxLength(100).Null().Build(),
-		schema.String("billing_state").MaxLength(100).Null().Build(),
-		schema.String("billing_postal_code").MaxLength(20).Null().Build(),
-		schema.String("billing_country_code").MaxLength(2).Null().Build(),
-		schema.String("billing_country_name").MaxLength(100).Null().Build(),
+		schema.String("billing_first_name").MaxLength(100).Optional().Build(),
+		schema.String("billing_last_name").MaxLength(100).Optional().Build(),
+		schema.String("billing_company").MaxLength(200).Optional().Build(),
+		schema.String("billing_address_line1").MaxLength(255).Optional().Build(),
+		schema.String("billing_address_line2").MaxLength(255).Optional().Build(),
+		schema.String("billing_city").MaxLength(100).Optional().Build(),
+		schema.String("billing_state").MaxLength(100).Optional().Build(),
+		schema.String("billing_postal_code").MaxLength(20).Optional().Build(),
+		schema.String("billing_country_code").MaxLength(2).Optional().Build(),
+		schema.String("billing_country_name").MaxLength(100).Optional().Build(),
 		
 		// Payment
-		schema.String("payment_method").MaxLength(50).Null().
+		schema.String("payment_method").MaxLength(50).Optional().
 			HelpText("Payment method: credit_card, paypal, stripe, etc.").Build(),
-		schema.String("payment_transaction_id").MaxLength(255).Null().Build(),
+		schema.String("payment_transaction_id").MaxLength(255).Optional().Build(),
 		
 		// Shipping
-		schema.String("shipping_method").MaxLength(100).Null().Build(),
-		schema.String("tracking_number").MaxLength(255).Null().Build(),
-		schema.String("carrier").MaxLength(100).Null().Build(),
+		schema.String("shipping_method").MaxLength(100).Optional().Build(),
+		schema.String("tracking_number").MaxLength(255).Optional().Build(),
+		schema.String("carrier").MaxLength(100).Optional().Build(),
 		
 		// Additional information
-		schema.Text("customer_notes").Null().
+		schema.Text("customer_notes").Optional().
 			HelpText("Notes from customer").Build(),
-		schema.Text("admin_notes").Null().
+		schema.Text("admin_notes").Optional().
 			HelpText("Internal notes").Build(),
 		
 		// IP and user agent (for fraud detection)
-		schema.String("ip_address").MaxLength(45).Null().Build(),
-		schema.String("user_agent").MaxLength(500).Null().Build(),
+		schema.String("ip_address").MaxLength(45).Optional().Build(),
+		schema.String("user_agent").MaxLength(500).Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("paid_at").Null().Build(),
-		schema.Time("shipped_at").Null().Build(),
-		schema.Time("delivered_at").Null().Build(),
-		schema.Time("cancelled_at").Null().Build(),
-		schema.Time("expires_at").Null().
+		schema.Time("paid_at").Optional().Build(),
+		schema.Time("shipped_at").Optional().Build(),
+		schema.Time("delivered_at").Optional().Build(),
+		schema.Time("cancelled_at").Optional().Build(),
+		schema.Time("expires_at").Optional().
 			HelpText("Order expiry for pending orders").Build(),
 	}
 }
@@ -290,22 +290,22 @@ func (Order) Meta() schema.Meta {
 
 func (Order) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer", "customer").
-			OnDelete(schema.Protect).
+		schema.ForeignKey("customer_id", "Customer").
+			OnDelete(schema.CascadePROTECT).
 			Required().
-			RelatedName("orders"),
-		schema.ForeignKey("coupon_id", "Coupon", "coupon").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("orders"),
-		schema.ForeignKey("shipping_address_id", "Address", "shipping_address").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("shipping_orders"),
-		schema.ForeignKey("billing_address_id", "Address", "billing_address").
-			OnDelete(schema.SetNull).
-			Null().
-			RelatedName("billing_orders"),
+			RelatedName("orders").Build(),
+		schema.ForeignKey("coupon_id", "Coupon").
+			OnDelete(schema.CascadeSET_NULL).
+			Optional().
+			RelatedName("orders").Build(),
+		schema.ForeignKey("shipping_address_id", "Address").
+			OnDelete(schema.CascadePROTECT).
+			Optional().
+			RelatedName("shipping_orders").Build(),
+		schema.ForeignKey("billing_address_id", "Address").
+			OnDelete(schema.CascadePROTECT).
+			Optional().
+			RelatedName("billing_orders").Build(),
 	}
 }
 
@@ -343,14 +343,14 @@ func (OrderItem) Fields() []schema.Field {
 		schema.Int64("id").Primary().AutoIncrement().Build(),
 		schema.Int64("order_id").Required().Build(),
 		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Null().Build(),
+		schema.Int64("variant_id").Optional().Build(),
 		
 		// Product snapshot (prices can change)
 		schema.String("product_name").Required().MaxLength(255).Build(),
 		schema.String("product_sku").Required().MaxLength(100).Build(),
-		schema.String("variant_name").MaxLength(255).Null().Build(),
-		schema.String("variant_sku").MaxLength(100).Null().Build(),
-		schema.String("image_url").MaxLength(500).Null().Build(),
+		schema.String("variant_name").MaxLength(255).Optional().Build(),
+		schema.String("variant_sku").MaxLength(100).Optional().Build(),
+		schema.String("image_url").MaxLength(500).Optional().Build(),
 		
 		// Quantity and pricing
 		schema.Int32("quantity").Required().Default(1).Build(),
@@ -368,7 +368,7 @@ func (OrderItem) Fields() []schema.Field {
 			HelpText("Status: unfulfilled, fulfilled, refunded").Build(),
 		
 		// Physical attributes (for shipping calculations)
-		schema.Float64("weight").Null().Build(),
+		schema.Float64("weight").Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
@@ -392,18 +392,18 @@ func (OrderItem) Meta() schema.Meta {
 
 func (OrderItem) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order", "order").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("order_id", "Order").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("items"),
-		schema.ForeignKey("product_id", "Product", "product").
-			OnDelete(schema.Protect).
+			RelatedName("items").Build(),
+		schema.ForeignKey("product_id", "Product").
+			OnDelete(schema.CascadePROTECT).
 			Required().
-			RelatedName("order_items"),
-		schema.ForeignKey("variant_id", "ProductVariant", "variant").
-			OnDelete(schema.Protect).
-			Null().
-			RelatedName("order_items"),
+			RelatedName("order_items").Build(),
+		schema.ForeignKey("variant_id", "ProductVariant").
+			OnDelete(schema.CascadePROTECT).
+			Optional().
+			RelatedName("order_items").Build(),
 	}
 }
 
@@ -432,7 +432,7 @@ func (Payment) Fields() []schema.Field {
 		schema.Int64("order_id").Required().Build(),
 		
 		// Payment identification
-		schema.String("transaction_id").MaxLength(255).Null().
+		schema.String("transaction_id").MaxLength(255).Optional().
 			HelpText("External payment gateway transaction ID").Build(),
 		
 		// Amount
@@ -443,28 +443,28 @@ func (Payment) Fields() []schema.Field {
 		// Payment method
 		schema.String("payment_method").Required().MaxLength(50).
 			HelpText("Method: credit_card, paypal, stripe, bank_transfer, etc.").Build(),
-		schema.String("payment_gateway").MaxLength(50).Null().
+		schema.String("payment_gateway").MaxLength(50).Optional().
 			HelpText("Gateway used: stripe, paypal, square, etc.").Build(),
 		
 		// Card details (last 4 digits only for security)
-		schema.String("card_last4").MaxLength(4).Null().Build(),
-		schema.String("card_brand").MaxLength(50).Null().Build(),
+		schema.String("card_last4").MaxLength(4).Optional().Build(),
+		schema.String("card_brand").MaxLength(50).Optional().Build(),
 		
 		// Status
 		schema.String("status").Required().MaxLength(20).Default("pending").
 			HelpText("Status: pending, completed, failed, refunded, cancelled").Build(),
 		
 		// Additional information
-		schema.Text("gateway_response").Null().
+		schema.Text("gateway_response").Optional().
 			HelpText("Full gateway response (JSON)").Build(),
-		schema.String("failure_reason").MaxLength(500).Null().Build(),
+		schema.String("failure_reason").MaxLength(500).Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("completed_at").Null().Build(),
-		schema.Time("failed_at").Null().Build(),
-		schema.Time("refunded_at").Null().Build(),
+		schema.Time("completed_at").Optional().Build(),
+		schema.Time("failed_at").Optional().Build(),
+		schema.Time("refunded_at").Optional().Build(),
 	}
 }
 
@@ -484,10 +484,10 @@ func (Payment) Meta() schema.Meta {
 
 func (Payment) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order", "order").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("order_id", "Order").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("payments"),
+			RelatedName("payments").Build(),
 	}
 }
 
@@ -515,22 +515,22 @@ func (Shipment) Fields() []schema.Field {
 		schema.String("tracking_number").Required().MaxLength(255).Build(),
 		schema.String("carrier").Required().MaxLength(100).
 			HelpText("Carrier: USPS, UPS, FedEx, DHL, etc.").Build(),
-		schema.String("service_level").MaxLength(100).Null().
+		schema.String("service_level").MaxLength(100).Optional().
 			HelpText("Service: Standard, Express, Overnight, etc.").Build(),
 		
 		// Shipping address (snapshot)
 		schema.String("recipient_name").Required().MaxLength(200).Build(),
 		schema.String("address_line1").Required().MaxLength(255).Build(),
-		schema.String("address_line2").MaxLength(255).Null().Build(),
+		schema.String("address_line2").MaxLength(255).Optional().Build(),
 		schema.String("city").Required().MaxLength(100).Build(),
-		schema.String("state").MaxLength(100).Null().Build(),
+		schema.String("state").MaxLength(100).Optional().Build(),
 		schema.String("postal_code").Required().MaxLength(20).Build(),
 		schema.String("country_code").Required().MaxLength(2).Build(),
 		schema.String("country_name").Required().MaxLength(100).Build(),
-		schema.String("phone").MaxLength(20).Null().Build(),
+		schema.String("phone").MaxLength(20).Optional().Build(),
 		
 		// Shipping details
-		schema.Float64("weight").Null().
+		schema.Float64("weight").Optional().
 			HelpText("Total weight in kg").Build(),
 		schema.Float64("shipping_cost").Required().Build(),
 		
@@ -539,18 +539,18 @@ func (Shipment) Fields() []schema.Field {
 			HelpText("Status: pending, in_transit, delivered, failed, returned").Build(),
 		
 		// Tracking events
-		schema.Text("tracking_events").Null().
+		schema.Text("tracking_events").Optional().
 			HelpText("JSON array of tracking events").Build(),
 		
 		// Notes
-		schema.Text("notes").Null().Build(),
+		schema.Text("notes").Optional().Build(),
 		
 		// Timestamps
 		schema.Time("created_at").AutoNowAdd().Build(),
 		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("shipped_at").Null().Build(),
-		schema.Time("estimated_delivery_at").Null().Build(),
-		schema.Time("delivered_at").Null().Build(),
+		schema.Time("shipped_at").Optional().Build(),
+		schema.Time("estimated_delivery_at").Optional().Build(),
+		schema.Time("delivered_at").Optional().Build(),
 	}
 }
 
@@ -570,10 +570,10 @@ func (Shipment) Meta() schema.Meta {
 
 func (Shipment) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order", "order").
-			OnDelete(schema.Cascade).
+		schema.ForeignKey("order_id", "Order").
+			OnDelete(schema.CascadeCASCADE).
 			Required().
-			RelatedName("shipments"),
+			RelatedName("shipments").Build(),
 	}
 }
 

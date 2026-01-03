@@ -12,332 +12,305 @@ image: /img/forge-social-card.jpg
 
 # Architecture
 
-Understanding forge's architecture helps you build better applications and extend the framework.
+forge is built to feel like Django but work like Go. Here's how it all fits together.
 
-## How forge works
+## The Big Picture
 
-forge uses a layered architecture that separates concerns and enables code generation:
-
-1. **You define schemas** - Declarative model definitions
-2. **forge generates code** - Type-safe structs, managers, querysets
-3. **You use the ORM** - Type-safe database queries
-4. **forge handles the rest** - Migrations, admin, APIs
-
-This architecture gives you Django-like productivity with Go's type safety and performance.
-
-## Architecture layers
-
-forge is organized into distinct layers, each with a specific responsibility:
+You write model definitions in Go, forge generates type-safe code, and you get a complete web framework. No reflection magic, no string-based queries that break at runtime.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                    User Application                      │
-│  (Schema Definitions, Models, Views, Controllers)        │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Code Generation Layer                        │
-│  (AST Parser → SQL Generation → Go Code Generation)      │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Framework API Layer                          │
-│  (QuerySet, Manager, FieldExpr, QueryExpr)               │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Database Layer                               │
-│  (SQL Builder, Parameter Binding, Transactions)          │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Infrastructure Layer                         │
-│  (HTTP Router, Middleware, Security, Config, Logging)     │
-└─────────────────────────────────────────────────────────┘
+You define models → forge generates code → you build your app
+     ↓                    ↓                    ↓
+  schema.go → models.go, fields.go → admin, API, views
 ```
 
-## Core principles
+## How It Works
 
-forge follows these design principles:
-
-1. **Type-Safe First** - Primary API uses generics for compile-time safety
-2. **Dynamic When Needed** - Secondary API for runtime flexibility
-3. **Convention over Configuration** - Sensible defaults everywhere
-4. **Fully Extensible** - Everything can be extended/overridden
-5. **Security by Default** - Built-in protections
-6. **Code Generation** - AST-based generation for type-safe code
-
-## System Architecture
-
-### High-Level Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Application Layer                          │
-│  User Models, Views, Controllers, Routes                      │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  Code Generation Layer                        │
-│  AST Parser → Schema Analysis → Code Generator                │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    Framework API Layer                        │
-│  Admin, API, ORM, Identity, Filter                            │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                    Database Layer                             │
-│  SQL Builder, Query Execution, Transactions, Migrations       │
-└─────────────────────────────────────────────────────────────┘
-                            ↓
-┌─────────────────────────────────────────────────────────────┐
-│                  Infrastructure Layer                         │
-│  HTTP Server, Security, Logging, Config, Server               │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Component Architecture
-
-### 1. Schema Definition System
-
-**Location:** `pkg/schema/`
-
-Defines models declaratively in Go code:
+### 1. You Define Models
 
 ```go
-type User struct {
+type Post struct {
     schema.BaseSchema
 }
 
-func (User) Fields() []schema.Field {
+func (Post) Fields() []schema.Field {
     return []schema.Field{
         schema.Int64("id").Primary().AutoIncrement().Build(),
-        schema.String("username").Required().Unique().Build(),
+        schema.String("title").Required().MaxLength(200).Build(),
+        schema.Text("content").Required().Build(),
+        schema.Bool("published").Default(false).Build(),
+        schema.Time("created_at").AutoNowAdd().Build(),
     }
 }
 ```
 
-### 2. Code Generation System
+### 2. forge Generates Code
 
-**Location:** `pkg/generator/`
+When you run `forge generate`, forge:
 
-Generates type-safe Go code from schema definitions:
-- Model structs
-- FieldExpr definitions
-- Manager with CRUD operations
-- QuerySet wrappers
+- Parses your Go code with AST
+- Generates type-safe structs
+- Creates field expressions for queries
+- Builds managers and QuerySets
 
-### 3. Query System
+### 3. You Use the Generated Code
 
-**Location:** `pkg/query/`
+```go
+// Type-safe queries - no string field names
+posts, err := Post.Objects.
+    Filter(Post.Fields.Published.Equals(true)).
+    OrderBy("-created_at").
+    All(ctx)
 
-Type-safe and dynamic query building:
-- `FieldExpr[T]` for type-safe field access
-- `QueryExpr` for query conditions
-- `BaseQuerySet[T]` for query execution
-- SQL builder with proper escaping
+// Admin interface - just register your model
+admin.RegisterModel(&Post{})
 
-### 4. Database Layer
+// REST API - one line of code
+router.Handle("/api/posts", api.NewBaseViewSet(serializer, Post.Objects, &Post{}))
+```
 
-**Location:** `pkg/db/`
+## The Layers
 
-Database connection, transactions, migrations:
-- Connection pooling
-- Transaction management
-- Migration system integration
-- SQL builder with parameter binding
+### Your Code (Top Layer)
+This is where you spend most of your time:
+- Model definitions in `models/`
+- Your business logic
+- Custom views and handlers
+- Configuration
 
-### 5. HTTP & Routing
+### Generated Code (Middle Layer)
+forge creates this for you:
+- Model structs with proper types
+- Field expressions for type-safe queries
+- Managers with CRUD operations
+- QuerySets for filtering and ordering
 
-**Location:** `pkg/http/`
+### Framework Core (Bottom Layer)
+The forge framework handles:
+- Database connections and transactions
+- HTTP routing and middleware
+- Security (CSRF, XSS, SQL injection)
+- Admin interface rendering
+- API serialization
 
-HTTP server and routing (chi wrapper):
-- Router wrapper
-- Middleware stack
-- Request context utilities
-- Server wrapper
+## Key Components
 
-### 6. Admin System
+### Schema System
+**Location:** `forge/schema/`  
+**What it does:** Defines your models declaratively
 
-**Location:** `pkg/admin/`
+```go
+func (Post) Fields() []schema.Field {
+    return []schema.Field{
+        schema.String("title").Required().Build(),
+        // More fields...
+    }
+}
+```
 
-Type-safe admin interface:
-- Type-safe Admin[T] and Config[T]
-- Complete HTTP handlers
-- Rich form widgets
-- Filters, search, pagination
+### Code Generator
+**Location:** `forge/codegen/`  
+**What it does:** Turns your schema definitions into Go code
 
-### 7. REST API Framework
+- AST parser reads your Go files
+- Template system generates code
+- Go formats the output
+- Imports are handled automatically
 
-**Location:** `pkg/api/`
+### ORM System
+**Location:** `forge/orm/`  
+**What it does:** Type-safe database operations
 
-DRF-like API framework:
-- Serializers
-- ViewSets
-- Authentication
-- Permissions
-- Throttling
+```go
+// This is compile-time checked
+Post.Fields.Title.Contains("golang")
+
+// Not this (runtime error waiting to happen)
+db.Query("SELECT * FROM posts WHERE title LIKE ?", "%golang%")
+```
+
+### Admin System
+**Location:** `forge/admin/`  
+**What it does:** Auto-generates Django-style admin interface
+
+- List views with pagination
+- Create/edit forms
+- Search and filtering
+- Bulk actions
+
+### API Framework
+**Location:** `forge/api/`  
+**What it does:** Django REST Framework equivalent
+
+- Serializers for data validation
+- ViewSets for CRUD operations
+- Authentication and permissions
+- OpenAPI documentation
 
 ## Data Flow
 
 ### Request Flow
+```
+HTTP Request → Chi Router → Middleware → Handler → QuerySet → Database → Response
+```
 
-```
-HTTP Request
-  ↓
-Chi Router
-  ↓
-Middleware Stack
-  ↓
-Framework Handler
-  ↓
-QuerySet / Manager
-  ↓
-SQL Builder (with parameter binding)
-  ↓
-PostgreSQL
-  ↓
-Response (JSON/HTML)
-```
+1. **HTTP Request** comes in
+2. **Chi Router** matches the URL
+3. **Middleware** runs (auth, CSRF, logging, etc.)
+4. **Handler** processes the request
+5. **QuerySet** builds a type-safe query
+6. **Database** executes with parameter binding
+7. **Response** goes back through middleware
 
 ### Code Generation Flow
-
 ```
-Schema Definition (Go)
-  ↓
-AST Parser
-  ↓
-Model Definition
-  ↓
-Code Generator
-  ↓
-Generated Files:
-  - Model structs
-  - FieldExpr
-  - Manager/QuerySet
+Schema Definition → AST Parser → Template → Generated Code
 ```
 
-## Design Patterns
+1. You write schema definitions
+2. AST parser reads the Go code
+3. Template system generates Go code
+4. Generated code is written to files
 
-### 1. Builder Pattern
+## Design Decisions
 
-Used extensively for field definitions:
+### Why Generics?
+Before Go 1.18, frameworks used `interface{}` everywhere. That meant:
+- No type safety
+- Runtime errors instead of compile-time errors
+- Terrible IDE support
 
+forge uses generics everywhere:
 ```go
-schema.String("username").
-    Required().
-    Unique().
-    MaxLength(150).
-    Build()
+QuerySet[Post]     // Type-safe
+Manager[Post]      // Type-safe  
+Admin[Post]        // Type-safe
+FieldExpr[string]  // Type-safe
 ```
 
-### 2. Strategy Pattern
+### Why Code Generation?
+Some frameworks use reflection at runtime. forge generates code because:
 
-Used for authentication, permissions, throttling:
+- **Performance** - No reflection overhead
+- **Type Safety** - Generated code is just Go code
+- **IDE Support** - Your IDE understands generated code
+- **Debugging** - You can step through generated code
 
-```go
-type Authentication interface {
-    Authenticate(r *http.Request) (*AuthResult, error)
-}
-```
+### Why Chi?
+Chi is a lightweight router that:
+- Works with Go's `net/http`
+- Has great middleware support
+- Is fast and battle-tested
+- Doesn't try to do too much
 
-### 3. Repository Pattern
-
-QuerySet/Manager abstracts data access:
-
-```go
-type QuerySet[T any] interface {
-    Filter(expr QueryExpr) QuerySet[T]
-    All(ctx context.Context) ([]*T, error)
-}
-```
-
-### 4. Template Method Pattern
-
-BaseViewSet defines skeleton, allows customization:
-
-```go
-type BaseViewSet struct {
-    // Template methods
-    GetQueryset() interface{}
-    GetSerializer() Serializer
-}
-```
-
-## Extension Points
-
-### 1. Model Extensions
-- Add fields to existing models
-- Add relations
-- Add hooks
-- Override methods
-
-### 2. Admin Extensions
-- Customize list display
-- Add filters
-- Add actions
-- Custom widgets
-
-### 3. Query Extensions
-- Custom QuerySet methods
-- Custom aggregates
-- Custom annotations
-
-### 4. Middleware
-- Custom middleware injection
-- Request/response modification
-
-### 5. Plugin System
-- Register plugins
-- Plugin lifecycle hooks
-- Plugin dependencies
+### Why PostgreSQL?
+PostgreSQL gives you:
+- Strong typing
+- Great JSON support
+- Full-text search
+- Advanced features (arrays, hstore, etc.)
 
 ## Technology Stack
 
-### Core
-- **Go 1.21+** - Programming language
-- **database/sql** - Database interface
-- **go/ast** - Code generation
-
-### HTTP & Routing
+### Core Dependencies
+- **Go 1.25+** - Language with generics
+- **database/sql** - Standard database interface
 - **chi/v5** - HTTP router
-- **chi/middleware** - Middleware
-
-### Database
-- **database/sql** - Standard library SQL interface
 - **lib/pq** - PostgreSQL driver
-- **golang-migrate/v4** - Migrations
 
-### Security
-- **gorilla/csrf** - CSRF protection
-- **alexedwards/scs/v2** - Sessions
-- **golang.org/x/crypto/bcrypt** - Password hashing
-
-### Validation & Configuration
-- **go-playground/validator/v10** - Validation
-- **spf13/viper** - Configuration
-
-### Logging & Templates
+### Key Libraries
+- **golang-migrate** - Database migrations
 - **zap** - Structured logging
-- **Masterminds/sprig/v3** - Template functions
+- **viper** - Configuration
+- **gorilla/csrf** - CSRF protection
+- **alexedwards/scs** - Session management
+- **go-playground/validator** - Validation
 
-## Design Principles
+## Performance Considerations
 
-1. **Wrap, Don't Expose** - All third-party libraries are wrapped
-2. **Type-Safe First** - Primary API uses generics
-3. **Convention over Configuration** - Sensible defaults
-4. **Extensibility** - Everything can be extended
-5. **Security by Default** - Built-in protections
-6. **Code Generation** - Reduce boilerplate
+### What's Fast?
+- **Database queries** - Uses connection pooling
+- **Code generation** - One-time cost
+- **HTTP routing** - Chi is very fast
+- **JSON serialization** - Uses standard library
 
-## Next Steps
+### What's Not Free?
+- **AST parsing** - Only runs during generation
+- **Template rendering** - Only in admin/API
+- **Reflection** - Minimized usage
 
-For complete architecture documentation, see the [Architecture Deep Dive](/docs/deep-dives/architecture).
+### Optimization Tips
+1. **Use select_related** for foreign keys
+2. **Cache expensive queries**
+3. **Use pagination** for large lists
+4. **Profile your queries** with EXPLAIN
 
-You may also want to explore:
-- [Design Principles](/docs/deep-dives/design-principles) - Framework design principles
-- [Features Overview](/docs/deep-dives/features-overview) - Complete feature list
-- [API Architecture](/docs/learn/api-architecture) - REST API framework architecture
-- [User System Architecture](/docs/learn/user-system-architecture) - User system design
+## Security Architecture
+
+### Defense in Depth
+1. **Input Validation** - At multiple layers
+2. **SQL Injection Prevention** - Parameter binding everywhere
+3. **CSRF Protection** - Built into forms
+4. **XSS Prevention** - Output encoding
+5. **Authentication** - Multiple secure options
+
+### Security by Default
+- CSRF protection is enabled by default
+- All database queries use parameter binding
+- Form input is validated and sanitized
+- Sessions are secure by default
+
+## Extensibility
+
+### Plugin Points
+- **Custom Fields** - Create your own field types
+- **Custom Widgets** - Build form widgets
+- **Custom Auth** - Authentication backends
+- **Custom Middleware** - Request/response processing
+- **Custom Serializers** - API serialization
+
+### Hook System
+- **Model Hooks** - Before/After save, create, update, delete
+- **Request Hooks** - Before/After request processing
+- **Admin Hooks** - Custom admin behavior
+
+## Testing Architecture
+
+### Test Support
+- **Test Database** - Automatic test database setup
+- **Mock Support** - Easy mocking of database operations
+- **Test Helpers** - Utilities for testing forge apps
+- **Integration Tests** - Database testing support
+
+### Test Patterns
+```go
+func TestPostModel(t *testing.T) {
+    // Setup test database
+    db := setupTestDB()
+    defer db.Close()
+    
+    // Create test data
+    post := &Post{Title: "Test"}
+    err := Post.Objects.Create(post)
+    assert.NoError(t, err)
+    
+    // Test queries
+    found, err := Post.Objects.Get(Post.Fields.ID.Equals(post.ID))
+    assert.NoError(t, err)
+    assert.Equal(t, "Test", found.Title)
+}
+```
+
+## What's Next?
+
+This architecture gives you:
+- **Django's productivity** - Admin interface, ORM, sensible defaults
+- **Go's performance** - Compiled, fast, efficient
+- **Type safety** - Compile-time checking everywhere
+- **Extensibility** - Everything can be customized
+
+Want to dive deeper?
+- [Features Overview](/docs/features/overview) - All features in detail
+- [Schema System](/docs/features/schema-system) - Model definitions
+- [Admin System](/docs/features/admin-system) - Auto-generated admin
+- [API Framework](/docs/features/api-framework) - REST API development

@@ -67,13 +67,13 @@ admin.RegisterModel(&models.Post{})
 ### Step 1: Install forge
 
 ```bash
-# Build from source
+# Build from source (recommended)
 git clone https://github.com/forgego/forge.git
-cd forge
+cd forge/newforge
 go build -o forge ./cli/cmd
 
 # Or install via go install
-go install github.com/forgego/forge/cli/cmd@latest
+go install github.com/forgego/forge/newforge/cli/cmd@latest
 ```
 
 ### Step 2: Create Project
@@ -93,12 +93,14 @@ database:
   port: 5432
   user: postgres
   password: your_password
-  dbname: myapp_db
+  name: myapp_db
   sslmode: disable
 
 server:
   host: localhost
-  port: "8000"
+  port: 8000
+  
+secret_key: "your-secret-key-here"
 ```
 
 Create the database:
@@ -163,44 +165,43 @@ package main
 
 import (
     "log"
-    "github.com/forgego/forge/pkg/admin"
-    "github.com/forgego/forge/pkg/config"
-    "github.com/forgego/forge/pkg/db"
-    "github.com/forgego/forge/pkg/logging"
-    httplib "github.com/forgego/forge/pkg/http"
-    "github.com/forgego/forge/pkg/registry"
+    "github.com/forgego/forge/admin"
+    "github.com/forgego/forge/server"
+    "github.com/forgego/forge/config"
     "myapp/models"
 )
 
 func main() {
-    cfg := config.NewConfig()
-    settings := config.LoadSettings(cfg)
-
-    logger, _ := logging.NewLogger(cfg.IsDevelopment())
-    defer logger.Sync()
-
-    database, _ := db.NewDBFromConfig(cfg)
-    defer database.Close()
-
-    registry.RegisterModel(&models.Post{})
-    admin.RegisterModel(&models.Post{})
-
-    server, _ := httplib.NewServer(cfg, settings, logger)
+    // Load configuration
+    cfg := config.Load()
     
-    server.RegisterRoutes(func(router *httplib.Router) {
-        if settings.Admin.Enabled {
-            admin.RegisterAdminRoutes(router, settings.Admin.Path)
-        }
-    })
-
-    server.Start()
+    // Initialize database
+    db, err := server.NewDatabase(cfg.Database)
+    if err != nil {
+        log.Fatal("Failed to connect to database:", err)
+    }
+    defer db.Close()
+    
+    // Register models for admin
+    admin.RegisterModel(&models.Post{})
+    
+    // Setup routes and start server
+    srv := &server.Server{
+        Config: cfg,
+        DB:     db,
+    }
+    
+    log.Printf("Starting server on %s", cfg.Server.Address())
+    if err := srv.Start(); err != nil {
+        log.Fatal("Server failed:", err)
+    }
 }
 ```
 
 ### Step 7: Migrate & Run
 
 ```bash
-forge makemigrations
+forge generate
 forge migrate
 forge runserver
 ```

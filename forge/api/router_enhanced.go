@@ -124,3 +124,4 @@ func (r *EnhancedRouter) RegisterRoutesEnhanced(router *forgehttp.Router) {
 func (r *EnhancedRouter) OptionsHandler(w http.ResponseWriter, req *http.Request, view interface{}) {
 	docs.OptionsHandler(w, req, view, r.metadata)
 }
+

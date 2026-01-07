@@ -785,3 +785,4 @@ func (vs *EnhancedBaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 
 // Ensure EnhancedBaseViewSet implements ViewSet interface
 var _ ViewSet = (*EnhancedBaseViewSet)(nil)
+

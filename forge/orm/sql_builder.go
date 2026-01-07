@@ -215,3 +215,6 @@ func (b *SQLBuilder) BuildDelete(table string) string {
 	escapedTable := EscapeIdentifier(table)
 	return "DELETE FROM " + escapedTable
 }
+
+
+

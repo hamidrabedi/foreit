@@ -245,3 +245,4 @@ func AssertCoveringIndex(ctx context.Context, t *testing.T, db *sql.DB, tableNam
 		}
 	}
 }
+

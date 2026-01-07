@@ -29,3 +29,4 @@ func RunCLI(ctx context.Context, workdir string, env map[string]string, args []s
 	output, err := cmd.CombinedOutput()
 	return string(output), "", err
 }
+

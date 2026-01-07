@@ -5,11 +5,11 @@ import (
 	"sync"
 )
 
-// FieldBuilderFactory is a function that creates a new field builder for a given field name
-type FieldBuilderFactory func(name string) interface{}
+// FieldFactory is a function that creates a new field for a given field name.
+type FieldFactory func(name string) Field
 
 var (
-	fieldRegistry = make(map[string]FieldBuilderFactory)
+	fieldRegistry = make(map[string]FieldFactory)
 	registryMutex sync.RWMutex
 )
 
@@ -18,10 +18,10 @@ var (
 //
 // Example:
 //
-//	RegisterFieldType("custom_type", func(name string) interface{} {
-//	    return &CustomFieldBuilder{UnifiedFieldBuilder: newUnifiedFieldBuilder(name, TypeString)}}
+//	RegisterFieldType("custom_type", func(name string) Field {
+//	    return String(name)
 //	})
-func RegisterFieldType(typeName string, factory FieldBuilderFactory) error {
+func RegisterFieldType(typeName string, factory FieldFactory) error {
 	registryMutex.Lock()
 	defer registryMutex.Unlock()
 
@@ -30,7 +30,7 @@ func RegisterFieldType(typeName string, factory FieldBuilderFactory) error {
 	}
 
 	if factory == nil {
-		return fmt.Errorf("field builder factory cannot be nil")
+		return fmt.Errorf("field factory cannot be nil")
 	}
 
 	if _, exists := fieldRegistry[typeName]; exists {
@@ -41,15 +41,15 @@ func RegisterFieldType(typeName string, factory FieldBuilderFactory) error {
 	return nil
 }
 
-// UnregisterFieldType removes a registered field type
+// UnregisterFieldType removes a registered field type.
 func UnregisterFieldType(typeName string) {
 	registryMutex.Lock()
 	defer registryMutex.Unlock()
 	delete(fieldRegistry, typeName)
 }
 
-// GetFieldBuilderFactory retrieves the factory function for a registered field type
-func GetFieldBuilderFactory(typeName string) (FieldBuilderFactory, error) {
+// GetFieldFactory retrieves the factory function for a registered field type.
+func GetFieldFactory(typeName string) (FieldFactory, error) {
 	registryMutex.RLock()
 	defer registryMutex.RUnlock()
 
@@ -61,7 +61,7 @@ func GetFieldBuilderFactory(typeName string) (FieldBuilderFactory, error) {
 	return factory, nil
 }
 
-// IsFieldTypeRegistered checks if a field type is registered
+// IsFieldTypeRegistered checks if a field type is registered.
 func IsFieldTypeRegistered(typeName string) bool {
 	registryMutex.RLock()
 	defer registryMutex.RUnlock()
@@ -69,7 +69,7 @@ func IsFieldTypeRegistered(typeName string) bool {
 	return exists
 }
 
-// ListRegisteredFieldTypes returns a list of all registered custom field types
+// ListRegisteredFieldTypes returns a list of all registered custom field types.
 func ListRegisteredFieldTypes() []string {
 	registryMutex.RLock()
 	defer registryMutex.RUnlock()
@@ -81,32 +81,12 @@ func ListRegisteredFieldTypes() []string {
 	return types
 }
 
-// CustomFieldBuilder is an interface that custom field builders should implement
-// to work seamlessly with the schema system
-type CustomFieldBuilder interface {
-	// Build returns the final Field
-	Build() Field
-	// GetFieldType returns the FieldType for this builder
-	GetFieldType() FieldType
-}
-
-// NewFieldBuilder creates a new field builder instance for a registered field type
-// This allows dynamic creation of field builders at runtime
-func NewFieldBuilder(typeName, fieldName string) (CustomFieldBuilder, error) {
-	factory, err := GetFieldBuilderFactory(typeName)
+// NewField creates a new field instance for a registered field type.
+func NewField(typeName, fieldName string) (Field, error) {
+	factory, err := GetFieldFactory(typeName)
 	if err != nil {
-		return nil, err
+		return Field{}, err
 	}
 
-	builder := factory(fieldName)
-	if builder == nil {
-		return nil, fmt.Errorf("factory for field type %q returned nil", typeName)
-	}
-
-	customBuilder, ok := builder.(CustomFieldBuilder)
-	if !ok {
-		return nil, fmt.Errorf("field builder for type %q does not implement CustomFieldBuilder interface", typeName)
-	}
-
-	return customBuilder, nil
+	return factory(fieldName), nil
 }

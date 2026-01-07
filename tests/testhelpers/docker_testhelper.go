@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ory/dockertest/v3"
@@ -84,6 +85,7 @@ func DefaultPostgresOptsWithTest(testName string) PostgresOpts {
 			opts.DBName = fmt.Sprintf("testdb_%d", time.Now().UnixNano())
 		}
 	}
+	opts.DBName = truncateDBName(opts.DBName)
 	return opts
 
 	// Use DOCKER_HOST from environment if set
@@ -112,11 +114,20 @@ func sanitizeTestName(name string) string {
 			result += "_"
 		}
 	}
+	result = strings.ToLower(result)
 	// Limit length to 50 chars (PostgreSQL identifier limit is 63, but we want some room)
 	if len(result) > 50 {
 		result = result[:50]
 	}
 	return result
+}
+
+func truncateDBName(name string) string {
+	const maxDBNameLen = 63
+	if len(name) > maxDBNameLen {
+		return name[:maxDBNameLen]
+	}
+	return name
 }
 
 // GetDockerEndpoint returns the Docker endpoint to use, trying multiple sources
@@ -337,6 +348,8 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 	if dbName == "" {
 		dbName = "testdb"
 	}
+	dbName = strings.ToLower(dbName)
+	dbName = truncateDBName(dbName)
 
 	fmt.Printf("[DEBUG] Connecting directly to PostgreSQL at %s:%s\n", host, port)
 

@@ -31,3 +31,4 @@ func (e *ValidationError) AddError(field, message string) {
 func (e *ValidationError) HasErrors() bool {
 	return len(e.Errors) > 0
 }
+

@@ -128,3 +128,4 @@ func (c *StatusCommand) Execute(ctx *core.Context, args []string) error {
 
 	return nil
 }
+

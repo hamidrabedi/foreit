@@ -272,3 +272,4 @@ func getErrorMessage(fe validator.FieldError) string {
 func (v *Validator) RegisterCustomValidator(tag string, fn validator.Func) error {
 	return v.RegisterValidation(tag, fn)
 }
+

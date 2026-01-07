@@ -122,3 +122,4 @@ func SendPaginatedResponse(w http.ResponseWriter, r *http.Request, results inter
 	response := BuildPaginatedResponse(r, results, totalCount, page, pageSize)
 	return forgehttp.SendJSON(w, http.StatusOK, response)
 }
+

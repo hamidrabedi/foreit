@@ -94,3 +94,4 @@ func TestParser_ParseValue(t *testing.T) {
 		t.Error("Numeric value is nil")
 	}
 }
+

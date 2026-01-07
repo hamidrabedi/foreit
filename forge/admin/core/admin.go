@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"time"
 
@@ -214,7 +215,11 @@ func (a *Admin[T]) ListObjects(ctx context.Context, params ListParams) (*Paginat
 			}
 		}
 		if !applied {
-			// Default filter behavior (exact match)
+			// Default filter behavior (exact match) with operator support
+			if next, ok := applyFilterOperators(qs, key, value); ok {
+				qs = next
+				continue
+			}
 			qs = qs.Filter(orm.F(key).Eq(value))
 		}
 	}
@@ -306,12 +311,12 @@ func (a *Admin[T]) GetObject(ctx context.Context, id interface{}) (interface{}, 
 func (a *Admin[T]) CreateObject(ctx context.Context, data map[string]interface{}) (interface{}, error) {
 	// Create new instance
 	var instance T
-	
+
 	// Map data to instance fields
 	if err := a.decodeData(data, &instance); err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)
 	}
-	
+
 	err := a.SaveModel(ctx, &instance, true)
 	if err != nil {
 		return nil, err
@@ -335,7 +340,7 @@ func (a *Admin[T]) UpdateObject(ctx context.Context, id interface{}, data map[st
 	if err := a.decodeData(data, instance); err != nil {
 		return nil, fmt.Errorf("failed to decode data: %w", err)
 	}
-	
+
 	err = a.SaveModel(ctx, instance, false)
 	if err != nil {
 		return nil, err
@@ -348,7 +353,7 @@ func (a *Admin[T]) DeleteObject(ctx context.Context, id interface{}) error {
 	if err != nil {
 		return err
 	}
-	
+
 	instance, err := a.manager.Get(ctx, intID)
 	if err != nil {
 		return err
@@ -377,7 +382,7 @@ func (a *Admin[T]) ExecuteAction(ctx context.Context, actionName string, ids []i
 		if err != nil {
 			continue // Skip invalid IDs
 		}
-		
+
 		instance, err := a.manager.Get(ctx, intID)
 		if err == nil {
 			instances = append(instances, instance)
@@ -424,7 +429,7 @@ func (a *Admin[T]) LogAction(ctx context.Context, user interface{}, objectID str
 			ChangeStats: changes,
 			UserID:      fmt.Sprintf("%v", a.resolveUserID(user)),
 		}
-		
+
 		return a.config.HistoryManager.LogAction(ctx, entry)
 	}
 	return nil
@@ -662,6 +667,81 @@ func (a *Admin[T]) getObjectLabel(obj *T) string {
 	return a.metadata.VerboseName
 }
 
+func applyFilterOperators[T any](qs orm.QuerySet[T], key string, value interface{}) (orm.QuerySet[T], bool) {
+	parts := strings.Split(key, "__")
+	if len(parts) < 2 {
+		return qs, false
+	}
+	field := parts[0]
+	op := parts[1]
+
+	switch op {
+	case "gte":
+		return qs.Filter(orm.F(field).Gte(value)), true
+	case "lte":
+		return qs.Filter(orm.F(field).Lte(value)), true
+	case "gt":
+		return qs.Filter(orm.F(field).Gt(value)), true
+	case "lt":
+		return qs.Filter(orm.F(field).Lt(value)), true
+	case "icontains":
+		if s, ok := value.(string); ok {
+			return qs.Filter(orm.F(field).IContains(s)), true
+		}
+	case "contains":
+		if s, ok := value.(string); ok {
+			return qs.Filter(orm.F(field).Contains(s)), true
+		}
+	case "in":
+		values := coerceToInterfaceSlice(value)
+		if len(values) > 0 {
+			return qs.Filter(orm.F(field).In(values...)), true
+		}
+	case "isnull":
+		switch v := value.(type) {
+		case string:
+			if strings.EqualFold(v, "true") || v == "1" {
+				return qs.Filter(orm.F(field).IsNull()), true
+			}
+			return qs.Filter(orm.Not(orm.F(field).IsNull())), true
+		case bool:
+			if v {
+				return qs.Filter(orm.F(field).IsNull()), true
+			}
+			return qs.Filter(orm.Not(orm.F(field).IsNull())), true
+		}
+	}
+
+	return qs, false
+}
+
+func coerceToInterfaceSlice(value interface{}) []interface{} {
+	switch typed := value.(type) {
+	case []interface{}:
+		return typed
+	case []string:
+		out := make([]interface{}, 0, len(typed))
+		for _, v := range typed {
+			out = append(out, v)
+		}
+		return out
+	case string:
+		parts := strings.Split(typed, ",")
+		out := make([]interface{}, 0, len(parts))
+		for _, part := range parts {
+			if trimmed := strings.TrimSpace(part); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	default:
+		if value != nil {
+			return []interface{}{value}
+		}
+	}
+	return []interface{}{}
+}
+
 // toInt64 converts interface{} to int64
 func toInt64(v interface{}) (int64, error) {
 	if v == nil {
@@ -716,3 +796,4 @@ func toInt64(v interface{}) (int64, error) {
 
 	return 0, fmt.Errorf("cannot convert %T to int64", v)
 }
+

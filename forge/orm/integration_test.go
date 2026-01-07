@@ -233,3 +233,6 @@ func TestSQLBuilder_Integration_ComplexQuery(t *testing.T) {
 func intPtr(i int) *int {
 	return &i
 }
+
+
+

@@ -234,3 +234,4 @@ func NewDateRangeFilter[T any](fieldPath string) *DateRangeFilter[T] {
 		RangeFilter: NewRangeFilter[T](fieldPath),
 	}
 }
+

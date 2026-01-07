@@ -99,9 +99,9 @@ type Product struct {
 
 func (Product) Fields() []schema.Field {
     return []schema.Field{
-        schema.Int64("id").Primary().AutoIncrement().Build(),
-        schema.String("name").Required().MaxLength(255).Build(),
-        schema.Float64("price").Required().Build(),
+        schema.Int64("id").WithPrimary().WithAutoIncrement(),
+        schema.String("name").WithRequired().WithMaxLength(255),
+        schema.Float64("price").WithRequired(),
     }
 }
 ```
@@ -869,3 +869,4 @@ This ecommerce example demonstrates all Forge CLI commands:
 ✅ **Deployment**: build, docker integration
 
 Every command has been designed to make Django developers feel at home while leveraging Go's type safety and performance.
+

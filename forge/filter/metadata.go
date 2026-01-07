@@ -107,3 +107,4 @@ func (fs *FilterSet[T]) GetAvailableFilters() []string {
 	}
 	return names
 }
+

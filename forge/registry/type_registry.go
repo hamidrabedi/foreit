@@ -158,3 +158,4 @@ func (tr *TypeRegistry) List() []string {
 	}
 	return names
 }
+

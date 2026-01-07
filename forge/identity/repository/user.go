@@ -589,3 +589,4 @@ func (r *userRepository) ExistsUsername(ctx context.Context, username string) (b
 
 	return exists, nil
 }
+

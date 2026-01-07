@@ -38,3 +38,4 @@ func parseRate(rate string) (int, time.Duration, error) {
 
 	return limit, duration, nil
 }
+

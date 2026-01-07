@@ -29,3 +29,4 @@ func (s *UserSession) IsExpired() bool {
 func (s *UserSession) IsActive() bool {
 	return !s.IsExpired()
 }
+

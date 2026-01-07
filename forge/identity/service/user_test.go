@@ -66,6 +66,49 @@ func setupTestDB(t *testing.T) *db.DB {
 			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			deleted_at TIMESTAMP
 		);
+
+		CREATE TABLE IF NOT EXISTS user_sessions (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			session_key VARCHAR(64) UNIQUE NOT NULL,
+			ip_address VARCHAR(45),
+			user_agent TEXT,
+			last_activity TIMESTAMP NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP,
+			is_remember_me BOOLEAN DEFAULT 0
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+		CREATE INDEX IF NOT EXISTS idx_user_sessions_session_key ON user_sessions(session_key);
+		CREATE INDEX IF NOT EXISTS idx_user_sessions_expires_at ON user_sessions(expires_at);
+
+		CREATE TABLE IF NOT EXISTS email_verification_tokens (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token VARCHAR(64) UNIQUE NOT NULL,
+			email VARCHAR(254) NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP NOT NULL,
+			verified_at TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token ON email_verification_tokens(token);
+		CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user_id ON email_verification_tokens(user_id);
+		CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_expires_at ON email_verification_tokens(expires_at);
+
+		CREATE TABLE IF NOT EXISTS password_reset_tokens (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			token VARCHAR(64) UNIQUE NOT NULL,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			expires_at TIMESTAMP NOT NULL,
+			used_at TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token);
+		CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id ON password_reset_tokens(user_id);
+		CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_expires_at ON password_reset_tokens(expires_at);
 	`)
 	require.NoError(t, err)
 
@@ -222,6 +265,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 		updated, err := service.UpdateUser(ctx, user.ID, updateReq)
 		require.NoError(t, err)
 		assert.Equal(t, "newemail@example.com", updated.Email)
+		user.Email = updated.Email
 	})
 
 	t.Run("fails to update non-existent user", func(t *testing.T) {

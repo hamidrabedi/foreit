@@ -178,3 +178,4 @@ func (p *SQLParser) getLineColumn(sql string, pos int) (line, col int) {
 	}
 	return line, col
 }
+

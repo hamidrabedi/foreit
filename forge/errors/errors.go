@@ -129,3 +129,4 @@ func IsDatabaseError(err error) bool {
 	_, ok := err.(*DatabaseError)
 	return ok
 }
+

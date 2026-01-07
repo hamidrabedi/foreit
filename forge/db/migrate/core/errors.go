@@ -40,3 +40,4 @@ func NewMigrationError(code ErrorCode, message string, cause error) *MigrationEr
 		Cause:   cause,
 	}
 }
+

@@ -121,3 +121,4 @@ func ValidateStructWithTags(validator *Validator, structValue interface{}) error
 func ValidateFieldValue(validator *Validator, value interface{}, tag string) error {
 	return validator.ValidateField(value, tag)
 }
+

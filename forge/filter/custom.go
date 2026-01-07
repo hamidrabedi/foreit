@@ -112,3 +112,4 @@ func (f *CustomFilter[T]) ToExpression(fieldPath string, value interface{}) (orm
 
 	return f.handler.Handler(value)
 }
+

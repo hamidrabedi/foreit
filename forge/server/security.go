@@ -344,3 +344,4 @@ func (x *XSS) SanitizeInput(input string) string {
 
 	return input
 }
+

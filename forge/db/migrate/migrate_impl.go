@@ -144,3 +144,4 @@ type Generator struct {
 func (g *Generator) GenerateMigrations(name string) error {
 	return g.generator.GenerateMigrations(name)
 }
+

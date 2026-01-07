@@ -12,7 +12,7 @@ type {{.ModelName}} struct {
 // Fields returns all field definitions for {{.ModelName}}
 func ({{.ModelName}}) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
 		// Add your fields here
 	}
 }
@@ -35,4 +35,6 @@ func ({{.ModelName}}) Relations() []schema.Relation {
 func ({{.ModelName}}) Hooks() *schema.ModelHooks {
 	return nil
 }
+
+
 

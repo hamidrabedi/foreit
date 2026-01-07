@@ -158,3 +158,4 @@ func ProductionLogger(logPath string) (*Logger, error) {
 	builder.Sampling(100, 100)
 	return builder.Build()
 }
+

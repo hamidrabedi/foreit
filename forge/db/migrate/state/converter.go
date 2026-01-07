@@ -8,6 +8,9 @@ import (
 func (s *SchemaState) ToModelDefinitions() []*generator.ModelDefinition {
 	var defs []*generator.ModelDefinition
 	for _, tableState := range s.Tables {
+		if tableState.Name == "schema_migrations" {
+			continue
+		}
 		def := &generator.ModelDefinition{
 			Name:      tableState.Name,
 			Fields:    []generator.FieldDefinition{},

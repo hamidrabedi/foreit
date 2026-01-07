@@ -86,3 +86,4 @@ func (f *BaseField) Validate(value interface{}) error {
 	}
 	return nil
 }
+

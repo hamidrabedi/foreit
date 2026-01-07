@@ -2,7 +2,7 @@ package marketing
 
 import (
 	"context"
-	
+
 	"github.com/forgego/forge/api"
 	"github.com/forgego/forge/db"
 )
@@ -20,7 +20,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-priority", "-created_at", "code"},
 		PerPage:      20,
 	})
-	
+
 	// CouponUsage API
 	router.Register("coupon-usage", &api.ViewSetConfig{
 		Model:        &CouponUsage{},
@@ -32,7 +32,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at"},
 		PerPage:      20,
 	})
-	
+
 	// Review API
 	router.Register("reviews", &api.ViewSetConfig{
 		Model:        &Review{},
@@ -44,7 +44,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at", "-helpful_count", "rating"},
 		PerPage:      20,
 	})
-	
+
 	// ReviewImage API
 	router.Register("review-images", &api.ViewSetConfig{
 		Model:        &ReviewImage{},
@@ -56,7 +56,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"review_id", "sort_order"},
 		PerPage:      50,
 	})
-	
+
 	// ReviewHelpfulness API (usually not exposed, just for admin)
 	router.Register("review-helpfulness", &api.ViewSetConfig{
 		Model:        &ReviewHelpfulness{},
@@ -68,7 +68,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at"},
 		PerPage:      20,
 	})
-	
+
 	// ProductQuestion API
 	router.Register("product-questions", &api.ViewSetConfig{
 		Model:        &ProductQuestion{},

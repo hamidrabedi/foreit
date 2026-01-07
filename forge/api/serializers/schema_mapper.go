@@ -36,7 +36,7 @@ func FromSchema[T any](schemaInstance schema.Schema) *TypedSerializer[T] {
 
 		// Apply schema constraints
 		if field.Required {
-			typedField = typedField.Required()
+			typedField = typedField.WithRequired()
 		}
 
 		// Add to serializer
@@ -56,7 +56,7 @@ func createTypedFieldFromSchema[T any](schemaField schema.Field, accessor *orm.F
 
 	// Apply schema options
 	if schemaField.Default != nil {
-		typedField = typedField.Default(schemaField.Default)
+		typedField = typedField.WithDefault(schemaField.Default)
 	}
 
 	return typedField
@@ -67,3 +67,5 @@ func (ts *TypedSerializer[T]) Override(fieldName string, field TypedField[T]) *T
 	ts.fields[fieldName] = field
 	return ts
 }
+
+

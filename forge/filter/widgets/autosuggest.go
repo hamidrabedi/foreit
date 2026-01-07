@@ -45,3 +45,4 @@ func (w *AutosuggestWidget) Render(name string, value interface{}, attrs map[str
 func (w *AutosuggestWidget) Parse(value string) (interface{}, error) {
 	return value, nil
 }
+

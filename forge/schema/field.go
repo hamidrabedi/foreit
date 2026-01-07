@@ -25,9 +25,48 @@ const (
 	TypeOneToOne
 )
 
+func (t FieldType) String() string {
+	switch t {
+	case TypeInt64, TypeInt32:
+		return "integer"
+	case TypeFloat32, TypeFloat64:
+		return "float"
+	case TypeDecimal:
+		return "decimal"
+	case TypeString:
+		return "string"
+	case TypeText:
+		return "text"
+	case TypeEmail:
+		return "email"
+	case TypeURL:
+		return "url"
+	case TypeUUID:
+		return "uuid"
+	case TypeJSON:
+		return "json"
+	case TypeBytes:
+		return "bytes"
+	case TypeBool:
+		return "boolean"
+	case TypeDate:
+		return "date"
+	case TypeDateTime:
+		return "datetime"
+	case TypeTime:
+		return "time"
+	case TypeForeignKey:
+		return "foreign_key"
+	case TypeManyToMany:
+		return "many_to_many"
+	case TypeOneToOne:
+		return "one_to_one"
+	default:
+		return "unknown"
+	}
+}
+
 // Field represents a model field with ALL Django field options.
-// This struct maintains compatibility while the internal
-// organization is improved through FieldOptions (see field_config.go).
 type Field struct {
 	// Core field properties
 	CustomField CustomField

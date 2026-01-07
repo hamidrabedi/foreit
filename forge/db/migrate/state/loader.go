@@ -288,3 +288,4 @@ func applyChangeToState(state *SchemaState, change core.Change) error {
 	manager := &InMemoryState{state: state}
 	return manager.Apply([]core.Change{change})
 }
+

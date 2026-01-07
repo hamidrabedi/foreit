@@ -7,45 +7,47 @@ import (
 // Metadata represents the complete metadata for an admin model
 // This is what gets serialized to JSON for the frontend
 type Metadata struct {
-	Name              string              `json:"name"`
-	VerboseName       string              `json:"verbose_name"`
-	VerboseNamePlural string              `json:"verbose_name_plural"`
-	Description       string              `json:"description,omitempty"`
-	Icon              string              `json:"icon,omitempty"`
-	Fields            []FieldMetadata     `json:"fields"`
-	Relations         []RelationMetadata  `json:"relations,omitempty"`
-	Permissions       PermissionMetadata  `json:"permissions"`
-	Actions           []ActionMetadata    `json:"actions"`
-	Filters           []FilterMetadata    `json:"filters"`
-	ListDisplay       []string            `json:"list_display"`
-	ListFilter        []string            `json:"list_filter,omitempty"`
-	SearchFields      []string            `json:"search_fields,omitempty"`
-	Ordering          []string            `json:"ordering,omitempty"`
-	Pagination        PaginationConfig    `json:"pagination"`
-	PageType          string              `json:"page_type,omitempty"` // "list", "form", "list-form", "detail"
-	UIOverrides       map[string]string   `json:"ui_overrides,omitempty"`
+	Name              string             `json:"name"`
+	VerboseName       string             `json:"verbose_name"`
+	VerboseNamePlural string             `json:"verbose_name_plural"`
+	Description       string             `json:"description,omitempty"`
+	Icon              string             `json:"icon,omitempty"`
+	Fields            []FieldMetadata    `json:"fields"`
+	Relations         []RelationMetadata `json:"relations,omitempty"`
+	Permissions       PermissionMetadata `json:"permissions"`
+	Actions           []ActionMetadata   `json:"actions"`
+	Filters           []FilterMetadata   `json:"filters"`
+	ListDisplay       []string           `json:"list_display"`
+	ListFilter        []string           `json:"list_filter,omitempty"`
+	SearchFields      []string           `json:"search_fields,omitempty"`
+	Ordering          []string           `json:"ordering,omitempty"`
+	Pagination        PaginationConfig   `json:"pagination"`
+	PageType          string             `json:"page_type,omitempty"` // "list", "form", "list-form", "detail"
+	UIOverrides       map[string]string  `json:"ui_overrides,omitempty"`
+	ReadOnlyFields    []string           `json:"read_only_fields,omitempty"`
+	Fieldsets         []FieldsetMetadata `json:"fieldsets,omitempty"`
 }
 
 // FieldMetadata represents metadata for a single field
 type FieldMetadata struct {
-	Name         string                 `json:"name"`
-	Type         string                 `json:"type"`
-	Label        string                 `json:"label"`
-	HelpText     string                 `json:"help_text,omitempty"`
-	Required     bool                   `json:"required"`
-	ReadOnly     bool                   `json:"read_only"`
-	Choices      []Choice               `json:"choices,omitempty"`
-	Widget       string                 `json:"widget"`
-	Validators   []ValidatorMetadata    `json:"validators,omitempty"`
-	DefaultValue interface{}            `json:"default_value,omitempty"`
-	MaxLength    int                    `json:"max_length,omitempty"`
-	MinLength    int                    `json:"min_length,omitempty"`
-	MaxValue     interface{}            `json:"max_value,omitempty"`
-	MinValue     interface{}            `json:"min_value,omitempty"`
-	Accept       string                 `json:"accept,omitempty"`       // For file uploads
-	MaxSize      int64                  `json:"max_size,omitempty"`     // For file uploads
-	Multiple     bool                   `json:"multiple,omitempty"`     // For file uploads
-	AllowCreate  bool                   `json:"allow_create,omitempty"` // For relations
+	Name         string              `json:"name"`
+	Type         string              `json:"type"`
+	Label        string              `json:"label"`
+	HelpText     string              `json:"help_text,omitempty"`
+	Required     bool                `json:"required"`
+	ReadOnly     bool                `json:"read_only"`
+	Choices      []Choice            `json:"choices,omitempty"`
+	Widget       string              `json:"widget"`
+	Validators   []ValidatorMetadata `json:"validators,omitempty"`
+	DefaultValue interface{}         `json:"default_value,omitempty"`
+	MaxLength    int                 `json:"max_length,omitempty"`
+	MinLength    int                 `json:"min_length,omitempty"`
+	MaxValue     interface{}         `json:"max_value,omitempty"`
+	MinValue     interface{}         `json:"min_value,omitempty"`
+	Accept       string              `json:"accept,omitempty"`       // For file uploads
+	MaxSize      int64               `json:"max_size,omitempty"`     // For file uploads
+	Multiple     bool                `json:"multiple,omitempty"`     // For file uploads
+	AllowCreate  bool                `json:"allow_create,omitempty"` // For relations
 }
 
 // Choice represents a choice for a field
@@ -102,6 +104,14 @@ type FilterMetadata struct {
 	UIComponent  string                 `json:"ui_component,omitempty"`
 }
 
+// FieldsetMetadata represents metadata for form fieldsets.
+type FieldsetMetadata struct {
+	Name        string   `json:"name"`
+	Fields      []string `json:"fields"`
+	Collapsed   bool     `json:"collapsed,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
 // PaginationConfig represents pagination configuration
 type PaginationConfig struct {
 	PageSize    int `json:"page_size"`
@@ -110,11 +120,11 @@ type PaginationConfig struct {
 
 // ModelListMetadata represents metadata for the model list endpoint
 type ModelListMetadata struct {
-	Name              string `json:"name"`
-	VerboseName       string `json:"verbose_name"`
-	VerboseNamePlural string `json:"verbose_name_plural"`
-	Icon              string `json:"icon,omitempty"`
-	Count             int64  `json:"count"`
+	Name              string             `json:"name"`
+	VerboseName       string             `json:"verbose_name"`
+	VerboseNamePlural string             `json:"verbose_name_plural"`
+	Icon              string             `json:"icon,omitempty"`
+	Count             int64              `json:"count"`
 	Permissions       PermissionMetadata `json:"permissions"`
 }
 
@@ -149,9 +159,9 @@ type BulkActionRequest struct {
 
 // BulkActionResponse represents a bulk action response
 type BulkActionResponse struct {
-	Success  bool   `json:"success"`
-	Affected int    `json:"affected"`
-	Message  string `json:"message"`
+	Success  bool              `json:"success"`
+	Affected int               `json:"affected"`
+	Message  string            `json:"message"`
 	Errors   []BulkActionError `json:"errors,omitempty"`
 }
 
@@ -174,17 +184,17 @@ type SearchResponse struct {
 
 // SearchResultGroup represents search results for a model
 type SearchResultGroup struct {
-	Model string              `json:"model"`
-	Count int                 `json:"count"`
-	Items []SearchResultItem  `json:"items"`
+	Model string             `json:"model"`
+	Count int                `json:"count"`
+	Items []SearchResultItem `json:"items"`
 }
 
 // SearchResultItem represents a single search result
 type SearchResultItem struct {
 	ID        interface{} `json:"id"`
 	Title     string      `json:"title"`
-	Highlight string `json:"highlight,omitempty"`
-	URL       string `json:"url"`
+	Highlight string      `json:"highlight,omitempty"`
+	URL       string      `json:"url"`
 }
 
 // AutocompleteRequest represents an autocomplete request
@@ -207,11 +217,12 @@ type AutocompleteItem struct {
 
 // UploadResponse represents a file upload response
 type UploadResponse struct {
-	URL      string    `json:"url"`
-	Filename string    `json:"filename"`
-	Size     int64     `json:"size"`
-	MimeType string    `json:"mime_type"`
-	Width    int       `json:"width,omitempty"`
-	Height   int       `json:"height,omitempty"`
+	URL        string    `json:"url"`
+	Filename   string    `json:"filename"`
+	Size       int64     `json:"size"`
+	MimeType   string    `json:"mime_type"`
+	Width      int       `json:"width,omitempty"`
+	Height     int       `json:"height,omitempty"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }
+

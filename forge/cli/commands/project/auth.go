@@ -64,15 +64,15 @@ type User struct {
 // Fields returns all field definitions for User
 func (User) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("username").Unique().Required().MaxLength(150).Build(),
-		schema.String("email").Unique().Required().MaxLength(255).Build(),
-		schema.String("password").Required().MaxLength(128).Build(),
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("is_staff").Default(false).Build(),
-		schema.Bool("is_superuser").Default(false).Build(),
-		schema.Time("date_joined").AutoNowAdd().Build(),
-		schema.Time("last_login").Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("username").WithUnique().WithRequired().WithMaxLength(150),
+		schema.String("email").WithUnique().WithRequired().WithMaxLength(255),
+		schema.String("password").WithRequired().WithMaxLength(128),
+		schema.Bool("is_active").WithDefault(true),
+		schema.Bool("is_staff").WithDefault(false),
+		schema.Bool("is_superuser").WithDefault(false),
+		schema.Time("date_joined").WithAutoNowAdd(),
+		schema.Time("last_login"),
 	}
 }
 

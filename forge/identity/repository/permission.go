@@ -432,3 +432,4 @@ func (r *groupRepository) RemovePermission(ctx context.Context, groupID, permiss
 
 	return nil
 }
+

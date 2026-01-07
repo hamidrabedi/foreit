@@ -19,3 +19,4 @@ var (
 	NewLinter       = verify.NewLinter
 	NewDriftDetector = verify.NewDriftDetector
 )
+

@@ -18,3 +18,4 @@ var (
 	NewDetector                      = generate.NewDetector
 	NewSquasher                      = generate.NewSquasher
 )
+

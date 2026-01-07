@@ -192,3 +192,4 @@ func (c *ShowCommand) Execute(ctx *core.Context, args []string) error {
 
 	return nil
 }
+

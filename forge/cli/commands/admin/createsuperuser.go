@@ -129,3 +129,4 @@ func readPassword() (string, error) {
 	}
 	return strings.TrimSpace(password), nil
 }
+

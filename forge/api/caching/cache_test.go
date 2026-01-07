@@ -106,3 +106,4 @@ func TestDefaultCacheKeyGenerator_MultipleParts(t *testing.T) {
 	key := generator.GenerateKey("users", "123", "orders", "456")
 	assert.Equal(t, "cache:users:123:orders:456", key)
 }
+

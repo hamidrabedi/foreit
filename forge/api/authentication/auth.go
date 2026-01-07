@@ -72,3 +72,4 @@ func GetUserFromRequest(r *http.Request) (interface{}, bool) {
 func GetAuthFromRequest(r *http.Request) (interface{}, bool) {
 	return core.AuthFromContext(r.Context())
 }
+

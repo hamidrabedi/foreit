@@ -2,13 +2,10 @@
 package customers
 
 import (
-	"time"
 	"github.com/forgego/forge/orm"
-	"github.com/forgego/forge/schema"
 	"github.com/forgego/forge/validate"
+	"time"
 )
-
-
 
 // Validate validates the CustomerGroup model
 func (m *CustomerGroup) Validate() error {
@@ -22,28 +19,26 @@ var CustomerGroupObjects, _ = orm.NewManager[CustomerGroup]("customer_groups")
 
 // CustomerGroupFields provides type-safe field access for CustomerGroup
 type CustomerGroupFields struct {
-	Id orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
-	Code orm.FieldExpression[string]
-	Description orm.FieldExpression[string]
+	Id                 orm.FieldExpression[int64]
+	Name               orm.FieldExpression[string]
+	Code               orm.FieldExpression[string]
+	Description        orm.FieldExpression[string]
 	DiscountPercentage orm.FieldExpression[float64]
-	IsActive orm.FieldExpression[bool]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	IsActive           orm.FieldExpression[bool]
+	CreatedAt          orm.FieldExpression[time.Time]
+	UpdatedAt          orm.FieldExpression[time.Time]
 }
 
 var CustomerGroupFieldsInstance = CustomerGroupFields{
-	Id: orm.NewField[int64]("id", "customer_groups"),
-	Name: orm.NewField[string]("name", "customer_groups"),
-	Code: orm.NewField[string]("code", "customer_groups"),
-	Description: orm.NewField[string]("description", "customer_groups"),
+	Id:                 orm.NewField[int64]("id", "customer_groups"),
+	Name:               orm.NewField[string]("name", "customer_groups"),
+	Code:               orm.NewField[string]("code", "customer_groups"),
+	Description:        orm.NewField[string]("description", "customer_groups"),
 	DiscountPercentage: orm.NewField[float64]("discount_percentage", "customer_groups"),
-	IsActive: orm.NewField[bool]("is_active", "customer_groups"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "customer_groups"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "customer_groups"),
+	IsActive:           orm.NewField[bool]("is_active", "customer_groups"),
+	CreatedAt:          orm.NewField[time.Time]("created_at", "customer_groups"),
+	UpdatedAt:          orm.NewField[time.Time]("updated_at", "customer_groups"),
 }
-
-
 
 // Validate validates the Customer model
 func (m *Customer) Validate() error {
@@ -57,66 +52,64 @@ var CustomerObjects, _ = orm.NewManager[Customer]("customers")
 
 // CustomerFields provides type-safe field access for Customer
 type CustomerFields struct {
-	Id orm.FieldExpression[int64]
-	Email orm.FieldExpression[string]
-	PasswordHash orm.FieldExpression[string]
-	FirstName orm.FieldExpression[string]
-	LastName orm.FieldExpression[string]
-	Phone orm.FieldExpression[string]
-	DateOfBirth orm.FieldExpression[time.Time]
-	Gender orm.FieldExpression[string]
-	CompanyName orm.FieldExpression[string]
-	TaxId orm.FieldExpression[string]
-	CustomerGroupId orm.FieldExpression[int64]
-	IsActive orm.FieldExpression[bool]
-	IsVerified orm.FieldExpression[bool]
-	AcceptsMarketing orm.FieldExpression[bool]
-	VerificationToken orm.FieldExpression[string]
-	ResetPasswordToken orm.FieldExpression[string]
+	Id                     orm.FieldExpression[int64]
+	Email                  orm.FieldExpression[string]
+	PasswordHash           orm.FieldExpression[string]
+	FirstName              orm.FieldExpression[string]
+	LastName               orm.FieldExpression[string]
+	Phone                  orm.FieldExpression[string]
+	DateOfBirth            orm.FieldExpression[time.Time]
+	Gender                 orm.FieldExpression[string]
+	CompanyName            orm.FieldExpression[string]
+	TaxId                  orm.FieldExpression[string]
+	CustomerGroupId        orm.FieldExpression[int64]
+	IsActive               orm.FieldExpression[bool]
+	IsVerified             orm.FieldExpression[bool]
+	AcceptsMarketing       orm.FieldExpression[bool]
+	VerificationToken      orm.FieldExpression[string]
+	ResetPasswordToken     orm.FieldExpression[string]
 	ResetPasswordExpiresAt orm.FieldExpression[time.Time]
-	LastLoginAt orm.FieldExpression[time.Time]
-	LastLoginIp orm.FieldExpression[string]
-	TotalOrders orm.FieldExpression[int32]
-	TotalSpent orm.FieldExpression[float64]
-	AverageOrderValue orm.FieldExpression[float64]
-	PreferredLanguage orm.FieldExpression[string]
-	PreferredCurrency orm.FieldExpression[string]
-	Notes orm.FieldExpression[string]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	LastLoginAt            orm.FieldExpression[time.Time]
+	LastLoginIp            orm.FieldExpression[string]
+	TotalOrders            orm.FieldExpression[int32]
+	TotalSpent             orm.FieldExpression[float64]
+	AverageOrderValue      orm.FieldExpression[float64]
+	PreferredLanguage      orm.FieldExpression[string]
+	PreferredCurrency      orm.FieldExpression[string]
+	Notes                  orm.FieldExpression[string]
+	CreatedAt              orm.FieldExpression[time.Time]
+	UpdatedAt              orm.FieldExpression[time.Time]
 }
 
 var CustomerFieldsInstance = CustomerFields{
-	Id: orm.NewField[int64]("id", "customers"),
-	Email: orm.NewField[string]("email", "customers"),
-	PasswordHash: orm.NewField[string]("password_hash", "customers"),
-	FirstName: orm.NewField[string]("first_name", "customers"),
-	LastName: orm.NewField[string]("last_name", "customers"),
-	Phone: orm.NewField[string]("phone", "customers"),
-	DateOfBirth: orm.NewField[time.Time]("date_of_birth", "customers"),
-	Gender: orm.NewField[string]("gender", "customers"),
-	CompanyName: orm.NewField[string]("company_name", "customers"),
-	TaxId: orm.NewField[string]("tax_id", "customers"),
-	CustomerGroupId: orm.NewField[int64]("customer_group_id", "customers"),
-	IsActive: orm.NewField[bool]("is_active", "customers"),
-	IsVerified: orm.NewField[bool]("is_verified", "customers"),
-	AcceptsMarketing: orm.NewField[bool]("accepts_marketing", "customers"),
-	VerificationToken: orm.NewField[string]("verification_token", "customers"),
-	ResetPasswordToken: orm.NewField[string]("reset_password_token", "customers"),
+	Id:                     orm.NewField[int64]("id", "customers"),
+	Email:                  orm.NewField[string]("email", "customers"),
+	PasswordHash:           orm.NewField[string]("password_hash", "customers"),
+	FirstName:              orm.NewField[string]("first_name", "customers"),
+	LastName:               orm.NewField[string]("last_name", "customers"),
+	Phone:                  orm.NewField[string]("phone", "customers"),
+	DateOfBirth:            orm.NewField[time.Time]("date_of_birth", "customers"),
+	Gender:                 orm.NewField[string]("gender", "customers"),
+	CompanyName:            orm.NewField[string]("company_name", "customers"),
+	TaxId:                  orm.NewField[string]("tax_id", "customers"),
+	CustomerGroupId:        orm.NewField[int64]("customer_group_id", "customers"),
+	IsActive:               orm.NewField[bool]("is_active", "customers"),
+	IsVerified:             orm.NewField[bool]("is_verified", "customers"),
+	AcceptsMarketing:       orm.NewField[bool]("accepts_marketing", "customers"),
+	VerificationToken:      orm.NewField[string]("verification_token", "customers"),
+	ResetPasswordToken:     orm.NewField[string]("reset_password_token", "customers"),
 	ResetPasswordExpiresAt: orm.NewField[time.Time]("reset_password_expires_at", "customers"),
-	LastLoginAt: orm.NewField[time.Time]("last_login_at", "customers"),
-	LastLoginIp: orm.NewField[string]("last_login_ip", "customers"),
-	TotalOrders: orm.NewField[int32]("total_orders", "customers"),
-	TotalSpent: orm.NewField[float64]("total_spent", "customers"),
-	AverageOrderValue: orm.NewField[float64]("average_order_value", "customers"),
-	PreferredLanguage: orm.NewField[string]("preferred_language", "customers"),
-	PreferredCurrency: orm.NewField[string]("preferred_currency", "customers"),
-	Notes: orm.NewField[string]("notes", "customers"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "customers"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "customers"),
+	LastLoginAt:            orm.NewField[time.Time]("last_login_at", "customers"),
+	LastLoginIp:            orm.NewField[string]("last_login_ip", "customers"),
+	TotalOrders:            orm.NewField[int32]("total_orders", "customers"),
+	TotalSpent:             orm.NewField[float64]("total_spent", "customers"),
+	AverageOrderValue:      orm.NewField[float64]("average_order_value", "customers"),
+	PreferredLanguage:      orm.NewField[string]("preferred_language", "customers"),
+	PreferredCurrency:      orm.NewField[string]("preferred_currency", "customers"),
+	Notes:                  orm.NewField[string]("notes", "customers"),
+	CreatedAt:              orm.NewField[time.Time]("created_at", "customers"),
+	UpdatedAt:              orm.NewField[time.Time]("updated_at", "customers"),
 }
-
-
 
 // Validate validates the Address model
 func (m *Address) Validate() error {
@@ -130,54 +123,52 @@ var AddressObjects, _ = orm.NewManager[Address]("addresses")
 
 // AddressFields provides type-safe field access for Address
 type AddressFields struct {
-	Id orm.FieldExpression[int64]
-	CustomerId orm.FieldExpression[int64]
-	AddressType orm.FieldExpression[string]
-	FirstName orm.FieldExpression[string]
-	LastName orm.FieldExpression[string]
-	CompanyName orm.FieldExpression[string]
-	Phone orm.FieldExpression[string]
-	AddressLine1 orm.FieldExpression[string]
-	AddressLine2 orm.FieldExpression[string]
-	City orm.FieldExpression[string]
-	StateProvince orm.FieldExpression[string]
-	PostalCode orm.FieldExpression[string]
-	CountryCode orm.FieldExpression[string]
-	CountryName orm.FieldExpression[string]
-	Latitude orm.FieldExpression[float64]
-	Longitude orm.FieldExpression[float64]
-	IsDefaultShipping orm.FieldExpression[bool]
-	IsDefaultBilling orm.FieldExpression[bool]
+	Id                   orm.FieldExpression[int64]
+	CustomerId           orm.FieldExpression[int64]
+	AddressType          orm.FieldExpression[string]
+	FirstName            orm.FieldExpression[string]
+	LastName             orm.FieldExpression[string]
+	CompanyName          orm.FieldExpression[string]
+	Phone                orm.FieldExpression[string]
+	AddressLine1         orm.FieldExpression[string]
+	AddressLine2         orm.FieldExpression[string]
+	City                 orm.FieldExpression[string]
+	StateProvince        orm.FieldExpression[string]
+	PostalCode           orm.FieldExpression[string]
+	CountryCode          orm.FieldExpression[string]
+	CountryName          orm.FieldExpression[string]
+	Latitude             orm.FieldExpression[float64]
+	Longitude            orm.FieldExpression[float64]
+	IsDefaultShipping    orm.FieldExpression[bool]
+	IsDefaultBilling     orm.FieldExpression[bool]
 	DeliveryInstructions orm.FieldExpression[string]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	CreatedAt            orm.FieldExpression[time.Time]
+	UpdatedAt            orm.FieldExpression[time.Time]
 }
 
 var AddressFieldsInstance = AddressFields{
-	Id: orm.NewField[int64]("id", "addresses"),
-	CustomerId: orm.NewField[int64]("customer_id", "addresses"),
-	AddressType: orm.NewField[string]("address_type", "addresses"),
-	FirstName: orm.NewField[string]("first_name", "addresses"),
-	LastName: orm.NewField[string]("last_name", "addresses"),
-	CompanyName: orm.NewField[string]("company_name", "addresses"),
-	Phone: orm.NewField[string]("phone", "addresses"),
-	AddressLine1: orm.NewField[string]("address_line1", "addresses"),
-	AddressLine2: orm.NewField[string]("address_line2", "addresses"),
-	City: orm.NewField[string]("city", "addresses"),
-	StateProvince: orm.NewField[string]("state_province", "addresses"),
-	PostalCode: orm.NewField[string]("postal_code", "addresses"),
-	CountryCode: orm.NewField[string]("country_code", "addresses"),
-	CountryName: orm.NewField[string]("country_name", "addresses"),
-	Latitude: orm.NewField[float64]("latitude", "addresses"),
-	Longitude: orm.NewField[float64]("longitude", "addresses"),
-	IsDefaultShipping: orm.NewField[bool]("is_default_shipping", "addresses"),
-	IsDefaultBilling: orm.NewField[bool]("is_default_billing", "addresses"),
+	Id:                   orm.NewField[int64]("id", "addresses"),
+	CustomerId:           orm.NewField[int64]("customer_id", "addresses"),
+	AddressType:          orm.NewField[string]("address_type", "addresses"),
+	FirstName:            orm.NewField[string]("first_name", "addresses"),
+	LastName:             orm.NewField[string]("last_name", "addresses"),
+	CompanyName:          orm.NewField[string]("company_name", "addresses"),
+	Phone:                orm.NewField[string]("phone", "addresses"),
+	AddressLine1:         orm.NewField[string]("address_line1", "addresses"),
+	AddressLine2:         orm.NewField[string]("address_line2", "addresses"),
+	City:                 orm.NewField[string]("city", "addresses"),
+	StateProvince:        orm.NewField[string]("state_province", "addresses"),
+	PostalCode:           orm.NewField[string]("postal_code", "addresses"),
+	CountryCode:          orm.NewField[string]("country_code", "addresses"),
+	CountryName:          orm.NewField[string]("country_name", "addresses"),
+	Latitude:             orm.NewField[float64]("latitude", "addresses"),
+	Longitude:            orm.NewField[float64]("longitude", "addresses"),
+	IsDefaultShipping:    orm.NewField[bool]("is_default_shipping", "addresses"),
+	IsDefaultBilling:     orm.NewField[bool]("is_default_billing", "addresses"),
 	DeliveryInstructions: orm.NewField[string]("delivery_instructions", "addresses"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "addresses"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "addresses"),
+	CreatedAt:            orm.NewField[time.Time]("created_at", "addresses"),
+	UpdatedAt:            orm.NewField[time.Time]("updated_at", "addresses"),
 }
-
-
 
 // Validate validates the WishList model
 func (m *WishList) Validate() error {
@@ -191,30 +182,28 @@ var WishListObjects, _ = orm.NewManager[WishList]("wish_lists")
 
 // WishListFields provides type-safe field access for WishList
 type WishListFields struct {
-	Id orm.FieldExpression[int64]
-	CustomerId orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
+	Id          orm.FieldExpression[int64]
+	CustomerId  orm.FieldExpression[int64]
+	Name        orm.FieldExpression[string]
 	Description orm.FieldExpression[string]
-	IsPublic orm.FieldExpression[bool]
-	ShareToken orm.FieldExpression[string]
-	IsDefault orm.FieldExpression[bool]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	IsPublic    orm.FieldExpression[bool]
+	ShareToken  orm.FieldExpression[string]
+	IsDefault   orm.FieldExpression[bool]
+	CreatedAt   orm.FieldExpression[time.Time]
+	UpdatedAt   orm.FieldExpression[time.Time]
 }
 
 var WishListFieldsInstance = WishListFields{
-	Id: orm.NewField[int64]("id", "wish_lists"),
-	CustomerId: orm.NewField[int64]("customer_id", "wish_lists"),
-	Name: orm.NewField[string]("name", "wish_lists"),
+	Id:          orm.NewField[int64]("id", "wish_lists"),
+	CustomerId:  orm.NewField[int64]("customer_id", "wish_lists"),
+	Name:        orm.NewField[string]("name", "wish_lists"),
 	Description: orm.NewField[string]("description", "wish_lists"),
-	IsPublic: orm.NewField[bool]("is_public", "wish_lists"),
-	ShareToken: orm.NewField[string]("share_token", "wish_lists"),
-	IsDefault: orm.NewField[bool]("is_default", "wish_lists"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "wish_lists"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "wish_lists"),
+	IsPublic:    orm.NewField[bool]("is_public", "wish_lists"),
+	ShareToken:  orm.NewField[string]("share_token", "wish_lists"),
+	IsDefault:   orm.NewField[bool]("is_default", "wish_lists"),
+	CreatedAt:   orm.NewField[time.Time]("created_at", "wish_lists"),
+	UpdatedAt:   orm.NewField[time.Time]("updated_at", "wish_lists"),
 }
-
-
 
 // Validate validates the WishListItem model
 func (m *WishListItem) Validate() error {
@@ -228,29 +217,27 @@ var WishListItemObjects, _ = orm.NewManager[WishListItem]("wish_list_items")
 
 // WishListItemFields provides type-safe field access for WishListItem
 type WishListItemFields struct {
-	Id orm.FieldExpression[int64]
-	WishListId orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
-	VariantId orm.FieldExpression[int64]
+	Id              orm.FieldExpression[int64]
+	WishListId      orm.FieldExpression[int64]
+	ProductId       orm.FieldExpression[int64]
+	VariantId       orm.FieldExpression[int64]
 	DesiredQuantity orm.FieldExpression[int32]
-	PriceWhenAdded orm.FieldExpression[float64]
-	Notes orm.FieldExpression[string]
-	Priority orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	PriceWhenAdded  orm.FieldExpression[float64]
+	Notes           orm.FieldExpression[string]
+	Priority        orm.FieldExpression[int32]
+	CreatedAt       orm.FieldExpression[time.Time]
+	UpdatedAt       orm.FieldExpression[time.Time]
 }
 
 var WishListItemFieldsInstance = WishListItemFields{
-	Id: orm.NewField[int64]("id", "wish_list_items"),
-	WishListId: orm.NewField[int64]("wish_list_id", "wish_list_items"),
-	ProductId: orm.NewField[int64]("product_id", "wish_list_items"),
-	VariantId: orm.NewField[int64]("variant_id", "wish_list_items"),
+	Id:              orm.NewField[int64]("id", "wish_list_items"),
+	WishListId:      orm.NewField[int64]("wish_list_id", "wish_list_items"),
+	ProductId:       orm.NewField[int64]("product_id", "wish_list_items"),
+	VariantId:       orm.NewField[int64]("variant_id", "wish_list_items"),
 	DesiredQuantity: orm.NewField[int32]("desired_quantity", "wish_list_items"),
-	PriceWhenAdded: orm.NewField[float64]("price_when_added", "wish_list_items"),
-	Notes: orm.NewField[string]("notes", "wish_list_items"),
-	Priority: orm.NewField[int32]("priority", "wish_list_items"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "wish_list_items"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "wish_list_items"),
+	PriceWhenAdded:  orm.NewField[float64]("price_when_added", "wish_list_items"),
+	Notes:           orm.NewField[string]("notes", "wish_list_items"),
+	Priority:        orm.NewField[int32]("priority", "wish_list_items"),
+	CreatedAt:       orm.NewField[time.Time]("created_at", "wish_list_items"),
+	UpdatedAt:       orm.NewField[time.Time]("updated_at", "wish_list_items"),
 }
-
-

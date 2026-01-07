@@ -6,10 +6,11 @@ package orm
 // Field[T] provides the same functionality with a cleaner API that matches the Expression interface.
 //
 // Migration:
-//   // Old
-//   f := orm.NewFieldExpr[string]("name", "users")
-//   // New
-//   f := orm.NewField[string]("name", "users")
+//
+//	// Old
+//	f := orm.NewFieldExpr[string]("name", "users")
+//	// New
+//	f := orm.NewField[string]("name", "users")
 type FieldExpr[T any] struct {
 	name  string
 	table string
@@ -199,3 +200,6 @@ func (f FieldExpr[T]) Day(n int) QueryExpr {
 		value: n,
 	}
 }
+
+
+

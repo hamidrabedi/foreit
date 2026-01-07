@@ -2,7 +2,7 @@ package inventory
 
 import (
 	"context"
-	
+
 	"github.com/forgego/forge/api"
 	"github.com/forgego/forge/db"
 )
@@ -20,7 +20,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-is_primary", "-priority", "name"},
 		PerPage:      20,
 	})
-	
+
 	// Stock API
 	router.Register("stock", &api.ViewSetConfig{
 		Model:        &Stock{},
@@ -32,7 +32,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"warehouse_id", "quantity"},
 		PerPage:      20,
 	})
-	
+
 	// StockMovement API
 	router.Register("stock-movements", &api.ViewSetConfig{
 		Model:        &StockMovement{},
@@ -44,7 +44,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-movement_date", "-created_at"},
 		PerPage:      20,
 	})
-	
+
 	// StockAlert API
 	router.Register("stock-alerts", &api.ViewSetConfig{
 		Model:        &StockAlert{},
@@ -56,7 +56,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at", "status"},
 		PerPage:      20,
 	})
-	
+
 	// StockTransfer API
 	router.Register("stock-transfers", &api.ViewSetConfig{
 		Model:        &StockTransfer{},

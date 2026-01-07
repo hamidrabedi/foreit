@@ -160,3 +160,4 @@ func (w *LookupWidget) Render(name string, value interface{}, attrs map[string]s
 func (w *LookupWidget) Parse(value string) (interface{}, error) {
 	return value, nil
 }
+

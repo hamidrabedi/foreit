@@ -30,3 +30,4 @@ func (c *VersionCommand) Execute(ctx *core.Context, args []string) error {
 	fmt.Println("Forge Framework v0.1.0")
 	return nil
 }
+

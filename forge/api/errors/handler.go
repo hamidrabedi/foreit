@@ -261,3 +261,4 @@ func (w *errorResponseWriter) handlePanic(rec interface{}) {
 	}
 	w.handler.HandlePanic(w, w.request, rec)
 }
+

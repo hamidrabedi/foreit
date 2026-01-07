@@ -171,3 +171,4 @@ func (f *CharFilter[T]) IExact() *CharFilter[T] {
 	f.lookups = []string{"iexact"}
 	return f
 }
+

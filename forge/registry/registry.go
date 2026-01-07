@@ -92,3 +92,4 @@ func Global() *ModelRegistry {
 func GetRegistry() *ModelRegistry {
 	return Global()
 }
+

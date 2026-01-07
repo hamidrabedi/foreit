@@ -435,15 +435,23 @@ func (mr *MigrationRunner) GetDetailedStatus(ctx context.Context) (*DetailedMigr
 			return nil, fmt.Errorf("failed to get status: %w", statusErr)
 		}
 		return &DetailedMigrationStatus{
-			Current: fmt.Sprintf("%d", status.Version),
+			Current: status.Version,
 			Status:  "OK",
 			Dirty:   status.Dirty,
 		}, nil
 	}
 
+	var currentVersion uint
+	if detailed.Current != "" {
+		parsed, err := strconv.ParseUint(detailed.Current, 10, 64)
+		if err == nil {
+			currentVersion = uint(parsed)
+		}
+	}
+
 	// Convert execute.DetailedStatus to db.DetailedMigrationStatus
 	result := &DetailedMigrationStatus{
-		Current:    detailed.Current,
+		Current:    currentVersion,
 		Next:       detailed.Next,
 		Status:     detailed.Status,
 		Dirty:      detailed.Status == "DIRTY",
@@ -474,7 +482,7 @@ type MigrationStatus struct {
 
 // DetailedMigrationStatus represents detailed migration status
 type DetailedMigrationStatus struct {
-	Current    string
+	Current    uint
 	Next       string
 	Applied    []string
 	Pending    []string

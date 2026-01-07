@@ -22,3 +22,4 @@ func (p *XMLParser) Parse(r io.Reader, v interface{}) error {
 func (p *XMLParser) MediaType() string {
 	return "application/xml"
 }
+

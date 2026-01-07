@@ -45,8 +45,9 @@ type QueryExpr struct {
 // This is the recommended way to create conditions when you don't have type-safe fields
 //
 // Example:
-//   qs.Filter(Where("age", OpGreater, 18))
-//   qs.Filter(Where("name", OpEquals, "John"))
+//
+//	qs.Filter(Where("age", OpGreater, 18))
+//	qs.Filter(Where("name", OpEquals, "John"))
 func Where(field string, op Operator, value interface{}) Expression {
 	return &ComparisonExpression[interface{}]{
 		Field: Field[interface{}]{
@@ -64,12 +65,13 @@ func Where(field string, op Operator, value interface{}) Expression {
 // NewFieldQueryExpr will be removed in v2.0.
 //
 // Migration:
-//   // Old
-//   expr := orm.NewFieldQueryExpr("age", orm.OpGreater, 18)
-//   // New - Option 1: Where (explicit)
-//   expr := orm.Where("age", orm.OpGreater, 18)
-//   // New - Option 2: Type-safe (best)
-//   expr := User.Age.Gt(18)
+//
+//	// Old
+//	expr := orm.NewFieldQueryExpr("age", orm.OpGreater, 18)
+//	// New - Option 1: Where (explicit)
+//	expr := orm.Where("age", orm.OpGreater, 18)
+//	// New - Option 2: Type-safe (best)
+//	expr := User.Age.Gt(18)
 func NewFieldQueryExpr(field string, op Operator, value interface{}) QueryExpr {
 	return QueryExpr{
 		field: field,
@@ -121,7 +123,6 @@ func (q QueryExpr) ToSQL(paramIndex int) (string, []interface{}, int) {
 
 	return q.buildSingle(paramIndex)
 }
-
 
 // buildCombined builds SQL for combined conditions (AND/OR)
 func (q QueryExpr) buildCombined(paramIndex int) (string, []interface{}, int) {
@@ -260,3 +261,6 @@ func (q QueryExpr) buildSingle(paramIndex int) (string, []interface{}, int) {
 func RegisterQueryExpr(name string, builder func(...interface{}) QueryExpr) {
 	// TODO: Implement custom query expression registry
 }
+
+
+

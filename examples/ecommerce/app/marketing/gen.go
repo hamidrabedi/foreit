@@ -2,13 +2,10 @@
 package marketing
 
 import (
-	"time"
 	"github.com/forgego/forge/orm"
-	"github.com/forgego/forge/schema"
 	"github.com/forgego/forge/validate"
+	"time"
 )
-
-
 
 // Validate validates the Coupon model
 func (m *Coupon) Validate() error {
@@ -22,62 +19,60 @@ var CouponObjects, _ = orm.NewManager[Coupon]("coupons")
 
 // CouponFields provides type-safe field access for Coupon
 type CouponFields struct {
-	Id orm.FieldExpression[int64]
-	Code orm.FieldExpression[string]
-	Name orm.FieldExpression[string]
-	Description orm.FieldExpression[string]
-	DiscountType orm.FieldExpression[string]
-	DiscountValue orm.FieldExpression[float64]
+	Id                    orm.FieldExpression[int64]
+	Code                  orm.FieldExpression[string]
+	Name                  orm.FieldExpression[string]
+	Description           orm.FieldExpression[string]
+	DiscountType          orm.FieldExpression[string]
+	DiscountValue         orm.FieldExpression[float64]
 	MinimumPurchaseAmount orm.FieldExpression[float64]
 	MaximumDiscountAmount orm.FieldExpression[float64]
-	UsageLimit orm.FieldExpression[int32]
+	UsageLimit            orm.FieldExpression[int32]
 	UsageLimitPerCustomer orm.FieldExpression[int32]
-	UsageCount orm.FieldExpression[int32]
-	AppliesToAllProducts orm.FieldExpression[bool]
-	ProductIds orm.FieldExpression[string]
-	CategoryIds orm.FieldExpression[string]
-	ExcludedProductIds orm.FieldExpression[string]
+	UsageCount            orm.FieldExpression[int32]
+	AppliesToAllProducts  orm.FieldExpression[bool]
+	ProductIds            orm.FieldExpression[string]
+	CategoryIds           orm.FieldExpression[string]
+	ExcludedProductIds    orm.FieldExpression[string]
 	AppliesToAllCustomers orm.FieldExpression[bool]
-	CustomerGroupIds orm.FieldExpression[string]
-	CustomerEmailList orm.FieldExpression[string]
-	ValidFrom orm.FieldExpression[time.Time]
-	ValidUntil orm.FieldExpression[time.Time]
-	IsActive orm.FieldExpression[bool]
-	IsPublic orm.FieldExpression[bool]
-	Priority orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	CustomerGroupIds      orm.FieldExpression[string]
+	CustomerEmailList     orm.FieldExpression[string]
+	ValidFrom             orm.FieldExpression[time.Time]
+	ValidUntil            orm.FieldExpression[time.Time]
+	IsActive              orm.FieldExpression[bool]
+	IsPublic              orm.FieldExpression[bool]
+	Priority              orm.FieldExpression[int32]
+	CreatedAt             orm.FieldExpression[time.Time]
+	UpdatedAt             orm.FieldExpression[time.Time]
 }
 
 var CouponFieldsInstance = CouponFields{
-	Id: orm.NewField[int64]("id", "coupons"),
-	Code: orm.NewField[string]("code", "coupons"),
-	Name: orm.NewField[string]("name", "coupons"),
-	Description: orm.NewField[string]("description", "coupons"),
-	DiscountType: orm.NewField[string]("discount_type", "coupons"),
-	DiscountValue: orm.NewField[float64]("discount_value", "coupons"),
+	Id:                    orm.NewField[int64]("id", "coupons"),
+	Code:                  orm.NewField[string]("code", "coupons"),
+	Name:                  orm.NewField[string]("name", "coupons"),
+	Description:           orm.NewField[string]("description", "coupons"),
+	DiscountType:          orm.NewField[string]("discount_type", "coupons"),
+	DiscountValue:         orm.NewField[float64]("discount_value", "coupons"),
 	MinimumPurchaseAmount: orm.NewField[float64]("minimum_purchase_amount", "coupons"),
 	MaximumDiscountAmount: orm.NewField[float64]("maximum_discount_amount", "coupons"),
-	UsageLimit: orm.NewField[int32]("usage_limit", "coupons"),
+	UsageLimit:            orm.NewField[int32]("usage_limit", "coupons"),
 	UsageLimitPerCustomer: orm.NewField[int32]("usage_limit_per_customer", "coupons"),
-	UsageCount: orm.NewField[int32]("usage_count", "coupons"),
-	AppliesToAllProducts: orm.NewField[bool]("applies_to_all_products", "coupons"),
-	ProductIds: orm.NewField[string]("product_ids", "coupons"),
-	CategoryIds: orm.NewField[string]("category_ids", "coupons"),
-	ExcludedProductIds: orm.NewField[string]("excluded_product_ids", "coupons"),
+	UsageCount:            orm.NewField[int32]("usage_count", "coupons"),
+	AppliesToAllProducts:  orm.NewField[bool]("applies_to_all_products", "coupons"),
+	ProductIds:            orm.NewField[string]("product_ids", "coupons"),
+	CategoryIds:           orm.NewField[string]("category_ids", "coupons"),
+	ExcludedProductIds:    orm.NewField[string]("excluded_product_ids", "coupons"),
 	AppliesToAllCustomers: orm.NewField[bool]("applies_to_all_customers", "coupons"),
-	CustomerGroupIds: orm.NewField[string]("customer_group_ids", "coupons"),
-	CustomerEmailList: orm.NewField[string]("customer_email_list", "coupons"),
-	ValidFrom: orm.NewField[time.Time]("valid_from", "coupons"),
-	ValidUntil: orm.NewField[time.Time]("valid_until", "coupons"),
-	IsActive: orm.NewField[bool]("is_active", "coupons"),
-	IsPublic: orm.NewField[bool]("is_public", "coupons"),
-	Priority: orm.NewField[int32]("priority", "coupons"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "coupons"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "coupons"),
+	CustomerGroupIds:      orm.NewField[string]("customer_group_ids", "coupons"),
+	CustomerEmailList:     orm.NewField[string]("customer_email_list", "coupons"),
+	ValidFrom:             orm.NewField[time.Time]("valid_from", "coupons"),
+	ValidUntil:            orm.NewField[time.Time]("valid_until", "coupons"),
+	IsActive:              orm.NewField[bool]("is_active", "coupons"),
+	IsPublic:              orm.NewField[bool]("is_public", "coupons"),
+	Priority:              orm.NewField[int32]("priority", "coupons"),
+	CreatedAt:             orm.NewField[time.Time]("created_at", "coupons"),
+	UpdatedAt:             orm.NewField[time.Time]("updated_at", "coupons"),
 }
-
-
 
 // Validate validates the CouponUsage model
 func (m *CouponUsage) Validate() error {
@@ -91,24 +86,22 @@ var CouponUsageObjects, _ = orm.NewManager[CouponUsage]("coupon_usage")
 
 // CouponUsageFields provides type-safe field access for CouponUsage
 type CouponUsageFields struct {
-	Id orm.FieldExpression[int64]
-	CouponId orm.FieldExpression[int64]
-	OrderId orm.FieldExpression[int64]
-	CustomerId orm.FieldExpression[int64]
+	Id             orm.FieldExpression[int64]
+	CouponId       orm.FieldExpression[int64]
+	OrderId        orm.FieldExpression[int64]
+	CustomerId     orm.FieldExpression[int64]
 	DiscountAmount orm.FieldExpression[float64]
-	CreatedAt orm.FieldExpression[time.Time]
+	CreatedAt      orm.FieldExpression[time.Time]
 }
 
 var CouponUsageFieldsInstance = CouponUsageFields{
-	Id: orm.NewField[int64]("id", "coupon_usage"),
-	CouponId: orm.NewField[int64]("coupon_id", "coupon_usage"),
-	OrderId: orm.NewField[int64]("order_id", "coupon_usage"),
-	CustomerId: orm.NewField[int64]("customer_id", "coupon_usage"),
+	Id:             orm.NewField[int64]("id", "coupon_usage"),
+	CouponId:       orm.NewField[int64]("coupon_id", "coupon_usage"),
+	OrderId:        orm.NewField[int64]("order_id", "coupon_usage"),
+	CustomerId:     orm.NewField[int64]("customer_id", "coupon_usage"),
 	DiscountAmount: orm.NewField[float64]("discount_amount", "coupon_usage"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "coupon_usage"),
+	CreatedAt:      orm.NewField[time.Time]("created_at", "coupon_usage"),
 }
-
-
 
 // Validate validates the Review model
 func (m *Review) Validate() error {
@@ -122,52 +115,50 @@ var ReviewObjects, _ = orm.NewManager[Review]("reviews")
 
 // ReviewFields provides type-safe field access for Review
 type ReviewFields struct {
-	Id orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
-	CustomerId orm.FieldExpression[int64]
-	OrderId orm.FieldExpression[int64]
-	Title orm.FieldExpression[string]
-	Content orm.FieldExpression[string]
-	Rating orm.FieldExpression[int32]
-	IsVerifiedPurchase orm.FieldExpression[bool]
-	Status orm.FieldExpression[string]
-	IsFeatured orm.FieldExpression[bool]
-	HelpfulCount orm.FieldExpression[int32]
-	NotHelpfulCount orm.FieldExpression[int32]
-	MerchantResponse orm.FieldExpression[string]
-	MerchantResponseAt orm.FieldExpression[time.Time]
+	Id                       orm.FieldExpression[int64]
+	ProductId                orm.FieldExpression[int64]
+	CustomerId               orm.FieldExpression[int64]
+	OrderId                  orm.FieldExpression[int64]
+	Title                    orm.FieldExpression[string]
+	Content                  orm.FieldExpression[string]
+	Rating                   orm.FieldExpression[int32]
+	IsVerifiedPurchase       orm.FieldExpression[bool]
+	Status                   orm.FieldExpression[string]
+	IsFeatured               orm.FieldExpression[bool]
+	HelpfulCount             orm.FieldExpression[int32]
+	NotHelpfulCount          orm.FieldExpression[int32]
+	MerchantResponse         orm.FieldExpression[string]
+	MerchantResponseAt       orm.FieldExpression[time.Time]
 	MerchantResponseByUserId orm.FieldExpression[int64]
-	ReportCount orm.FieldExpression[int32]
-	ReportReasons orm.FieldExpression[string]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
-	ApprovedAt orm.FieldExpression[time.Time]
+	ReportCount              orm.FieldExpression[int32]
+	ReportReasons            orm.FieldExpression[string]
+	CreatedAt                orm.FieldExpression[time.Time]
+	UpdatedAt                orm.FieldExpression[time.Time]
+	ApprovedAt               orm.FieldExpression[time.Time]
 }
 
 var ReviewFieldsInstance = ReviewFields{
-	Id: orm.NewField[int64]("id", "reviews"),
-	ProductId: orm.NewField[int64]("product_id", "reviews"),
-	CustomerId: orm.NewField[int64]("customer_id", "reviews"),
-	OrderId: orm.NewField[int64]("order_id", "reviews"),
-	Title: orm.NewField[string]("title", "reviews"),
-	Content: orm.NewField[string]("content", "reviews"),
-	Rating: orm.NewField[int32]("rating", "reviews"),
-	IsVerifiedPurchase: orm.NewField[bool]("is_verified_purchase", "reviews"),
-	Status: orm.NewField[string]("status", "reviews"),
-	IsFeatured: orm.NewField[bool]("is_featured", "reviews"),
-	HelpfulCount: orm.NewField[int32]("helpful_count", "reviews"),
-	NotHelpfulCount: orm.NewField[int32]("not_helpful_count", "reviews"),
-	MerchantResponse: orm.NewField[string]("merchant_response", "reviews"),
-	MerchantResponseAt: orm.NewField[time.Time]("merchant_response_at", "reviews"),
+	Id:                       orm.NewField[int64]("id", "reviews"),
+	ProductId:                orm.NewField[int64]("product_id", "reviews"),
+	CustomerId:               orm.NewField[int64]("customer_id", "reviews"),
+	OrderId:                  orm.NewField[int64]("order_id", "reviews"),
+	Title:                    orm.NewField[string]("title", "reviews"),
+	Content:                  orm.NewField[string]("content", "reviews"),
+	Rating:                   orm.NewField[int32]("rating", "reviews"),
+	IsVerifiedPurchase:       orm.NewField[bool]("is_verified_purchase", "reviews"),
+	Status:                   orm.NewField[string]("status", "reviews"),
+	IsFeatured:               orm.NewField[bool]("is_featured", "reviews"),
+	HelpfulCount:             orm.NewField[int32]("helpful_count", "reviews"),
+	NotHelpfulCount:          orm.NewField[int32]("not_helpful_count", "reviews"),
+	MerchantResponse:         orm.NewField[string]("merchant_response", "reviews"),
+	MerchantResponseAt:       orm.NewField[time.Time]("merchant_response_at", "reviews"),
 	MerchantResponseByUserId: orm.NewField[int64]("merchant_response_by_user_id", "reviews"),
-	ReportCount: orm.NewField[int32]("report_count", "reviews"),
-	ReportReasons: orm.NewField[string]("report_reasons", "reviews"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "reviews"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "reviews"),
-	ApprovedAt: orm.NewField[time.Time]("approved_at", "reviews"),
+	ReportCount:              orm.NewField[int32]("report_count", "reviews"),
+	ReportReasons:            orm.NewField[string]("report_reasons", "reviews"),
+	CreatedAt:                orm.NewField[time.Time]("created_at", "reviews"),
+	UpdatedAt:                orm.NewField[time.Time]("updated_at", "reviews"),
+	ApprovedAt:               orm.NewField[time.Time]("approved_at", "reviews"),
 }
-
-
 
 // Validate validates the ReviewImage model
 func (m *ReviewImage) Validate() error {
@@ -181,26 +172,24 @@ var ReviewImageObjects, _ = orm.NewManager[ReviewImage]("review_images")
 
 // ReviewImageFields provides type-safe field access for ReviewImage
 type ReviewImageFields struct {
-	Id orm.FieldExpression[int64]
-	ReviewId orm.FieldExpression[int64]
-	ImageUrl orm.FieldExpression[string]
+	Id           orm.FieldExpression[int64]
+	ReviewId     orm.FieldExpression[int64]
+	ImageUrl     orm.FieldExpression[string]
 	ThumbnailUrl orm.FieldExpression[string]
-	AltText orm.FieldExpression[string]
-	SortOrder orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
+	AltText      orm.FieldExpression[string]
+	SortOrder    orm.FieldExpression[int32]
+	CreatedAt    orm.FieldExpression[time.Time]
 }
 
 var ReviewImageFieldsInstance = ReviewImageFields{
-	Id: orm.NewField[int64]("id", "review_images"),
-	ReviewId: orm.NewField[int64]("review_id", "review_images"),
-	ImageUrl: orm.NewField[string]("image_url", "review_images"),
+	Id:           orm.NewField[int64]("id", "review_images"),
+	ReviewId:     orm.NewField[int64]("review_id", "review_images"),
+	ImageUrl:     orm.NewField[string]("image_url", "review_images"),
 	ThumbnailUrl: orm.NewField[string]("thumbnail_url", "review_images"),
-	AltText: orm.NewField[string]("alt_text", "review_images"),
-	SortOrder: orm.NewField[int32]("sort_order", "review_images"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "review_images"),
+	AltText:      orm.NewField[string]("alt_text", "review_images"),
+	SortOrder:    orm.NewField[int32]("sort_order", "review_images"),
+	CreatedAt:    orm.NewField[time.Time]("created_at", "review_images"),
 }
-
-
 
 // Validate validates the ReviewHelpfulness model
 func (m *ReviewHelpfulness) Validate() error {
@@ -214,24 +203,22 @@ var ReviewHelpfulnessObjects, _ = orm.NewManager[ReviewHelpfulness]("review_help
 
 // ReviewHelpfulnessFields provides type-safe field access for ReviewHelpfulness
 type ReviewHelpfulnessFields struct {
-	Id orm.FieldExpression[int64]
-	ReviewId orm.FieldExpression[int64]
+	Id         orm.FieldExpression[int64]
+	ReviewId   orm.FieldExpression[int64]
 	CustomerId orm.FieldExpression[int64]
-	IsHelpful orm.FieldExpression[bool]
-	IpAddress orm.FieldExpression[string]
-	CreatedAt orm.FieldExpression[time.Time]
+	IsHelpful  orm.FieldExpression[bool]
+	IpAddress  orm.FieldExpression[string]
+	CreatedAt  orm.FieldExpression[time.Time]
 }
 
 var ReviewHelpfulnessFieldsInstance = ReviewHelpfulnessFields{
-	Id: orm.NewField[int64]("id", "review_helpfulness"),
-	ReviewId: orm.NewField[int64]("review_id", "review_helpfulness"),
+	Id:         orm.NewField[int64]("id", "review_helpfulness"),
+	ReviewId:   orm.NewField[int64]("review_id", "review_helpfulness"),
 	CustomerId: orm.NewField[int64]("customer_id", "review_helpfulness"),
-	IsHelpful: orm.NewField[bool]("is_helpful", "review_helpfulness"),
-	IpAddress: orm.NewField[string]("ip_address", "review_helpfulness"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "review_helpfulness"),
+	IsHelpful:  orm.NewField[bool]("is_helpful", "review_helpfulness"),
+	IpAddress:  orm.NewField[string]("ip_address", "review_helpfulness"),
+	CreatedAt:  orm.NewField[time.Time]("created_at", "review_helpfulness"),
 }
-
-
 
 // Validate validates the ProductQuestion model
 func (m *ProductQuestion) Validate() error {
@@ -245,35 +232,33 @@ var ProductQuestionObjects, _ = orm.NewManager[ProductQuestion]("product_questio
 
 // ProductQuestionFields provides type-safe field access for ProductQuestion
 type ProductQuestionFields struct {
-	Id orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
-	CustomerId orm.FieldExpression[int64]
-	Question orm.FieldExpression[string]
-	Answer orm.FieldExpression[string]
-	AnsweredAt orm.FieldExpression[time.Time]
-	AnsweredByUserId orm.FieldExpression[int64]
+	Id                 orm.FieldExpression[int64]
+	ProductId          orm.FieldExpression[int64]
+	CustomerId         orm.FieldExpression[int64]
+	Question           orm.FieldExpression[string]
+	Answer             orm.FieldExpression[string]
+	AnsweredAt         orm.FieldExpression[time.Time]
+	AnsweredByUserId   orm.FieldExpression[int64]
 	AnsweredByUserName orm.FieldExpression[string]
-	Status orm.FieldExpression[string]
-	IsPublic orm.FieldExpression[bool]
-	HelpfulCount orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	Status             orm.FieldExpression[string]
+	IsPublic           orm.FieldExpression[bool]
+	HelpfulCount       orm.FieldExpression[int32]
+	CreatedAt          orm.FieldExpression[time.Time]
+	UpdatedAt          orm.FieldExpression[time.Time]
 }
 
 var ProductQuestionFieldsInstance = ProductQuestionFields{
-	Id: orm.NewField[int64]("id", "product_questions"),
-	ProductId: orm.NewField[int64]("product_id", "product_questions"),
-	CustomerId: orm.NewField[int64]("customer_id", "product_questions"),
-	Question: orm.NewField[string]("question", "product_questions"),
-	Answer: orm.NewField[string]("answer", "product_questions"),
-	AnsweredAt: orm.NewField[time.Time]("answered_at", "product_questions"),
-	AnsweredByUserId: orm.NewField[int64]("answered_by_user_id", "product_questions"),
+	Id:                 orm.NewField[int64]("id", "product_questions"),
+	ProductId:          orm.NewField[int64]("product_id", "product_questions"),
+	CustomerId:         orm.NewField[int64]("customer_id", "product_questions"),
+	Question:           orm.NewField[string]("question", "product_questions"),
+	Answer:             orm.NewField[string]("answer", "product_questions"),
+	AnsweredAt:         orm.NewField[time.Time]("answered_at", "product_questions"),
+	AnsweredByUserId:   orm.NewField[int64]("answered_by_user_id", "product_questions"),
 	AnsweredByUserName: orm.NewField[string]("answered_by_user_name", "product_questions"),
-	Status: orm.NewField[string]("status", "product_questions"),
-	IsPublic: orm.NewField[bool]("is_public", "product_questions"),
-	HelpfulCount: orm.NewField[int32]("helpful_count", "product_questions"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "product_questions"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "product_questions"),
+	Status:             orm.NewField[string]("status", "product_questions"),
+	IsPublic:           orm.NewField[bool]("is_public", "product_questions"),
+	HelpfulCount:       orm.NewField[int32]("helpful_count", "product_questions"),
+	CreatedAt:          orm.NewField[time.Time]("created_at", "product_questions"),
+	UpdatedAt:          orm.NewField[time.Time]("updated_at", "product_questions"),
 }
-
-

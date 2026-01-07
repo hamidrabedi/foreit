@@ -23,3 +23,4 @@ func TemplateExists(name string) bool {
 	_, err := templateFS.ReadFile("templates/" + name)
 	return err == nil
 }
+

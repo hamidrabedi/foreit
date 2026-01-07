@@ -93,3 +93,4 @@ func parseAcceptHeader(accept string) []string {
 
 	return mediaTypes
 }
+

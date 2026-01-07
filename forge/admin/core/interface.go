@@ -70,3 +70,4 @@ const (
 func GetPermissionName(modelName string, perm PermissionType) string {
 	return string(perm) + "_" + modelName
 }
+

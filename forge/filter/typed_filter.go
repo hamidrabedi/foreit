@@ -115,3 +115,4 @@ func buildTypedExpression(fieldExpr orm.Expression, op TypedFilterOp, value inte
 	// Full implementation would create ComparisonExpression based on op
 	return fieldExpr
 }
+

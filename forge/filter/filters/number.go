@@ -169,3 +169,4 @@ func (f *NumberFilter[T]) ValidateValue(value interface{}) error {
 		return fmt.Errorf("number filter value must be a number, got %T", value)
 	}
 }
+

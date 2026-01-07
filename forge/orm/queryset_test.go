@@ -227,11 +227,11 @@ type testModel struct {
 // Fields returns field definitions
 func (testModel) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().Build(),
-		schema.String("email").Build(),
-		schema.Float64("price").Default(0.0).Build(),
-		schema.Bool("available").Default(true).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("name").WithRequired(),
+		schema.String("email"),
+		schema.Float64("price").WithDefault(0.0),
+		schema.Bool("available").WithDefault(true),
 	}
 }
 
@@ -251,3 +251,6 @@ func (testModel) Relations() []schema.Relation {
 func (testModel) Hooks() *schema.ModelHooks {
 	return nil
 }
+
+
+

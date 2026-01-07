@@ -225,3 +225,4 @@ func createMergeMigration(migrationsDir, name string, conflict Conflict) (upPath
 
 	return upPath, downPath, nil
 }
+

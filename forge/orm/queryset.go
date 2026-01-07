@@ -103,12 +103,13 @@ func Desc(field string) OrderField {
 //
 // Deprecated: Use Asc(field) or Desc(field) instead for clarity. NewOrderField will be removed in v3.0.
 // Migration:
-//   // Old
-//   order := orm.NewOrderField("created_at", true)
-//   order := orm.NewOrderField("created_at", false)
-//   // New
-//   order := orm.Asc("created_at")
-//   order := orm.Desc("created_at")
+//
+//	// Old
+//	order := orm.NewOrderField("created_at", true)
+//	order := orm.NewOrderField("created_at", false)
+//	// New
+//	order := orm.Asc("created_at")
+//	order := orm.Desc("created_at")
 func NewOrderField(field string, ascending bool) OrderField {
 	if ascending {
 		return Asc(field)
@@ -442,7 +443,7 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	fromClause := fmt.Sprintf("FROM %s", EscapeIdentifier(qs.table))
 
 	// Build WHERE clause
-	whereClause, whereArgs := qs.buildWhereClause(builder)
+	whereClause, _ := qs.buildWhereClause(builder)
 
 	// Build ORDER BY clause
 	orderByClause := qs.buildOrderByClause(builder)
@@ -468,7 +469,6 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 
 	sql := strings.Join(parts, " ")
 	args := builder.Args()
-	args = append(args, whereArgs...)
 
 	return sql, args, nil
 }
@@ -630,6 +630,7 @@ func (qs *BaseQuerySet[T]) buildFieldMap(columns []string) map[string]*FieldInfo
 func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldMap map[string]*FieldInfo) []interface{} {
 	scanArgs := make([]interface{}, len(columns))
 	instanceValue := reflect.ValueOf(instance).Elem()
+	instanceType := instanceValue.Type()
 
 	for i, col := range columns {
 		fieldInfo, ok := fieldMap[col]
@@ -640,6 +641,29 @@ func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldM
 		}
 
 		field := instanceValue.FieldByName(fieldInfo.Name)
+		if !field.IsValid() {
+			field = instanceValue.FieldByName(toPascalCaseSafe(fieldInfo.Name))
+		}
+		if !field.IsValid() {
+			for j := 0; j < instanceType.NumField(); j++ {
+				structField := instanceType.Field(j)
+				if !structField.IsExported() {
+					continue
+				}
+				jsonTag := strings.Split(structField.Tag.Get("json"), ",")[0]
+				dbTag := strings.Split(structField.Tag.Get("db"), ",")[0]
+				if jsonTag == "-" {
+					jsonTag = ""
+				}
+				if dbTag == "-" {
+					dbTag = ""
+				}
+				if jsonTag == fieldInfo.Name || jsonTag == fieldInfo.DBColumn || dbTag == fieldInfo.Name || dbTag == fieldInfo.DBColumn {
+					field = instanceValue.Field(j)
+					break
+				}
+			}
+		}
 		if field.IsValid() && field.CanSet() {
 			scanArgs[i] = field.Addr().Interface()
 		} else {
@@ -661,8 +685,9 @@ func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldM
 // when no instances are found. Get() requires exactly one match.
 //
 // Example:
-//   user, err := qs.Filter(User.Email.Eq("john@example.com")).Get(ctx)
-//   // Returns error if 0 or >1 users found
+//
+//	user, err := qs.Filter(User.Email.Eq("john@example.com")).Get(ctx)
+//	// Returns error if 0 or >1 users found
 func (qs *BaseQuerySet[T]) Get(ctx context.Context) (*T, error) {
 	results, err := qs.Limit(2).All(ctx)
 	if err != nil {
@@ -690,8 +715,9 @@ func (qs *BaseQuerySet[T]) Get(ctx context.Context) (*T, error) {
 // Use First() if you want the first of potentially many results.
 //
 // Example:
-//   user, err := qs.Filter(User.Age.Gt(18)).OrderBy(User.CreatedAt.Desc()).First(ctx)
-//   // Returns first user over 18, ordered by creation date (newest first)
+//
+//	user, err := qs.Filter(User.Age.Gt(18)).OrderBy(User.CreatedAt.Desc()).First(ctx)
+//	// Returns first user over 18, ordered by creation date (newest first)
 func (qs *BaseQuerySet[T]) First(ctx context.Context) (*T, error) {
 	results, err := qs.Limit(1).All(ctx)
 	if err != nil {
@@ -1109,3 +1135,6 @@ func (vls *BaseValuesListQuerySet[T]) Flat(ctx context.Context) ([]interface{}, 
 
 	return flat, nil
 }
+
+
+

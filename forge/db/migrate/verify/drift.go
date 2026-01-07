@@ -130,3 +130,4 @@ func (d *DriftDetector) DetectDrift(expectedState *state.SchemaState, actualStat
 
 	return drifts, nil
 }
+

@@ -6,7 +6,7 @@ import (
 )
 
 // dist contains the built React Admin UI files
-//go:embed dist/*
+//go:embed dist/* dist/assets/*
 var dist embed.FS
 
 // GetFS returns a sub-filesystem for the dist folder
@@ -20,3 +20,4 @@ func GetFS() fs.FS {
 func Handler() fs.FS {
 	return GetFS()
 }
+

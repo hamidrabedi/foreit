@@ -311,3 +311,4 @@ func (e *Executor) ValidatePendingMigrations(ctx context.Context, currentVersion
 
 	return nil
 }
+

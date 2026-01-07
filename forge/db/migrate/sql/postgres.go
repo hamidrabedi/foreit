@@ -314,3 +314,4 @@ func (b *PostgreSQLBuilder) BuildModifyForeignKey(c *core.ModifyForeignKey) (str
 func (b *PostgreSQLBuilder) BuildAddConstraint(c *core.AddConstraint) (string, error) {
 	return b.baseBuilder.BuildAddConstraint(c)
 }
+

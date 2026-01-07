@@ -52,3 +52,4 @@ func NewSQLBuilder(driver core.Driver) (SQLBuilder, error) {
 		)
 	}
 }
+

@@ -80,3 +80,4 @@ func SendSuccess(w http.ResponseWriter, statusCode int, data interface{}) error 
 		"data":    data,
 	})
 }
+

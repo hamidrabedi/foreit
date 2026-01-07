@@ -97,3 +97,4 @@ type PostCategory struct {
 	PostID     int64 `db:"post_id"`     // FK to Post
 	CategoryID int64 `db:"category_id"` // FK to Category
 }
+

@@ -461,3 +461,4 @@ func Metrics(opts *MetricsOptions) Middleware {
 		})
 	}
 }
+

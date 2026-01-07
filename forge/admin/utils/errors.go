@@ -62,3 +62,4 @@ func HandleAdminError(w http.ResponseWriter, err error) {
 	w.WriteHeader(adminErr.HTTPStatus())
 	fmt.Fprintf(w, `{"error": "%s", "code": %d}`, adminErr.Message, adminErr.Code)
 }
+

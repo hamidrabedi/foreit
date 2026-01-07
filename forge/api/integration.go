@@ -124,3 +124,4 @@ func CompleteExample() {
 		// apiRouter.RegisterEnhanced("users", userViewSet)
 	})
 }
+

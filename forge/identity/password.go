@@ -38,3 +38,4 @@ func CheckPasswordHash(password, hash string) bool {
 func NeedsRehash(hash string, cost int) bool {
 	return utils.NeedsRehash(hash, cost)
 }
+

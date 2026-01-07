@@ -195,3 +195,4 @@ type Filter[T any] struct {
 	Handler     func(ctx context.Context, qs orm.QuerySet[T], value interface{}) orm.QuerySet[T]
 	UIComponent string
 }
+

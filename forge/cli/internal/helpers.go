@@ -33,3 +33,4 @@ func GetAbsolutePath(path string) (string, error) {
 	}
 	return absPath, nil
 }
+

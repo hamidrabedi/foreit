@@ -144,3 +144,4 @@ func (vs *EnhancedBaseViewSetIntegrated) Destroy(w http.ResponseWriter, r *http.
 
 // Ensure EnhancedBaseViewSetIntegrated implements ViewSet
 var _ ViewSet = (*EnhancedBaseViewSetIntegrated)(nil)
+

@@ -169,3 +169,4 @@ func NewFilterError(field, lookup string, value interface{}, message string, err
 		Err:     err,
 	}
 }
+

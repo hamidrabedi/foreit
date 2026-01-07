@@ -67,3 +67,4 @@ type StateManager interface {
 	// GetState returns the current state
 	GetState() *SchemaState
 }
+

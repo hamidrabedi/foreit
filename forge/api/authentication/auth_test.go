@@ -155,3 +155,4 @@ func TestContextIntegration(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, authData, auth)
 }
+

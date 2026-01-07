@@ -71,9 +71,11 @@ func (f Field[T]) Resolve(schema *ModelSchema) error {
 		return fmt.Errorf("field %s not found in model", parts[0])
 	}
 
-	// Validate type matches
-	if field.Type != f.fieldType {
-		return fmt.Errorf("field %s has type %v, expected %v", parts[0], field.Type, f.fieldType)
+	// Allow dynamic field references to skip strict type checks
+	if f.fieldType != nil && f.fieldType.Kind() != reflect.Interface {
+		if field.Type != f.fieldType {
+			return fmt.Errorf("field %s has type %v, expected %v", parts[0], field.Type, f.fieldType)
+		}
 	}
 
 	// TODO: Validate relation paths for nested fields
@@ -534,10 +536,11 @@ func (e *EmptyExpression) Resolve(schema *ModelSchema) error {
 // And combines multiple expressions with AND logic
 //
 // Example:
-//   qs.Filter(And(
-//       User.Name.Eq("John"),
-//       User.Age.Gt(18),
-//   ))
+//
+//	qs.Filter(And(
+//	    User.Name.Eq("John"),
+//	    User.Age.Gt(18),
+//	))
 func And(expressions ...Expression) Expression {
 	return &BoolExpression{
 		operator: ConnectorAnd,
@@ -548,10 +551,11 @@ func And(expressions ...Expression) Expression {
 // Or combines multiple expressions with OR logic
 //
 // Example:
-//   qs.Filter(Or(
-//       User.Age.Gt(18),
-//       User.Role.Eq("admin"),
-//   ))
+//
+//	qs.Filter(Or(
+//	    User.Age.Gt(18),
+//	    User.Role.Eq("admin"),
+//	))
 func Or(expressions ...Expression) Expression {
 	return &BoolExpression{
 		operator: ConnectorOr,
@@ -562,7 +566,8 @@ func Or(expressions ...Expression) Expression {
 // Not negates an expression
 //
 // Example:
-//   qs.Filter(Not(User.Age.Gt(65)))
+//
+//	qs.Filter(Not(User.Age.Gt(65)))
 func Not(expr Expression) Expression {
 	return &NotExpression{inner: expr}
 }
@@ -586,12 +591,13 @@ type Q struct {
 // Q() provides a cleaner API that matches Django's Q object pattern.
 //
 // Migration:
-//   // Old
-//   q := orm.NewQ(expr)
-//   // New
-//   q := orm.Q(expr)
-//   // Or simply
-//   qs.Filter(expr)
+//
+//	// Old
+//	q := orm.NewQ(expr)
+//	// New
+//	q := orm.Q(expr)
+//	// Or simply
+//	qs.Filter(expr)
 func NewQ(expr Expression) *Q {
 	return &Q{
 		expressions: []Expression{expr},
@@ -696,7 +702,8 @@ type FieldRef struct {
 // For Django users familiar with F() objects
 //
 // Example:
-//   qs.Filter(F("age").Gt(18))
+//
+//	qs.Filter(F("age").Gt(18))
 func F(fieldPath string) FieldRef {
 	return FieldRef{path: fieldPath}
 }
@@ -705,7 +712,8 @@ func F(fieldPath string) FieldRef {
 // For Go-first developers who prefer clarity
 //
 // Example:
-//   qs.Filter(FieldRef("age").Gt(18))
+//
+//	qs.Filter(FieldRef("age").Gt(18))
 func NewFieldRef(fieldPath string) FieldRef {
 	return FieldRef{path: fieldPath}
 }
@@ -877,3 +885,6 @@ func (f FieldRef) IContains(value string) Expression {
 		Value: value,
 	}
 }
+
+
+

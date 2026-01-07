@@ -267,3 +267,4 @@ func TestIntegration_ExceptionHandling(t *testing.T) {
 }
 
 // MockAuth, MockUser, MockQueryset, MockModel, MockSerializer are defined in viewset_enhanced_test.go
+

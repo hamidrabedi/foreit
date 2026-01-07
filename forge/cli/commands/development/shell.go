@@ -167,3 +167,4 @@ func (s *InteractiveShell) cmdDBInfo(args []string) error {
 	fmt.Println("  (Database connection info integration pending)")
 	return nil
 }
+

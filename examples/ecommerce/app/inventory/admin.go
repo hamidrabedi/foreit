@@ -12,17 +12,17 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Warehouse]{
 		Icon: "Warehouse",
 		ListDisplay: []admin.Field{
-			WarehouseFields.Name,
-			WarehouseFields.Code,
-			WarehouseFields.City,
-			WarehouseFields.CountryCode,
-			WarehouseFields.IsActive,
-			WarehouseFields.IsPrimary,
+			WarehouseFieldsInstance.Name,
+			WarehouseFieldsInstance.Code,
+			WarehouseFieldsInstance.City,
+			WarehouseFieldsInstance.CountryCode,
+			WarehouseFieldsInstance.IsActive,
+			WarehouseFieldsInstance.IsPrimary,
 		},
 		ListFilter: []admin.Field{
-			WarehouseFields.IsActive,
-			WarehouseFields.IsPrimary,
-			WarehouseFields.CountryCode,
+			WarehouseFieldsInstance.IsActive,
+			WarehouseFieldsInstance.IsPrimary,
+			WarehouseFieldsInstance.CountryCode,
 		},
 	})
 
@@ -30,15 +30,15 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Stock]{
 		Icon: "Activity",
 		ListDisplay: []admin.Field{
-			StockFields.ProductVariantID,
-			StockFields.WarehouseID,
-			StockFields.Quantity,
-			StockFields.ReservedQuantity,
-			StockFields.IsActive,
+			StockFieldsInstance.ProductVariantId,
+			StockFieldsInstance.WarehouseId,
+			StockFieldsInstance.Quantity,
+			StockFieldsInstance.ReservedQuantity,
+			StockFieldsInstance.IsActive,
 		},
 		ListFilter: []admin.Field{
-			StockFields.WarehouseID,
-			StockFields.IsActive,
+			StockFieldsInstance.WarehouseId,
+			StockFieldsInstance.IsActive,
 		},
 	})
 
@@ -46,16 +46,16 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[StockMovement]{
 		Icon: "TrendingUp",
 		ListDisplay: []admin.Field{
-			StockMovementFields.ProductVariantID,
-			StockMovementFields.WarehouseID,
-			StockMovementFields.Type,
-			StockMovementFields.Quantity,
-			StockMovementFields.MovementDate,
+			StockMovementFieldsInstance.ProductVariantId,
+			StockMovementFieldsInstance.WarehouseId,
+			StockMovementFieldsInstance.Type,
+			StockMovementFieldsInstance.Quantity,
+			StockMovementFieldsInstance.MovementDate,
 		},
 		ListFilter: []admin.Field{
-			StockMovementFields.Type,
-			StockMovementFields.WarehouseID,
-			StockMovementFields.MovementDate,
+			StockMovementFieldsInstance.Type,
+			StockMovementFieldsInstance.WarehouseId,
+			StockMovementFieldsInstance.MovementDate,
 		},
 	})
 
@@ -63,16 +63,16 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[StockAlert]{
 		Icon: "AlertTriangle",
 		ListDisplay: []admin.Field{
-			StockAlertFields.ProductVariantID,
-			StockAlertFields.WarehouseID,
-			StockAlertFields.AlertType,
-			StockAlertFields.CurrentQuantity,
-			StockAlertFields.Status,
+			StockAlertFieldsInstance.ProductVariantId,
+			StockAlertFieldsInstance.WarehouseId,
+			StockAlertFieldsInstance.AlertType,
+			StockAlertFieldsInstance.CurrentQuantity,
+			StockAlertFieldsInstance.Status,
 		},
 		ListFilter: []admin.Field{
-			StockAlertFields.AlertType,
-			StockAlertFields.Status,
-			StockAlertFields.WarehouseID,
+			StockAlertFieldsInstance.AlertType,
+			StockAlertFieldsInstance.Status,
+			StockAlertFieldsInstance.WarehouseId,
 		},
 	})
 
@@ -80,16 +80,16 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[StockTransfer]{
 		Icon: "Repeat",
 		ListDisplay: []admin.Field{
-			StockTransferFields.TransferNumber,
-			StockTransferFields.FromWarehouseID,
-			StockTransferFields.ToWarehouseID,
-			StockTransferFields.Quantity,
-			StockTransferFields.Status,
+			StockTransferFieldsInstance.TransferNumber,
+			StockTransferFieldsInstance.FromWarehouseId,
+			StockTransferFieldsInstance.ToWarehouseId,
+			StockTransferFieldsInstance.Quantity,
+			StockTransferFieldsInstance.Status,
 		},
 		ListFilter: []admin.Field{
-			StockTransferFields.Status,
-			StockTransferFields.FromWarehouseID,
-			StockTransferFields.ToWarehouseID,
+			StockTransferFieldsInstance.Status,
+			StockTransferFieldsInstance.FromWarehouseId,
+			StockTransferFieldsInstance.ToWarehouseId,
 		},
 	})
 }

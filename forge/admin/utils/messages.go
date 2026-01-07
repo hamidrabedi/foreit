@@ -104,3 +104,4 @@ func Warning(ctx context.Context, r *http.Request, message string) error {
 func Error(ctx context.Context, r *http.Request, message string) error {
 	return MessageUser(ctx, r, message, MessageError)
 }
+

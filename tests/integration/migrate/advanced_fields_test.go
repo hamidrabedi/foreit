@@ -52,15 +52,14 @@ type Product struct {
 
 func (Product) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(200).Build(),
-		schema.Decimal("price").Required().MaxDigits(10).DecimalPlaces(2).Build(),
-		schema.Decimal("tax_rate").Required().MaxDigits(5).DecimalPlaces(4).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("name").WithRequired().WithMaxLength(200),
+		schema.Decimal("price").WithRequired().WithMaxDigits(10).WithDecimalPlaces(2),
+		schema.Decimal("tax_rate").WithRequired().WithMaxDigits(5).WithDecimalPlaces(4),
 		schema.Decimal("price_with_tax").
-			GeneratedColumn("price * (1 + tax_rate)", true).
-			MaxDigits(10).
-			DecimalPlaces(2).
-			Build(),
+			WithGeneratedColumn("price * (1 + tax_rate)", true).
+			WithMaxDigits(10).
+			WithDecimalPlaces(2),
 	}
 }
 
@@ -148,22 +147,20 @@ type Article struct {
 
 func (Article) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
 		schema.String("title").
-			Required().
-			MaxLength(200).
-			DBColumn("article_title").
-			DBComment("The title of the article").
-			Build(),
+			WithRequired().
+			WithMaxLength(200).
+			WithDBColumn("article_title").
+			WithDBComment("The title of the article"),
 		schema.String("slug").
-			Required().
-			MaxLength(200).
-			Unique().
-			DBIndex().
-			DBComment("URL-friendly slug").
-			Build(),
-		schema.Text("content").Build(),
-		schema.DateTime("created_at").AutoNowAdd().Build(),
+			WithRequired().
+			WithMaxLength(200).
+			WithUnique().
+			WithDBIndex().
+			WithDBComment("URL-friendly slug"),
+		schema.Text("content"),
+		schema.DateTime("created_at").WithAutoNowAdd(),
 	}
 }
 
@@ -262,11 +259,11 @@ type Employee struct {
 
 func (Employee) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("email").Required().MaxLength(255).Unique().Build(),
-		schema.String("employee_id").Required().MaxLength(50).Unique().Build(),
-		schema.Int32("age").MinValue(18).MaxValue(120).Build(),
-		schema.Decimal("salary").MinValue(0).MaxDigits(12).DecimalPlaces(2).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("email").WithRequired().WithMaxLength(255).WithUnique(),
+		schema.String("employee_id").WithRequired().WithMaxLength(50).WithUnique(),
+		schema.Int32("age").WithMinValue(18).WithMaxValue(120),
+		schema.Decimal("salary").WithMinValue(0).WithMaxDigits(12).WithDecimalPlaces(2),
 	}
 }
 
@@ -274,7 +271,7 @@ func (Employee) Meta() schema.Meta {
 	return schema.Meta{
 		TableName: "employees",
 		Indexes: []schema.Index{
-			schema.Index("email", "employee_id").Unique().Build(),
+			schema.Index("email", "employee_id").WithUnique(),
 		},
 	}
 }
@@ -360,12 +357,12 @@ type Task struct {
 
 func (Task) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("title").Required().MaxLength(200).Build(),
-		schema.String("status").Required().MaxLength(50).DBDefault("'pending'").Build(),
-		schema.Bool("is_completed").DBDefault("false").Build(),
-		schema.DateTime("created_at").DBDefault("CURRENT_TIMESTAMP").Build(),
-		schema.Int32("priority").DBDefault("5").Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("title").WithRequired().WithMaxLength(200),
+		schema.String("status").WithRequired().WithMaxLength(50).WithDBDefault("'pending'"),
+		schema.Bool("is_completed").WithDBDefault("false"),
+		schema.DateTime("created_at").WithDBDefault("CURRENT_TIMESTAMP"),
+		schema.Int32("priority").WithDBDefault("5"),
 	}
 }
 

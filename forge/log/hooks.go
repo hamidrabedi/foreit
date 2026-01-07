@@ -63,3 +63,4 @@ func (c *HookCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	}
 	return c.Core.Write(entry, fields)
 }
+

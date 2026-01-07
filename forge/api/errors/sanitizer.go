@@ -249,3 +249,4 @@ func (s *Sanitizer) SanitizeMap(data map[string]interface{}) map[string]interfac
 
 	return sanitized
 }
+

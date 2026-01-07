@@ -12,3 +12,4 @@ type CLIPlugin interface {
 	// CommandGroups returns command groups provided by this plugin
 	CommandGroups() []CommandGroup
 }
+

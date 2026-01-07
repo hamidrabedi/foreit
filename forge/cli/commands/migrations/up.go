@@ -154,3 +154,4 @@ func (c *UpCommand) Execute(ctx *core.Context, args []string) error {
 	fmt.Println("✓ Migrations applied successfully")
 	return nil
 }
+

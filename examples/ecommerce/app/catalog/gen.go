@@ -2,13 +2,10 @@
 package catalog
 
 import (
-	"time"
 	"github.com/forgego/forge/orm"
-	"github.com/forgego/forge/schema"
 	"github.com/forgego/forge/validate"
+	"time"
 )
-
-
 
 // Validate validates the Category model
 func (m *Category) Validate() error {
@@ -22,34 +19,32 @@ var CategoryObjects, _ = orm.NewManager[Category]("categories")
 
 // CategoryFields provides type-safe field access for Category
 type CategoryFields struct {
-	Id orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
-	Slug orm.FieldExpression[string]
+	Id          orm.FieldExpression[int64]
+	Name        orm.FieldExpression[string]
+	Slug        orm.FieldExpression[string]
 	Description orm.FieldExpression[string]
-	ParentId orm.FieldExpression[int64]
-	ImageUrl orm.FieldExpression[string]
-	SortOrder orm.FieldExpression[int32]
-	IsActive orm.FieldExpression[bool]
-	Level orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	ParentId    orm.FieldExpression[int64]
+	ImageUrl    orm.FieldExpression[string]
+	SortOrder   orm.FieldExpression[int32]
+	IsActive    orm.FieldExpression[bool]
+	Level       orm.FieldExpression[int32]
+	CreatedAt   orm.FieldExpression[time.Time]
+	UpdatedAt   orm.FieldExpression[time.Time]
 }
 
 var CategoryFieldsInstance = CategoryFields{
-	Id: orm.NewField[int64]("id", "categories"),
-	Name: orm.NewField[string]("name", "categories"),
-	Slug: orm.NewField[string]("slug", "categories"),
+	Id:          orm.NewField[int64]("id", "categories"),
+	Name:        orm.NewField[string]("name", "categories"),
+	Slug:        orm.NewField[string]("slug", "categories"),
 	Description: orm.NewField[string]("description", "categories"),
-	ParentId: orm.NewField[int64]("parent_id", "categories"),
-	ImageUrl: orm.NewField[string]("image_url", "categories"),
-	SortOrder: orm.NewField[int32]("sort_order", "categories"),
-	IsActive: orm.NewField[bool]("is_active", "categories"),
-	Level: orm.NewField[int32]("level", "categories"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "categories"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "categories"),
+	ParentId:    orm.NewField[int64]("parent_id", "categories"),
+	ImageUrl:    orm.NewField[string]("image_url", "categories"),
+	SortOrder:   orm.NewField[int32]("sort_order", "categories"),
+	IsActive:    orm.NewField[bool]("is_active", "categories"),
+	Level:       orm.NewField[int32]("level", "categories"),
+	CreatedAt:   orm.NewField[time.Time]("created_at", "categories"),
+	UpdatedAt:   orm.NewField[time.Time]("updated_at", "categories"),
 }
-
-
 
 // Validate validates the Brand model
 func (m *Brand) Validate() error {
@@ -63,30 +58,28 @@ var BrandObjects, _ = orm.NewManager[Brand]("brands")
 
 // BrandFields provides type-safe field access for Brand
 type BrandFields struct {
-	Id orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
-	Slug orm.FieldExpression[string]
+	Id          orm.FieldExpression[int64]
+	Name        orm.FieldExpression[string]
+	Slug        orm.FieldExpression[string]
 	Description orm.FieldExpression[string]
-	LogoUrl orm.FieldExpression[string]
-	WebsiteUrl orm.FieldExpression[string]
-	IsActive orm.FieldExpression[bool]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	LogoUrl     orm.FieldExpression[string]
+	WebsiteUrl  orm.FieldExpression[string]
+	IsActive    orm.FieldExpression[bool]
+	CreatedAt   orm.FieldExpression[time.Time]
+	UpdatedAt   orm.FieldExpression[time.Time]
 }
 
 var BrandFieldsInstance = BrandFields{
-	Id: orm.NewField[int64]("id", "brands"),
-	Name: orm.NewField[string]("name", "brands"),
-	Slug: orm.NewField[string]("slug", "brands"),
+	Id:          orm.NewField[int64]("id", "brands"),
+	Name:        orm.NewField[string]("name", "brands"),
+	Slug:        orm.NewField[string]("slug", "brands"),
 	Description: orm.NewField[string]("description", "brands"),
-	LogoUrl: orm.NewField[string]("logo_url", "brands"),
-	WebsiteUrl: orm.NewField[string]("website_url", "brands"),
-	IsActive: orm.NewField[bool]("is_active", "brands"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "brands"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "brands"),
+	LogoUrl:     orm.NewField[string]("logo_url", "brands"),
+	WebsiteUrl:  orm.NewField[string]("website_url", "brands"),
+	IsActive:    orm.NewField[bool]("is_active", "brands"),
+	CreatedAt:   orm.NewField[time.Time]("created_at", "brands"),
+	UpdatedAt:   orm.NewField[time.Time]("updated_at", "brands"),
 }
-
-
 
 // Validate validates the Product model
 func (m *Product) Validate() error {
@@ -100,74 +93,72 @@ var ProductObjects, _ = orm.NewManager[Product]("products")
 
 // ProductFields provides type-safe field access for Product
 type ProductFields struct {
-	Id orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
-	Slug orm.FieldExpression[string]
-	Sku orm.FieldExpression[string]
-	Description orm.FieldExpression[string]
+	Id               orm.FieldExpression[int64]
+	Name             orm.FieldExpression[string]
+	Slug             orm.FieldExpression[string]
+	Sku              orm.FieldExpression[string]
+	Description      orm.FieldExpression[string]
 	ShortDescription orm.FieldExpression[string]
-	CategoryId orm.FieldExpression[int64]
-	BrandId orm.FieldExpression[int64]
-	Price orm.FieldExpression[float64]
-	CostPrice orm.FieldExpression[float64]
-	CompareAtPrice orm.FieldExpression[float64]
-	StockQuantity orm.FieldExpression[int32]
-	TrackInventory orm.FieldExpression[bool]
-	AllowBackorder orm.FieldExpression[bool]
-	Weight orm.FieldExpression[float64]
-	Length orm.FieldExpression[float64]
-	Width orm.FieldExpression[float64]
-	Height orm.FieldExpression[float64]
-	IsActive orm.FieldExpression[bool]
-	IsFeatured orm.FieldExpression[bool]
-	IsDigital orm.FieldExpression[bool]
-	MetaTitle orm.FieldExpression[string]
-	MetaDescription orm.FieldExpression[string]
-	MetaKeywords orm.FieldExpression[string]
-	ViewCount orm.FieldExpression[int32]
-	OrderCount orm.FieldExpression[int32]
-	RatingAverage orm.FieldExpression[float64]
-	RatingCount orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
-	PublishedAt orm.FieldExpression[time.Time]
+	CategoryId       orm.FieldExpression[int64]
+	BrandId          orm.FieldExpression[int64]
+	Price            orm.FieldExpression[float64]
+	CostPrice        orm.FieldExpression[float64]
+	CompareAtPrice   orm.FieldExpression[float64]
+	StockQuantity    orm.FieldExpression[int32]
+	TrackInventory   orm.FieldExpression[bool]
+	AllowBackorder   orm.FieldExpression[bool]
+	Weight           orm.FieldExpression[float64]
+	Length           orm.FieldExpression[float64]
+	Width            orm.FieldExpression[float64]
+	Height           orm.FieldExpression[float64]
+	IsActive         orm.FieldExpression[bool]
+	IsFeatured       orm.FieldExpression[bool]
+	IsDigital        orm.FieldExpression[bool]
+	MetaTitle        orm.FieldExpression[string]
+	MetaDescription  orm.FieldExpression[string]
+	MetaKeywords     orm.FieldExpression[string]
+	ViewCount        orm.FieldExpression[int32]
+	OrderCount       orm.FieldExpression[int32]
+	RatingAverage    orm.FieldExpression[float64]
+	RatingCount      orm.FieldExpression[int32]
+	CreatedAt        orm.FieldExpression[time.Time]
+	UpdatedAt        orm.FieldExpression[time.Time]
+	PublishedAt      orm.FieldExpression[time.Time]
 }
 
 var ProductFieldsInstance = ProductFields{
-	Id: orm.NewField[int64]("id", "products"),
-	Name: orm.NewField[string]("name", "products"),
-	Slug: orm.NewField[string]("slug", "products"),
-	Sku: orm.NewField[string]("sku", "products"),
-	Description: orm.NewField[string]("description", "products"),
+	Id:               orm.NewField[int64]("id", "products"),
+	Name:             orm.NewField[string]("name", "products"),
+	Slug:             orm.NewField[string]("slug", "products"),
+	Sku:              orm.NewField[string]("sku", "products"),
+	Description:      orm.NewField[string]("description", "products"),
 	ShortDescription: orm.NewField[string]("short_description", "products"),
-	CategoryId: orm.NewField[int64]("category_id", "products"),
-	BrandId: orm.NewField[int64]("brand_id", "products"),
-	Price: orm.NewField[float64]("price", "products"),
-	CostPrice: orm.NewField[float64]("cost_price", "products"),
-	CompareAtPrice: orm.NewField[float64]("compare_at_price", "products"),
-	StockQuantity: orm.NewField[int32]("stock_quantity", "products"),
-	TrackInventory: orm.NewField[bool]("track_inventory", "products"),
-	AllowBackorder: orm.NewField[bool]("allow_backorder", "products"),
-	Weight: orm.NewField[float64]("weight", "products"),
-	Length: orm.NewField[float64]("length", "products"),
-	Width: orm.NewField[float64]("width", "products"),
-	Height: orm.NewField[float64]("height", "products"),
-	IsActive: orm.NewField[bool]("is_active", "products"),
-	IsFeatured: orm.NewField[bool]("is_featured", "products"),
-	IsDigital: orm.NewField[bool]("is_digital", "products"),
-	MetaTitle: orm.NewField[string]("meta_title", "products"),
-	MetaDescription: orm.NewField[string]("meta_description", "products"),
-	MetaKeywords: orm.NewField[string]("meta_keywords", "products"),
-	ViewCount: orm.NewField[int32]("view_count", "products"),
-	OrderCount: orm.NewField[int32]("order_count", "products"),
-	RatingAverage: orm.NewField[float64]("rating_average", "products"),
-	RatingCount: orm.NewField[int32]("rating_count", "products"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "products"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "products"),
-	PublishedAt: orm.NewField[time.Time]("published_at", "products"),
+	CategoryId:       orm.NewField[int64]("category_id", "products"),
+	BrandId:          orm.NewField[int64]("brand_id", "products"),
+	Price:            orm.NewField[float64]("price", "products"),
+	CostPrice:        orm.NewField[float64]("cost_price", "products"),
+	CompareAtPrice:   orm.NewField[float64]("compare_at_price", "products"),
+	StockQuantity:    orm.NewField[int32]("stock_quantity", "products"),
+	TrackInventory:   orm.NewField[bool]("track_inventory", "products"),
+	AllowBackorder:   orm.NewField[bool]("allow_backorder", "products"),
+	Weight:           orm.NewField[float64]("weight", "products"),
+	Length:           orm.NewField[float64]("length", "products"),
+	Width:            orm.NewField[float64]("width", "products"),
+	Height:           orm.NewField[float64]("height", "products"),
+	IsActive:         orm.NewField[bool]("is_active", "products"),
+	IsFeatured:       orm.NewField[bool]("is_featured", "products"),
+	IsDigital:        orm.NewField[bool]("is_digital", "products"),
+	MetaTitle:        orm.NewField[string]("meta_title", "products"),
+	MetaDescription:  orm.NewField[string]("meta_description", "products"),
+	MetaKeywords:     orm.NewField[string]("meta_keywords", "products"),
+	ViewCount:        orm.NewField[int32]("view_count", "products"),
+	OrderCount:       orm.NewField[int32]("order_count", "products"),
+	RatingAverage:    orm.NewField[float64]("rating_average", "products"),
+	RatingCount:      orm.NewField[int32]("rating_count", "products"),
+	CreatedAt:        orm.NewField[time.Time]("created_at", "products"),
+	UpdatedAt:        orm.NewField[time.Time]("updated_at", "products"),
+	PublishedAt:      orm.NewField[time.Time]("published_at", "products"),
 }
-
-
 
 // Validate validates the ProductVariant model
 func (m *ProductVariant) Validate() error {
@@ -181,64 +172,62 @@ var ProductVariantObjects, _ = orm.NewManager[ProductVariant]("product_variants"
 
 // ProductVariantFields provides type-safe field access for ProductVariant
 type ProductVariantFields struct {
-	Id orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
-	Sku orm.FieldExpression[string]
-	Name orm.FieldExpression[string]
-	Option1Name orm.FieldExpression[string]
-	Option1Value orm.FieldExpression[string]
-	Option2Name orm.FieldExpression[string]
-	Option2Value orm.FieldExpression[string]
-	Option3Name orm.FieldExpression[string]
-	Option3Value orm.FieldExpression[string]
-	Price orm.FieldExpression[float64]
-	CompareAtPrice orm.FieldExpression[float64]
-	CostPrice orm.FieldExpression[float64]
-	StockQuantity orm.FieldExpression[int32]
+	Id               orm.FieldExpression[int64]
+	ProductId        orm.FieldExpression[int64]
+	Sku              orm.FieldExpression[string]
+	Name             orm.FieldExpression[string]
+	Option1Name      orm.FieldExpression[string]
+	Option1Value     orm.FieldExpression[string]
+	Option2Name      orm.FieldExpression[string]
+	Option2Value     orm.FieldExpression[string]
+	Option3Name      orm.FieldExpression[string]
+	Option3Value     orm.FieldExpression[string]
+	Price            orm.FieldExpression[float64]
+	CompareAtPrice   orm.FieldExpression[float64]
+	CostPrice        orm.FieldExpression[float64]
+	StockQuantity    orm.FieldExpression[int32]
 	ReservedQuantity orm.FieldExpression[int32]
-	TrackInventory orm.FieldExpression[bool]
-	Weight orm.FieldExpression[float64]
-	Length orm.FieldExpression[float64]
-	Width orm.FieldExpression[float64]
-	Height orm.FieldExpression[float64]
-	IsActive orm.FieldExpression[bool]
-	IsDefault orm.FieldExpression[bool]
-	ImageUrl orm.FieldExpression[string]
-	SortOrder orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	TrackInventory   orm.FieldExpression[bool]
+	Weight           orm.FieldExpression[float64]
+	Length           orm.FieldExpression[float64]
+	Width            orm.FieldExpression[float64]
+	Height           orm.FieldExpression[float64]
+	IsActive         orm.FieldExpression[bool]
+	IsDefault        orm.FieldExpression[bool]
+	ImageUrl         orm.FieldExpression[string]
+	SortOrder        orm.FieldExpression[int32]
+	CreatedAt        orm.FieldExpression[time.Time]
+	UpdatedAt        orm.FieldExpression[time.Time]
 }
 
 var ProductVariantFieldsInstance = ProductVariantFields{
-	Id: orm.NewField[int64]("id", "product_variants"),
-	ProductId: orm.NewField[int64]("product_id", "product_variants"),
-	Sku: orm.NewField[string]("sku", "product_variants"),
-	Name: orm.NewField[string]("name", "product_variants"),
-	Option1Name: orm.NewField[string]("option1_name", "product_variants"),
-	Option1Value: orm.NewField[string]("option1_value", "product_variants"),
-	Option2Name: orm.NewField[string]("option2_name", "product_variants"),
-	Option2Value: orm.NewField[string]("option2_value", "product_variants"),
-	Option3Name: orm.NewField[string]("option3_name", "product_variants"),
-	Option3Value: orm.NewField[string]("option3_value", "product_variants"),
-	Price: orm.NewField[float64]("price", "product_variants"),
-	CompareAtPrice: orm.NewField[float64]("compare_at_price", "product_variants"),
-	CostPrice: orm.NewField[float64]("cost_price", "product_variants"),
-	StockQuantity: orm.NewField[int32]("stock_quantity", "product_variants"),
+	Id:               orm.NewField[int64]("id", "product_variants"),
+	ProductId:        orm.NewField[int64]("product_id", "product_variants"),
+	Sku:              orm.NewField[string]("sku", "product_variants"),
+	Name:             orm.NewField[string]("name", "product_variants"),
+	Option1Name:      orm.NewField[string]("option1_name", "product_variants"),
+	Option1Value:     orm.NewField[string]("option1_value", "product_variants"),
+	Option2Name:      orm.NewField[string]("option2_name", "product_variants"),
+	Option2Value:     orm.NewField[string]("option2_value", "product_variants"),
+	Option3Name:      orm.NewField[string]("option3_name", "product_variants"),
+	Option3Value:     orm.NewField[string]("option3_value", "product_variants"),
+	Price:            orm.NewField[float64]("price", "product_variants"),
+	CompareAtPrice:   orm.NewField[float64]("compare_at_price", "product_variants"),
+	CostPrice:        orm.NewField[float64]("cost_price", "product_variants"),
+	StockQuantity:    orm.NewField[int32]("stock_quantity", "product_variants"),
 	ReservedQuantity: orm.NewField[int32]("reserved_quantity", "product_variants"),
-	TrackInventory: orm.NewField[bool]("track_inventory", "product_variants"),
-	Weight: orm.NewField[float64]("weight", "product_variants"),
-	Length: orm.NewField[float64]("length", "product_variants"),
-	Width: orm.NewField[float64]("width", "product_variants"),
-	Height: orm.NewField[float64]("height", "product_variants"),
-	IsActive: orm.NewField[bool]("is_active", "product_variants"),
-	IsDefault: orm.NewField[bool]("is_default", "product_variants"),
-	ImageUrl: orm.NewField[string]("image_url", "product_variants"),
-	SortOrder: orm.NewField[int32]("sort_order", "product_variants"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "product_variants"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "product_variants"),
+	TrackInventory:   orm.NewField[bool]("track_inventory", "product_variants"),
+	Weight:           orm.NewField[float64]("weight", "product_variants"),
+	Length:           orm.NewField[float64]("length", "product_variants"),
+	Width:            orm.NewField[float64]("width", "product_variants"),
+	Height:           orm.NewField[float64]("height", "product_variants"),
+	IsActive:         orm.NewField[bool]("is_active", "product_variants"),
+	IsDefault:        orm.NewField[bool]("is_default", "product_variants"),
+	ImageUrl:         orm.NewField[string]("image_url", "product_variants"),
+	SortOrder:        orm.NewField[int32]("sort_order", "product_variants"),
+	CreatedAt:        orm.NewField[time.Time]("created_at", "product_variants"),
+	UpdatedAt:        orm.NewField[time.Time]("updated_at", "product_variants"),
 }
-
-
 
 // Validate validates the ProductImage model
 func (m *ProductImage) Validate() error {
@@ -252,32 +241,30 @@ var ProductImageObjects, _ = orm.NewManager[ProductImage]("product_images")
 
 // ProductImageFields provides type-safe field access for ProductImage
 type ProductImageFields struct {
-	Id orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
-	VariantId orm.FieldExpression[int64]
-	ImageUrl orm.FieldExpression[string]
+	Id           orm.FieldExpression[int64]
+	ProductId    orm.FieldExpression[int64]
+	VariantId    orm.FieldExpression[int64]
+	ImageUrl     orm.FieldExpression[string]
 	ThumbnailUrl orm.FieldExpression[string]
-	AltText orm.FieldExpression[string]
-	SortOrder orm.FieldExpression[int32]
-	IsPrimary orm.FieldExpression[bool]
-	CreatedAt orm.FieldExpression[time.Time]
-	UpdatedAt orm.FieldExpression[time.Time]
+	AltText      orm.FieldExpression[string]
+	SortOrder    orm.FieldExpression[int32]
+	IsPrimary    orm.FieldExpression[bool]
+	CreatedAt    orm.FieldExpression[time.Time]
+	UpdatedAt    orm.FieldExpression[time.Time]
 }
 
 var ProductImageFieldsInstance = ProductImageFields{
-	Id: orm.NewField[int64]("id", "product_images"),
-	ProductId: orm.NewField[int64]("product_id", "product_images"),
-	VariantId: orm.NewField[int64]("variant_id", "product_images"),
-	ImageUrl: orm.NewField[string]("image_url", "product_images"),
+	Id:           orm.NewField[int64]("id", "product_images"),
+	ProductId:    orm.NewField[int64]("product_id", "product_images"),
+	VariantId:    orm.NewField[int64]("variant_id", "product_images"),
+	ImageUrl:     orm.NewField[string]("image_url", "product_images"),
 	ThumbnailUrl: orm.NewField[string]("thumbnail_url", "product_images"),
-	AltText: orm.NewField[string]("alt_text", "product_images"),
-	SortOrder: orm.NewField[int32]("sort_order", "product_images"),
-	IsPrimary: orm.NewField[bool]("is_primary", "product_images"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "product_images"),
-	UpdatedAt: orm.NewField[time.Time]("updated_at", "product_images"),
+	AltText:      orm.NewField[string]("alt_text", "product_images"),
+	SortOrder:    orm.NewField[int32]("sort_order", "product_images"),
+	IsPrimary:    orm.NewField[bool]("is_primary", "product_images"),
+	CreatedAt:    orm.NewField[time.Time]("created_at", "product_images"),
+	UpdatedAt:    orm.NewField[time.Time]("updated_at", "product_images"),
 }
-
-
 
 // Validate validates the ProductAttribute model
 func (m *ProductAttribute) Validate() error {
@@ -291,28 +278,26 @@ var ProductAttributeObjects, _ = orm.NewManager[ProductAttribute]("product_attri
 
 // ProductAttributeFields provides type-safe field access for ProductAttribute
 type ProductAttributeFields struct {
-	Id orm.FieldExpression[int64]
-	Name orm.FieldExpression[string]
-	Code orm.FieldExpression[string]
-	Type orm.FieldExpression[string]
+	Id           orm.FieldExpression[int64]
+	Name         orm.FieldExpression[string]
+	Code         orm.FieldExpression[string]
+	Type         orm.FieldExpression[string]
 	IsFilterable orm.FieldExpression[bool]
-	IsVisible orm.FieldExpression[bool]
-	SortOrder orm.FieldExpression[int32]
-	CreatedAt orm.FieldExpression[time.Time]
+	IsVisible    orm.FieldExpression[bool]
+	SortOrder    orm.FieldExpression[int32]
+	CreatedAt    orm.FieldExpression[time.Time]
 }
 
 var ProductAttributeFieldsInstance = ProductAttributeFields{
-	Id: orm.NewField[int64]("id", "product_attributes"),
-	Name: orm.NewField[string]("name", "product_attributes"),
-	Code: orm.NewField[string]("code", "product_attributes"),
-	Type: orm.NewField[string]("type", "product_attributes"),
+	Id:           orm.NewField[int64]("id", "product_attributes"),
+	Name:         orm.NewField[string]("name", "product_attributes"),
+	Code:         orm.NewField[string]("code", "product_attributes"),
+	Type:         orm.NewField[string]("type", "product_attributes"),
 	IsFilterable: orm.NewField[bool]("is_filterable", "product_attributes"),
-	IsVisible: orm.NewField[bool]("is_visible", "product_attributes"),
-	SortOrder: orm.NewField[int32]("sort_order", "product_attributes"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "product_attributes"),
+	IsVisible:    orm.NewField[bool]("is_visible", "product_attributes"),
+	SortOrder:    orm.NewField[int32]("sort_order", "product_attributes"),
+	CreatedAt:    orm.NewField[time.Time]("created_at", "product_attributes"),
 }
-
-
 
 // Validate validates the ProductAttributeValue model
 func (m *ProductAttributeValue) Validate() error {
@@ -326,19 +311,17 @@ var ProductAttributeValueObjects, _ = orm.NewManager[ProductAttributeValue]("pro
 
 // ProductAttributeValueFields provides type-safe field access for ProductAttributeValue
 type ProductAttributeValueFields struct {
-	Id orm.FieldExpression[int64]
-	ProductId orm.FieldExpression[int64]
+	Id          orm.FieldExpression[int64]
+	ProductId   orm.FieldExpression[int64]
 	AttributeId orm.FieldExpression[int64]
-	Value orm.FieldExpression[string]
-	CreatedAt orm.FieldExpression[time.Time]
+	Value       orm.FieldExpression[string]
+	CreatedAt   orm.FieldExpression[time.Time]
 }
 
 var ProductAttributeValueFieldsInstance = ProductAttributeValueFields{
-	Id: orm.NewField[int64]("id", "product_attribute_values"),
-	ProductId: orm.NewField[int64]("product_id", "product_attribute_values"),
+	Id:          orm.NewField[int64]("id", "product_attribute_values"),
+	ProductId:   orm.NewField[int64]("product_id", "product_attribute_values"),
 	AttributeId: orm.NewField[int64]("attribute_id", "product_attribute_values"),
-	Value: orm.NewField[string]("value", "product_attribute_values"),
-	CreatedAt: orm.NewField[time.Time]("created_at", "product_attribute_values"),
+	Value:       orm.NewField[string]("value", "product_attribute_values"),
+	CreatedAt:   orm.NewField[time.Time]("created_at", "product_attribute_values"),
 }
-
-

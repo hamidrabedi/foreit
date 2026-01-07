@@ -19,3 +19,4 @@ func NewPermissionDenied(message string) *PermissionDenied {
 		),
 	}
 }
+

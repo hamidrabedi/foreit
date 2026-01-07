@@ -3,12 +3,13 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/forgego/forge/identity/utils"
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/config"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -44,7 +45,7 @@ func TestPasswordService_ChangePassword(t *testing.T) {
 	t.Run("changes password successfully", func(t *testing.T) {
 		req := &ChangePasswordRequest{
 			CurrentPassword: "oldpassword",
-			NewPassword:     "newpassword123!",
+			NewPassword:     "Newpassword123!",
 		}
 
 		err := service.ChangePassword(ctx, user.ID, req)
@@ -53,14 +54,14 @@ func TestPasswordService_ChangePassword(t *testing.T) {
 		// Verify password was changed
 		updated, err := userRepo.GetByID(ctx, user.ID)
 		require.NoError(t, err)
-		assert.True(t, utils.CheckPassword("newpassword123!", updated.Password))
+		assert.True(t, utils.CheckPassword("Newpassword123!", updated.Password))
 		assert.False(t, utils.CheckPassword("oldpassword", updated.Password))
 	})
 
 	t.Run("fails with incorrect current password", func(t *testing.T) {
 		req := &ChangePasswordRequest{
 			CurrentPassword: "wrongpassword",
-			NewPassword:     "newpassword123!",
+			NewPassword:     "Newpassword123!",
 		}
 
 		err := service.ChangePassword(ctx, user.ID, req)
@@ -186,24 +187,25 @@ func TestPasswordService_ResetPassword(t *testing.T) {
 		// Create reset token - need to generate token string first
 		// This is a simplified test - in real implementation, token generation would be handled
 		token := &models.PasswordResetToken{
-			UserID: user.ID,
-			Token:  "test-reset-token-12345",
+			UserID:    user.ID,
+			Token:     "test-reset-token-12345",
+			ExpiresAt: time.Now().Add(1 * time.Hour),
 		}
 		err := tokenRepo.CreatePasswordResetToken(ctx, token)
 		require.NoError(t, err)
 
 		// Reset password
-		err = service.ResetPassword(ctx, token.Token, "newpassword123!")
+		err = service.ResetPassword(ctx, token.Token, "Newpassword123!")
 		require.NoError(t, err)
 
 		// Verify password was changed
 		updated, err := userRepo.GetByID(ctx, user.ID)
 		require.NoError(t, err)
-		assert.True(t, utils.CheckPassword("newpassword123!", updated.Password))
+		assert.True(t, utils.CheckPassword("Newpassword123!", updated.Password))
 	})
 
 	t.Run("fails with invalid token", func(t *testing.T) {
-		err := service.ResetPassword(ctx, "invalid-token", "newpassword123!")
+		err := service.ResetPassword(ctx, "invalid-token", "Newpassword123!")
 		assert.Error(t, err)
 	})
 

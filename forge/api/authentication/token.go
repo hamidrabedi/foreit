@@ -60,3 +60,4 @@ func (a *TokenAuthentication) Authenticate(r *http.Request) (*AuthResult, error)
 func (a *TokenAuthentication) AuthenticateHeader(r *http.Request) string {
 	return "Token"
 }
+

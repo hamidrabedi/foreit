@@ -23,3 +23,4 @@ func (vl VersioningList) DetermineVersion(r *http.Request) (string, error) {
 	}
 	return "", nil
 }
+

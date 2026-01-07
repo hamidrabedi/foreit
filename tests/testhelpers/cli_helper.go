@@ -2,8 +2,12 @@ package testhelpers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
+	"sync"
 	"time"
 )
 
@@ -16,7 +20,11 @@ func RunCLI(ctx context.Context, workdir string, env map[string]string, args []s
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "forge", args...)
+	cmdPath, cmdArgs, err := resolveForgeCommand(args)
+	if err != nil {
+		return "", "", err
+	}
+	cmd := exec.CommandContext(ctx, cmdPath, cmdArgs...)
 	cmd.Dir = workdir
 
 	// Set environment
@@ -28,4 +36,51 @@ func RunCLI(ctx context.Context, workdir string, env map[string]string, args []s
 	// Capture output
 	output, err := cmd.CombinedOutput()
 	return string(output), "", err
+}
+
+var (
+	forgeCmdOnce sync.Once
+	forgeCmdPath string
+	forgeCmdErr  error
+)
+
+func resolveForgeCommand(args []string) (string, []string, error) {
+	if path, err := exec.LookPath("forge"); err == nil {
+		return path, args, nil
+	}
+
+	forgeCmdOnce.Do(func() {
+		forgeDir := filepath.Join(repoRoot(), "forge")
+		binName := "forge"
+		if runtime.GOOS == "windows" {
+			binName += ".exe"
+		}
+		tmpDir, err := os.MkdirTemp("", "forge-cli-")
+		if err != nil {
+			forgeCmdErr = err
+			return
+		}
+		forgeCmdPath = filepath.Join(tmpDir, binName)
+
+		buildCmd := exec.Command("go", "build", "-o", forgeCmdPath, "./cli/cmd")
+		buildCmd.Dir = forgeDir
+		buildCmd.Env = os.Environ()
+		output, err := buildCmd.CombinedOutput()
+		if err != nil {
+			forgeCmdErr = fmt.Errorf("failed to build forge CLI: %w: %s", err, string(output))
+		}
+	})
+	if forgeCmdErr != nil {
+		return "", nil, forgeCmdErr
+	}
+
+	return forgeCmdPath, args, nil
+}
+
+func repoRoot() string {
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return "."
+	}
+	return filepath.Dir(filepath.Dir(filepath.Dir(file)))
 }

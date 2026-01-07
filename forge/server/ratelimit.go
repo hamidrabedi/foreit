@@ -279,3 +279,4 @@ func getUserID(user interface{}) string {
 func RateLimitGeneral(requests int, window time.Duration) Middleware {
 	return RateLimitByIP(requests, window)
 }
+

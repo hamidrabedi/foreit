@@ -109,3 +109,4 @@ func (h *NotificationHub) SSEHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+

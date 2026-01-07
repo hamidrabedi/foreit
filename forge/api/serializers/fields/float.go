@@ -80,3 +80,4 @@ func (f *FloatField) Validate(value interface{}) error {
 
 	return nil
 }
+

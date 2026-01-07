@@ -99,3 +99,4 @@ func (c *ForceCommand) Execute(ctx *core.Context, args []string) error {
 	fmt.Printf("✓ Migration version forced to %d (marked as clean)\n", version)
 	return nil
 }
+

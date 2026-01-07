@@ -235,7 +235,7 @@ func generateModelCode(appName, modelName, tableName string, fields []FieldDefin
 	sb.WriteString(fmt.Sprintf("// Fields returns all field definitions for %s\n", modelName))
 	sb.WriteString(fmt.Sprintf("func (%s) Fields() []schema.Field {\n", modelName))
 	sb.WriteString("\treturn []schema.Field{\n")
-	sb.WriteString("\t\tschema.Int64(\"id\").Primary().AutoIncrement().Build(),\n")
+	sb.WriteString("\t\tschema.Int64(\"id\").WithPrimary().WithAutoIncrement(),\n")
 
 	for _, field := range fields {
 		fieldCode := generateFieldCode(field)
@@ -275,7 +275,7 @@ func generateFieldCode(field FieldDefinition) string {
 	case "String":
 		parts = append(parts, fmt.Sprintf("schema.String(\"%s\")", field.Name))
 		if field.MaxLength > 0 {
-			parts = append(parts, fmt.Sprintf("MaxLength(%d)", field.MaxLength))
+			parts = append(parts, fmt.Sprintf("WithMaxLength(%d)", field.MaxLength))
 		}
 	case "Int64":
 		parts = append(parts, fmt.Sprintf("schema.Int64(\"%s\")", field.Name))
@@ -288,16 +288,14 @@ func generateFieldCode(field FieldDefinition) string {
 	}
 
 	if field.Required {
-		parts = append(parts, "Required()")
+		parts = append(parts, "WithRequired()")
 	}
 	if field.Unique {
-		parts = append(parts, "Unique()")
+		parts = append(parts, "WithUnique()")
 	}
 	if field.Default != "" {
-		parts = append(parts, fmt.Sprintf("Default(%s)", field.Default))
+		parts = append(parts, fmt.Sprintf("WithDefault(%s)", field.Default))
 	}
-
-	parts = append(parts, "Build()")
 
 	return strings.Join(parts, ".")
 }
@@ -322,7 +320,7 @@ func registerModelInAdmin(adminPath, appName, modelName string) error {
 		return err
 	}
 
-		// Check if model is already registered
+	// Check if model is already registered
 	registrationComment := fmt.Sprintf("// Register %s model for admin\n\t// schemaInstance := &%sSchema{}\n\t// manager := orm.NewManager[%s](db)\n\t// config := &admin.Config[%s]{...}\n\t// admin.Register(schemaInstance, manager, config)", modelName, modelName, modelName, modelName)
 	if strings.Contains(string(content), modelName+"Schema") || strings.Contains(string(content), "Register") {
 		return nil // Already registered or has registration pattern

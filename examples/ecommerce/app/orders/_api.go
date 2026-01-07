@@ -2,7 +2,7 @@ package orders
 
 import (
 	"context"
-	
+
 	"github.com/forgego/forge/api"
 	"github.com/forgego/forge/db"
 )
@@ -20,7 +20,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-updated_at", "-created_at"},
 		PerPage:      20,
 	})
-	
+
 	// CartItem API
 	router.Register("cart-items", &api.ViewSetConfig{
 		Model:        &CartItem{},
@@ -32,7 +32,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"cart_id", "created_at"},
 		PerPage:      50,
 	})
-	
+
 	// Order API
 	router.Register("orders", &api.ViewSetConfig{
 		Model:        &Order{},
@@ -44,7 +44,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at", "-total", "status"},
 		PerPage:      20,
 	})
-	
+
 	// OrderItem API
 	router.Register("order-items", &api.ViewSetConfig{
 		Model:        &OrderItem{},
@@ -56,7 +56,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"order_id", "created_at"},
 		PerPage:      50,
 	})
-	
+
 	// Payment API
 	router.Register("payments", &api.ViewSetConfig{
 		Model:        &Payment{},
@@ -68,7 +68,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"-created_at", "status"},
 		PerPage:      20,
 	})
-	
+
 	// Shipment API
 	router.Register("shipments", &api.ViewSetConfig{
 		Model:        &Shipment{},

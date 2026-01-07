@@ -273,3 +273,4 @@ func (m *ErrorMapper) MapPanic(rec interface{}, instance string) *Problem {
 		detail,
 	).WithInstance(instance)
 }
+

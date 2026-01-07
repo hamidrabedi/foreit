@@ -80,3 +80,4 @@ func (c *MemoryCache) Delete(key string) error {
 	delete(c.data, key)
 	return nil
 }
+

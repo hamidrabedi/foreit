@@ -71,3 +71,4 @@ func SetupIdentitySystem(database *db.DB, userConfig *config.IdentityConfig) (*I
 		Config:            userConfig,
 	}, nil
 }
+

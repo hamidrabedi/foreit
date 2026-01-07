@@ -43,3 +43,4 @@ func (v *HeaderVersioning) DetermineVersion(r *http.Request) (string, error) {
 func (v *HeaderVersioning) Reverse(name string, version string, args ...interface{}) string {
 	return ""
 }
+

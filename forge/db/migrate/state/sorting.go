@@ -69,3 +69,4 @@ func sortChangesByType(changes []core.Change) []core.Change {
 
 	return result
 }
+

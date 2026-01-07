@@ -123,3 +123,4 @@ func (ag *AdminGenerator) writeFormattedFile(path string, code string) error {
 	// Write file
 	return os.WriteFile(path, formatted, 0644)
 }
+

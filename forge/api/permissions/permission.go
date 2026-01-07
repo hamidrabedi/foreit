@@ -62,3 +62,4 @@ func IsSafeMethod(method string) bool {
 	}
 	return false
 }
+

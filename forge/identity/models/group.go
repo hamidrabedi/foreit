@@ -7,3 +7,4 @@ type Group struct {
 	Description string       `json:"description" db:"description"`
 	Permissions []Permission `json:"permissions" db:"-"` // Loaded separately
 }
+

@@ -47,3 +47,4 @@ func ErrorHandler(opts *ErrorHandlerOptions) Middleware {
 func RequestIDMiddleware() Middleware {
 	return errors.DefaultRequestIDMiddleware()
 }
+

@@ -81,3 +81,4 @@ func (f *IntegerField) Validate(value interface{}) error {
 
 	return nil
 }
+

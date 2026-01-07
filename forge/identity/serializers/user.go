@@ -178,3 +178,4 @@ func isValidEmail(email string) bool {
 
 	return atIndex > 0 && dotIndex > atIndex && dotIndex < len(email)-1
 }
+

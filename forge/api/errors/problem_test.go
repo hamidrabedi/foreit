@@ -129,3 +129,4 @@ func TestProblemError(t *testing.T) {
 		t.Error("Error() should return a non-empty string")
 	}
 }
+

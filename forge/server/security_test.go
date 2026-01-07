@@ -328,3 +328,4 @@ func BenchmarkSQLInjection(b *testing.B) {
 		}
 	})
 }
+

@@ -20,6 +20,7 @@ func NewRegisterSerializer(data map[string]interface{}) *RegisterSerializer {
 
 // Validate validates registration data
 func (s *RegisterSerializer) Validate() error {
+	_ = s.BaseSerializer.Validate()
 	username := s.GetString("username")
 	if username == "" {
 		s.AddError("username", "username is required")
@@ -79,6 +80,7 @@ func NewLoginSerializer(data map[string]interface{}) *LoginSerializer {
 
 // Validate validates login data
 func (s *LoginSerializer) Validate() error {
+	_ = s.BaseSerializer.Validate()
 	usernameOrEmail := s.GetString("username")
 	if usernameOrEmail == "" {
 		usernameOrEmail = s.GetString("email")
@@ -216,3 +218,4 @@ func isValidEmailAuth(email string) bool {
 
 	return atIndex > 0 && dotIndex > atIndex && dotIndex < len(email)-1
 }
+

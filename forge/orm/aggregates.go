@@ -87,3 +87,6 @@ func Variance(field string) Aggregate {
 func RegisterAggregate(name, funcName string, builder func(string) Aggregate) {
 	// TODO: Implement aggregate registry
 }
+
+
+

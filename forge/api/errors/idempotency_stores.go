@@ -237,3 +237,4 @@ func (s *DatabaseStore) Cleanup() error {
 	_ = query
 	return nil
 }
+

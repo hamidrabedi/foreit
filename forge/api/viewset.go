@@ -4,7 +4,9 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 
+	"github.com/forgego/forge/orm"
 	forgehttp "github.com/forgego/forge/server"
 )
 
@@ -480,10 +482,21 @@ type Router struct {
 
 // NewRouter creates a new API router
 func NewRouter(prefix string) *Router {
+	prefix = normalizePrefix(prefix)
 	return &Router{
 		prefix: prefix,
 		routes: make(map[string]ViewSet),
 	}
+}
+
+func normalizePrefix(prefix string) string {
+	if prefix == "" || prefix == "/" {
+		return ""
+	}
+	if !strings.HasPrefix(prefix, "/") {
+		prefix = "/" + prefix
+	}
+	return strings.TrimRight(prefix, "/")
 }
 
 // Register registers a viewset with a resource name
@@ -556,16 +569,73 @@ func applyFilters(qs reflect.Value, r *http.Request) reflect.Value {
 
 // createFilterExpr creates a QueryExpr from field name and value
 func createFilterExpr(field string, value string) reflect.Value {
-	// We need to create a query.QueryExpr
-	// Since we can't import query here (circular), we'll use a workaround
-	// For MVP, return invalid value - full implementation would use proper QueryExpr
+	if field == "" {
+		return reflect.Value{}
+	}
 
-	// This is a placeholder - full implementation would:
-	// 1. Parse value type (int, string, bool)
-	// 2. Create query.NewFieldQueryExpr(field, query.OpEquals, parsedValue)
-	// 3. Return the QueryExpr
+	op := orm.OpEquals
+	parts := strings.Split(field, "__")
+	if len(parts) > 1 {
+		field = strings.Join(parts[:len(parts)-1], "__")
+		lookup := parts[len(parts)-1]
+		switch lookup {
+		case "gt":
+			op = orm.OpGreater
+		case "gte":
+			op = orm.OpGreaterOrEqual
+		case "lt":
+			op = orm.OpLess
+		case "lte":
+			op = orm.OpLessOrEqual
+		case "in":
+			op = orm.OpIn
+		case "contains":
+			op = orm.OpContains
+		case "icontains":
+			op = orm.OpIContains
+		case "startswith":
+			op = orm.OpStartsWith
+		case "endswith":
+			op = orm.OpEndsWith
+		case "isnull":
+			op = orm.OpIsNull
+		}
+	}
 
-	return reflect.Value{}
+	parsed := parseFilterValue(value, op == orm.OpIn)
+	expr := orm.Where(field, op, parsed)
+	return reflect.ValueOf(expr)
+}
+
+func parseFilterValue(value string, isIn bool) interface{} {
+	if isIn {
+		raw := strings.Split(value, ",")
+		values := make([]interface{}, 0, len(raw))
+		for _, item := range raw {
+			values = append(values, parseScalarValue(strings.TrimSpace(item)))
+		}
+		return values
+	}
+	return parseScalarValue(value)
+}
+
+func parseScalarValue(value string) interface{} {
+	if value == "" {
+		return ""
+	}
+	if strings.EqualFold(value, "true") {
+		return true
+	}
+	if strings.EqualFold(value, "false") {
+		return false
+	}
+	if i, err := strconv.ParseInt(value, 10, 64); err == nil {
+		return i
+	}
+	if f, err := strconv.ParseFloat(value, 64); err == nil {
+		return f
+	}
+	return value
 }
 
 // applyOrdering applies ordering from query parameters
@@ -600,10 +670,8 @@ func getManagerFromModel(instance interface{}) reflect.Value {
 		modelType = modelType.Elem()
 	}
 
-	// Try to find package-level manager variable
-	// This requires the model to be in a package with a manager variable
-	// For MVP, return invalid value - full implementation needed
-	return reflect.Value{}
+	manager := orm.GetManagerForType(modelType)
+	return manager
 }
 
 // populateFromMap populates a model instance from a map
@@ -665,3 +733,4 @@ func setFieldValue(field reflect.Value, value interface{}) {
 		}
 	}
 }
+

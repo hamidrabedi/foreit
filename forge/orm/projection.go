@@ -9,13 +9,13 @@ import (
 
 // ProjectionQuerySet provides type-safe projection operations
 type ProjectionQuerySet[T any, P any] struct {
-	base      QuerySet[T]
+	base       QuerySet[T]
 	projection *Projection[P]
 }
 
 // Projection represents a type-safe projection
 type Projection[P any] struct {
-	fields    []string
+	fields     []string
 	fieldTypes map[string]reflect.Type
 	targetType reflect.Type
 }
@@ -79,7 +79,7 @@ func (pqs *ProjectionQuerySet[T, P]) All(ctx context.Context) ([]*P, error) {
 
 	// Build SQL with only selected fields
 	sqlBuilder := NewSQLBuilder()
-	
+
 	// Build SELECT clause with projection fields
 	selectClause := "SELECT "
 	for i, field := range pqs.projection.fields {
@@ -152,7 +152,7 @@ func (pqs *ProjectionQuerySet[T, P]) All(ctx context.Context) ([]*P, error) {
 		for i, fieldName := range pqs.projection.fields {
 			fieldType := pqs.projection.fieldTypes[fieldName]
 			fieldValue := projectionValue.FieldByName(getFieldNameFromColumn(fieldName, pqs.projection.targetType))
-			
+
 			if !fieldValue.IsValid() {
 				return nil, fmt.Errorf("field %s not found in projection type", fieldName)
 			}
@@ -263,3 +263,6 @@ func toSnakeCase(s string) string {
 	}
 	return result
 }
+
+
+

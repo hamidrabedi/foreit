@@ -405,3 +405,6 @@ func fieldPathToSQL(path string) string {
 	// For now, just escape - JOIN logic handled elsewhere
 	return EscapeIdentifier(strings.Join(parts, "."))
 }
+
+
+

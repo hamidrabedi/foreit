@@ -326,3 +326,4 @@ func (r *Recovery) GetAppliedMigrations(ctx context.Context) ([]RecoveryMigratio
 
 	return migrations, nil
 }
+

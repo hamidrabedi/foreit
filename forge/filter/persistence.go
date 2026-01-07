@@ -161,3 +161,4 @@ func PreviewFilter[T any](fs *FilterSet[T], ctx context.Context, limit int) (int
 
 	return count, nil
 }
+

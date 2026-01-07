@@ -9,7 +9,7 @@ import (
 
 // TypedValidatorBuilder provides type-safe validator construction
 type TypedValidatorBuilder[T any] struct {
-	fields map[string]*FieldValidatorBuilder[T]
+	fields    map[string]*FieldValidatorBuilder[T]
 	validator *Validator
 }
 
@@ -61,6 +61,11 @@ func (fvb *FieldValidatorBuilder[T]) Required() *FieldValidatorBuilder[T] {
 	return fvb
 }
 
+// WithRequired is an alias for Required.
+func (fvb *FieldValidatorBuilder[T]) WithRequired() *FieldValidatorBuilder[T] {
+	return fvb.Required()
+}
+
 // Email validates email format
 func (fvb *FieldValidatorBuilder[T]) Email() *FieldValidatorBuilder[T] {
 	fvb.rules = append(fvb.rules, "email")
@@ -100,11 +105,21 @@ func (fvb *FieldValidatorBuilder[T]) MinLength(length int) *FieldValidatorBuilde
 	return fvb
 }
 
+// WithMinLength is an alias for MinLength.
+func (fvb *FieldValidatorBuilder[T]) WithMinLength(length int) *FieldValidatorBuilder[T] {
+	return fvb.MinLength(length)
+}
+
 // MaxLength sets maximum length (for string fields)
 func (fvb *FieldValidatorBuilder[T]) MaxLength(length int) *FieldValidatorBuilder[T] {
 	fvb.maxLength = &length
 	fvb.rules = append(fvb.rules, fmt.Sprintf("max=%d", length))
 	return fvb
+}
+
+// WithMaxLength is an alias for MaxLength.
+func (fvb *FieldValidatorBuilder[T]) WithMaxLength(length int) *FieldValidatorBuilder[T] {
+	return fvb.MaxLength(length)
 }
 
 // Range sets both min and max
@@ -127,6 +142,17 @@ func (fvb *FieldValidatorBuilder[T]) Choices(choices ...interface{}) *FieldValid
 		choiceStrs[i] = fmt.Sprintf("%v", choice)
 	}
 	fvb.rules = append(fvb.rules, fmt.Sprintf("oneof=%s", joinStrings(choiceStrs, " ")))
+	return fvb
+}
+
+// WithChoices is an alias for Choices.
+func (fvb *FieldValidatorBuilder[T]) WithChoices(values ...interface{}) *FieldValidatorBuilder[T] {
+	return fvb.Choices(values...)
+}
+
+// WithUnique adds a unique validation rule tag.
+func (fvb *FieldValidatorBuilder[T]) WithUnique() *FieldValidatorBuilder[T] {
+	fvb.rules = append(fvb.rules, "unique")
 	return fvb
 }
 
@@ -169,7 +195,7 @@ func (fvb *FieldValidatorBuilder[T]) Phone() *FieldValidatorBuilder[T] {
 // ComplexityRules adds password complexity rules
 func (fvb *FieldValidatorBuilder[T]) ComplexityRules() *FieldValidatorBuilder[T] {
 	// Add multiple rules for password complexity
-	fvb.MinLength(8)
+	fvb.WithMinLength(8)
 	fvb.rules = append(fvb.rules, "alphanum") // At least alphanumeric
 	return fvb
 }

@@ -7,8 +7,8 @@ import (
 
 // PathCache provides LRU caching for compiled path tokens
 type PathCache struct {
-	cache map[string]*PathToken
-	mu    sync.RWMutex
+	cache   map[string]*PathToken
+	mu      sync.RWMutex
 	maxSize int
 }
 
@@ -76,3 +76,6 @@ var globalPathCache = NewPathCache(1000)
 func GetCachedPathToken(path string, schema *ModelSchema) (*PathToken, error) {
 	return globalPathCache.Get(path, schema)
 }
+
+
+

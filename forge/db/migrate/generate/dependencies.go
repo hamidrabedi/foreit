@@ -228,3 +228,4 @@ func (d *DependencyDetector) ValidateDependencies(dependencies []core.Dependency
 
 	return nil
 }
+

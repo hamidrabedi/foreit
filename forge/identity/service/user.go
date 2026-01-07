@@ -268,3 +268,4 @@ func validateCreateUserRequest(req *CreateUserRequest) error {
 
 	return nil
 }
+

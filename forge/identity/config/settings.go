@@ -114,3 +114,4 @@ func DefaultIdentityConfig() *IdentityConfig {
 		SessionCleanupInterval:    1 * time.Hour,
 	}
 }
+

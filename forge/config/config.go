@@ -41,6 +41,7 @@ func NewConfig() *Config {
 	v.SetDefault("security.secret_key", "change-me-in-production")
 	v.SetDefault("security.csrf_secret_key", "change-me-in-production")
 	v.SetDefault("security.session_secret", "change-me-in-production")
+	v.SetDefault("security.csrf_exempt_paths", []string{})
 	v.SetDefault("admin.enabled", true)
 	v.SetDefault("admin.path", "/admin")
 	v.SetDefault("admin.title", "forge Admin")
@@ -85,7 +86,16 @@ func (c *Config) GetInt64(key string, defaultValue int64) int64 {
 	return defaultValue
 }
 
+// GetStringSlice gets a string slice value with a default.
+func (c *Config) GetStringSlice(key string, defaultValue []string) []string {
+	if c.Viper.IsSet(key) {
+		return c.Viper.GetStringSlice(key)
+	}
+	return defaultValue
+}
+
 // GetDriver returns the database driver name
 func (c *Config) GetDriver() string {
 	return c.GetString("database.driver", "postgres")
 }
+

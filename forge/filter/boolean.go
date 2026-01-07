@@ -52,3 +52,4 @@ func CombineNodes(op FilterOp, nodes ...*FilterNode) *FilterNode {
 		return NewAndNode(nodes...)
 	}
 }
+

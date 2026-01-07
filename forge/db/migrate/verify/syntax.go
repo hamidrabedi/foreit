@@ -91,9 +91,6 @@ func (v *Validator) validateChange(change core.Change, index int) error {
 		}
 
 	case *core.AddIndex:
-		if c.Index.Name == "" {
-			return fmt.Errorf("AddIndex has empty index name")
-		}
 		if len(c.Index.Fields) == 0 {
 			return fmt.Errorf("AddIndex has no fields")
 		}
@@ -227,3 +224,4 @@ func (v *Validator) checkCircularDependency(dep core.Dependency, visited, visiti
 	// For now, this is a basic check
 	return nil
 }
+

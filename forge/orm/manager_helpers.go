@@ -200,15 +200,39 @@ func getFieldValueByName(instance interface{}, fieldName string) (interface{}, e
 	}
 
 	fieldValue := instanceValue.FieldByName(fieldName)
-	if !fieldValue.IsValid() {
-		return nil, fmt.Errorf("field %s not found", fieldName)
+	if fieldValue.IsValid() {
+		if !fieldValue.CanInterface() {
+			return nil, fmt.Errorf("field %s is not accessible", fieldName)
+		}
+		return fieldValue.Interface(), nil
 	}
 
-	if !fieldValue.CanInterface() {
-		return nil, fmt.Errorf("field %s is not accessible", fieldName)
+	typ := instanceValue.Type()
+	for i := 0; i < typ.NumField(); i++ {
+		field := typ.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+
+		jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
+		dbTag := strings.Split(field.Tag.Get("db"), ",")[0]
+		if jsonTag == "-" {
+			jsonTag = ""
+		}
+		if dbTag == "-" {
+			dbTag = ""
+		}
+
+		if jsonTag == fieldName || dbTag == fieldName {
+			matched := instanceValue.Field(i)
+			if !matched.CanInterface() {
+				return nil, fmt.Errorf("field %s is not accessible", fieldName)
+			}
+			return matched.Interface(), nil
+		}
 	}
 
-	return fieldValue.Interface(), nil
+	return nil, fmt.Errorf("field %s not found", fieldName)
 }
 
 // BuildUpdateSQL builds an UPDATE SQL statement from a model instance
@@ -484,3 +508,6 @@ func GetIDValue(instance interface{}, idFieldName string) (interface{}, error) {
 
 	return nil, fmt.Errorf("id field '%s' not found", idFieldName)
 }
+
+
+

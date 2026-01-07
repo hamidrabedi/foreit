@@ -21,3 +21,4 @@ func (h *MetricsHook) Process(entry zapcore.Entry, fields []zapcore.Field) (zapc
 	// This will be implemented when the metrics system is integrated
 	return entry, fields, true
 }
+

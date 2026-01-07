@@ -10,3 +10,4 @@ type (
 	// Core types are already re-exported in migrate.go
 	_ = core.Change // Ensure core package is imported
 )
+

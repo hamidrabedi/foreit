@@ -88,3 +88,4 @@ var (
 func DetectChanges(current, previous []*codegen.ModelDefinition) ([]Change, error) {
 	return dbmigrate.DetectChanges(current, previous)
 }
+

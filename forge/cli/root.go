@@ -15,3 +15,4 @@ func BuildRootCommand() *cobra.Command {
 	registry := core.GetRegistry()
 	return registry.BuildRootCommand()
 }
+

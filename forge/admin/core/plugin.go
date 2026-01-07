@@ -57,3 +57,4 @@ type MenuEntry struct {
 	Children []MenuEntry `json:"children,omitempty"`
 	Order    int         `json:"order,omitempty"`
 }
+

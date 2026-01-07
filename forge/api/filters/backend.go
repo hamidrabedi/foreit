@@ -23,3 +23,4 @@ func (fbl FilterBackendList) ApplyFilters(r *http.Request, queryset interface{})
 	}
 	return result
 }
+

@@ -59,3 +59,4 @@ func AuthenticationMiddleware(authClasses []authentication.Authentication) core.
 		})
 	}
 }
+

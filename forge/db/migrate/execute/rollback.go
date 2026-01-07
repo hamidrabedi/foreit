@@ -40,3 +40,4 @@ func (r *RollbackManager) Rollback(ctx context.Context, opts RollbackOptions) er
 	// Default: rollback one step
 	return r.executor.Rollback(ctx)
 }
+

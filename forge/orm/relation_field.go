@@ -104,8 +104,8 @@ func (rf RelationField[T, D]) CheckDepth() error {
 
 // TraversalContext tracks visited nodes to prevent cycles at runtime
 type TraversalContext struct {
-	visited map[visitKey]bool
-	depth   int
+	visited  map[visitKey]bool
+	depth    int
 	maxDepth int
 }
 
@@ -177,3 +177,6 @@ var ErrCycleDetected = fmt.Errorf("cycle detected in relation traversal")
 
 // ErrMaxDepthExceeded is returned when max depth is exceeded
 var ErrMaxDepthExceeded = fmt.Errorf("max relation depth exceeded")
+
+
+

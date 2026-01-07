@@ -29,3 +29,4 @@ func (f *ReadOnlyField) ToRepresentation(value interface{}) (interface{}, error)
 	}
 	return value, nil
 }
+

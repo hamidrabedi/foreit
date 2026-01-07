@@ -220,3 +220,4 @@ func TestSerializerMethodField(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Computed Value", value)
 }
+

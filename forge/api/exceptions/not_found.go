@@ -19,3 +19,4 @@ func NewNotFound(message string) *NotFound {
 		),
 	}
 }
+

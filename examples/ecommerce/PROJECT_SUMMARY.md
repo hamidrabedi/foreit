@@ -194,9 +194,9 @@ type Product struct {
 
 func (Product) Fields() []schema.Field {
     return []schema.Field{
-        schema.Int64("id").Primary().AutoIncrement().Build(),
-        schema.String("name").Required().MaxLength(255).Build(),
-        schema.Float64("price").Required().Build(),
+        schema.Int64("id").WithPrimary().WithAutoIncrement(),
+        schema.String("name").WithRequired().WithMaxLength(255),
+        schema.Float64("price").WithRequired(),
         // ... 30+ more fields
     }
 }
@@ -431,3 +431,4 @@ This ecommerce example is a **complete, production-grade** application demonstra
 **Total Project Size**: ~20,000 lines of code (including generated code and docs)
 
 This is one of the most comprehensive framework example projects available in any language/framework!
+

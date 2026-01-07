@@ -170,3 +170,4 @@ func init() {
 	RegisterErrorCodeWithVersion(CodeInvalidNumberFormatField, "Invalid number format", 400, ErrorTypeValidation, "v1")
 	RegisterErrorCodeWithVersion(CodeRequiredFieldField, "Required field is missing", 400, ErrorTypeValidation, "v1")
 }
+

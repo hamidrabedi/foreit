@@ -66,3 +66,6 @@ func TestManager_Filter_WithoutDB(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, qs)
 }
+
+
+

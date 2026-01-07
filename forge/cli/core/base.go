@@ -18,3 +18,4 @@ type CommandGroup interface {
 	// Commands returns subcommands in this group
 	Commands() []Command
 }
+

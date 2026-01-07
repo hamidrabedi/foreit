@@ -21,7 +21,7 @@ import (
 func TestMigrationFlow_MigrateToVersion(t *testing.T) {
 	opts := docker.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "localhost",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",
@@ -62,8 +62,8 @@ type Item%d struct {
 
 func (Item%d) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(255).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("name").WithRequired().WithMaxLength(255),
 	}
 }
 
@@ -145,7 +145,7 @@ func (Item%d) Relations() []schema.Relation {
 func TestMigrationFlow_NoChangesDetected(t *testing.T) {
 	opts := docker.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "localhost",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",
@@ -178,8 +178,8 @@ type Author struct {
 
 func (Author) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(255).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("name").WithRequired().WithMaxLength(255),
 	}
 }
 

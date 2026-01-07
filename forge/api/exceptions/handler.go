@@ -117,3 +117,4 @@ func SetExceptionHandler(handler ExceptionHandler) {
 func GetExceptionHandler() ExceptionHandler {
 	return globalHandler
 }
+

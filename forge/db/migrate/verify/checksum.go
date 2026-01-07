@@ -89,3 +89,4 @@ func ValidateChecksum(sql, expectedChecksum string) error {
 	}
 	return nil
 }
+

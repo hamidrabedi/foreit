@@ -77,3 +77,4 @@ func CheckPerformanceImpact(sql string) []string {
 
 	return warnings
 }
+

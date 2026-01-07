@@ -37,3 +37,4 @@ func (w *SQLPreviewWidget) Render(name string, value interface{}, attrs map[stri
 func (w *SQLPreviewWidget) Parse(value string) (interface{}, error) {
 	return nil, fmt.Errorf("SQL preview widget does not parse values")
 }
+

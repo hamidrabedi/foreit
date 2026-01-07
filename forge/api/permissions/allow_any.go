@@ -31,3 +31,4 @@ func (p *AllowAny) GetMessage() string {
 func (p *AllowAny) GetCode() string {
 	return ""
 }
+

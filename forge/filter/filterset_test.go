@@ -2,14 +2,40 @@ package filter
 
 import (
 	"testing"
+
+	"github.com/forgego/forge/schema"
 )
 
 // MockModel for testing
 type MockModel struct {
+	schema.BaseSchema
 	ID       int64
 	Username string
 	Email    string
 	IsActive bool
+}
+
+func (MockModel) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("username").WithRequired().WithMaxLength(100),
+		schema.String("email").WithRequired().WithMaxLength(255),
+		schema.Bool("is_active").WithDefault(true),
+	}
+}
+
+func (MockModel) Relations() []schema.Relation {
+	return []schema.Relation{}
+}
+
+func (MockModel) Meta() schema.Meta {
+	return schema.Meta{
+		TableName: "mock_models",
+	}
+}
+
+func (MockModel) Hooks() *schema.ModelHooks {
+	return nil
 }
 
 func TestFilterSet_NewFilterSet(t *testing.T) {

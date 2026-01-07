@@ -1,489 +1,504 @@
-# forge Framework - Complete Roadmap
-
-## Vision
-
-forge aims to be the **Django of Go** - a full-featured, type-safe web framework that combines the best of Django's developer experience with Go's performance and type safety.
-
-## Current Status: MVP Complete ✅
-
-The framework has achieved MVP status with all core features working. Here's what's been implemented:
-
-### ✅ Completed Features
-
-#### Core Framework
-- ✅ **Schema Definition System** - Declarative model definitions with full Django field options
-- ✅ **Code Generation** - AST-based generation for models, managers, and querysets
-- ✅ **Type-Safe ORM** - Complete QuerySet API (All, Get, First, Last, Count, Exists, Filter, Exclude, OrderBy, Limit, Offset, Distinct)
-- ✅ **Manager CRUD** - Create, Update, Delete with lifecycle hooks
-- ✅ **SQL Builder** - Type-safe SQL generation with proper escaping and parameter binding
-- ✅ **Migration System** - Built-in migrations with golang-migrate
-- ✅ **Database Layer** - PostgreSQL support with connection pooling and transactions
-
-#### Admin System
-- ✅ **Type-Safe Admin Interface** - Full Django-like admin with generics
-- ✅ **HTTP Handlers** - Complete CRUD operations (List, Detail, Create, Update, Delete)
-- ✅ **Widgets** - Rich form widgets for all field types
-- ✅ **Filters & Search** - List filtering and search functionality
-- ✅ **Bulk Actions** - Type-safe bulk operations
-- ✅ **Export** - CSV and JSON export
-- ✅ **Inlines** - Related model editing
-- ✅ **Fieldsets** - Form field grouping
-
-#### API Framework
-- ✅ **REST API Framework** - DRF-like API framework
-- ✅ **Serializers** - Complete serializer system with field types
-- ✅ **ViewSets** - BaseViewSet with CRUD operations
-- ✅ **Authentication** - Token, JWT, Basic, Session, API Key authentication
-- ✅ **Permissions** - Complete permission system (AllowAny, IsAuthenticated, IsAdminUser, IsOwnerOrReadOnly)
-- ✅ **Throttling** - Rate limiting with AnonRateThrottle, UserRateThrottle, ScopedRateThrottle
-- ✅ **Content Negotiation** - JSON, XML, YAML, HTML, CSV renderers and parsers
-- ✅ **Pagination** - PageNumber and LimitOffset pagination
-- ✅ **Filtering** - Field filtering and search
-- ✅ **Exception Handling** - Complete exception hierarchy
-
-#### User System
-- ✅ **User Management** - Complete user CRUD operations
-- ✅ **Authentication** - Password and token-based authentication
-- ✅ **Session Management** - User session handling
-- ✅ **Password Management** - Reset, change, validation
-- ✅ **Permission System** - RBAC with permissions and groups
-- ✅ **Email Verification** - Email verification tokens
-- ✅ **Account Security** - Account lockout and rate limiting
-
-#### Infrastructure
-- ✅ **HTTP & Routing** - Chi router wrapper with middleware stack
-- ✅ **Security** - CSRF protection, XSS protection, SQL injection prevention
-- ✅ **Validation** - go-playground/validator integration
-- ✅ **Logging** - Structured logging with zap
-- ✅ **Configuration** - Viper integration (YAML, JSON, env vars)
-- ✅ **CLI Tools** - Complete CLI (new, generate, migrate, runserver)
-
-#### Developer Experience
-- ✅ **Plugin System** - Extensible plugin architecture
-- ✅ **Documentation** - Comprehensive documentation system
-- ✅ **Examples** - Example applications
-
----
-
-## Roadmap by Priority
-
-### P0 - Critical (In Progress / Next)
-
-#### 1. Advanced ORM Features
-**Status:** 🚧 Structure Ready
-
-- [ ] **SelectRelated/PrefetchRelated** - JOIN queries and separate queries for relations
-- [ ] **Aggregates** - Count, Sum, Avg, Min, Max, etc.
-- [ ] **Annotations** - Computed fields and expressions
-- [ ] **F() Expressions** - Database functions in queries
-- [ ] **Subqueries** - Nested query support
-- [ ] **Values/ValuesList** - Return dictionaries instead of model instances
-- [ ] **Bulk Operations** - BulkUpdate, BulkCreate for performance
-
-**Impact:** Enables complex queries and better performance
-
-#### 2. AST Parser Enhancements
-**Status:** 🚧 Partial
-
-- [ ] Extract all field options (currently basic extraction)
-- [ ] Extract relation options completely
-- [ ] Extract meta options
-- [ ] Extract hooks (BeforeSave, AfterSave, etc.)
-- [ ] Generate validation tags from schema
-- [ ] Generate database constraints from schema
-
-**Impact:** More complete code generation
-
-#### 3. Admin Interface Enhancements
-**Status:** ✅ Core Complete, 🚧 Enhancements Needed
-
-- [ ] **Template Rendering** - HTML templates for admin views
-- [ ] **Rich Text Editor** - WYSIWYG editor for text fields
-- [ ] **File/Image Uploads** - File handling in admin
-- [ ] **History/Audit Logging** - Track changes to models
-- [ ] **Autocomplete UI** - Better autocomplete interface
-- [ ] **Date/Time Pickers** - Enhanced date/time widgets
+﻿# forge Roadmap (comprehensive, code-aligned)
 
-**Impact:** Better admin user experience
+## Table of contents
 
-#### 4. Migration System Enhancements
-**Status:** ✅ Core Complete, 🚧 Enhancements Needed
+- [1. Summary](#1-summary)
+- [2. Current state (what is actually implemented)](#2-current-state-what-is-actually-implemented)
+- [3. Guiding priorities](#3-guiding-priorities)
+- [4. Near-term epics (0-3 months)](#4-near-term-epics-0-3-months)
+- [5. Mid-term epics (3-6 months)](#5-mid-term-epics-3-6-months)
+- [6. Longer-term epics (6-12 months)](#6-longer-term-epics-6-12-months)
+- [7. Long-term bets (12+ months)](#7-long-term-bets-12-months)
+- [8. Ongoing quality work](#8-ongoing-quality-work)
+- [9. Release process and definitions of done](#9-release-process-and-definitions-of-done)
+- [10. Cross-references to archived plans](#10-cross-references-to-archived-plans)
 
-- [ ] **Migration Recovery** - Automatic dirty state recovery and partial rollback
-- [ ] **Schema Drift Detection** - Database introspection to detect schema drift
-- [ ] **Migration Integrity Validation** - Checksum validation for applied migrations
-- [ ] **Advanced Rollback** - Partial migration rollback support
+## 1. Summary
 
-**Impact:** Better migration safety and recovery capabilities
+The archive contains multiple roadmaps and TODO lists (see `docs/archive/ROADMAP.md` and `docs/archive/docs-new/TODOS.md`). This roadmap reconciles them with the real implementation in `forge/` today.
 
-#### 5. Testing Infrastructure
-**Status:** 🚧 Partial
+Key themes:
 
-- [ ] Comprehensive test suite
-- [ ] Test utilities and helpers
-- [ ] Fixture system
-- [ ] Test database setup/teardown
-- [ ] Integration test framework
-- [ ] Performance benchmarks
+- The "core stack" is present: schema, codegen, ORM, filters, migrations, admin, API, identity, CLI.
+- The next work should focus on correctness, stability, and the developer experience of overrides and assets.
+- Advanced ORM and advanced admin UI are the major growth areas.
 
-**Impact:** Code quality and reliability
+## 2. Current state (what is actually implemented)
 
----
+### 2.1 Core framework
 
-### P1 - High Priority
+Implemented:
 
-#### 5. Migration Recovery & Drift Detection
-**Status:** 📋 Planned
+- Schema DSL: `forge/schema/*`.
+- AST-based code generation: `forge/codegen/*`.
+- ORM core with QuerySet: `forge/orm/*`.
+- Filter system: `forge/filter/*`.
+- Migrations: `forge/db/migrate/*` + `forge/db/migrations.go`.
+- CLI: `forge/cli/*`.
 
-- [ ] Automatic dirty state recovery
-- [ ] Database introspection for drift detection
-- [ ] Migration integrity validation
-- [ ] Partial migration rollback
+### 2.2 Admin
 
-**Impact:** Production migration safety
+Implemented:
 
-#### 6. REST API Auto-Generation
-**Status:** ✅ Framework Complete, 🚧 Auto-Generation Needed
+- Admin registry and site: `forge/admin/core/*`, `forge/admin/site.go`.
+- Admin REST router: `forge/admin/api/rest/router.go`.
+- UI scaffolding and widgets: `forge/admin/ui/*`.
 
-- [ ] Auto-generate ViewSets from models
-- [ ] Auto-generate Serializers from models
-- [ ] Auto-register routes
-- [ ] OpenAPI/Swagger documentation generation
-- [ ] API versioning support
-- [ ] API documentation UI
+### 2.3 API
 
-**Impact:** Faster API development
+Implemented:
 
-#### 7. Advanced Query Features
-**Status:** 🚧 Structure Ready
+- Serializers, viewsets, permissions, throttling, renderers/parsers.
+- OpenAPI generator: `forge/api/docs/openapi.go`.
 
-- [ ] **Window Functions** - ROW_NUMBER, RANK, etc.
-- [ ] **Full-Text Search** - PostgreSQL full-text search
-- [ ] **Raw SQL Support** - Execute raw SQL when needed
-- [ ] **Database Functions** - Custom database functions
-- [ ] **Query Optimization** - Query plan analysis
+### 2.4 Identity
 
-**Impact:** More powerful querying capabilities
+Implemented:
 
-#### 8. Caching Layer
-**Status:** 📋 Planned
+- Models, repos, services, backends, handlers, middleware.
 
-- [ ] Query result caching
-- [ ] Model instance caching
-- [ ] Cache invalidation strategies
-- [ ] Redis support
-- [ ] In-memory cache
-- [ ] Cache middleware
+### 2.5 Tests
 
-**Impact:** Performance improvements
+Implemented:
 
-#### 9. CLI Enhancements
-**Status:** ✅ Basic Complete, 🚧 Enhancements Needed
+- Migration integration tests: `tests/integration/migrate/*`.
+- CLI e2e tests: `tests/cmd_forge/*`, `tests/e2e/cli/*`.
+- ORM/schema integration tests: `tests/integration/schema`, `tests/integration/orm`.
 
-- [ ] `forge startapp` - Create new app
-- [ ] `forge shell` - Interactive shell
-- [ ] `forge test` - Test runner
-- [ ] `forge collectstatic` - Static file collection
-- [ ] `forge createsuperuser` - Admin user creation
-- [ ] `forge dbshell` - Database shell
-- [ ] `forge check` - System check
+## 3. Guiding priorities
 
-**Impact:** Better developer experience
+1. Correctness and deterministic behavior (migrations, codegen, admin/API).
+2. Security by default (filter whitelists, identity, middleware ordering).
+3. Override-first extensibility (registry/plug-ins, fewer hard-coded calls).
+4. Great DX: CLI workflows and examples stay in lockstep with code.
 
----
+## 4. Near-term epics (0-3 months)
 
-### P2 - Medium Priority
+These are the highest ROI work items that improve reliability and unblock teams.
 
-#### 9. Background Tasks
-**Status:** 📋 Planned
+### Epic 4.1 Admin asset pipeline and static serving
 
-- [ ] Task queue integration
-- [ ] Scheduled tasks (cron-like)
-- [ ] Async task execution
-- [ ] Task monitoring
-- [ ] Task retry logic
-- [ ] Task priorities
+Problem:
 
-**Impact:** Async processing capabilities
+- Admin UI can produce hashed assets (e.g., Vite `index-<hash>.js`). 404s happen when server does not serve the correct dist directory or when build artifacts are missing.
 
-#### 10. Development Tools
-**Status:** 📋 Planned
+Deliverables:
 
-- [ ] Hot reload (file watching)
-- [ ] Debug toolbar
-- [ ] Query logging and profiling
-- [ ] Performance profiling
-- [ ] Code coverage tools
-- [ ] Development server enhancements
+1. Define a single authoritative admin asset directory.
+2. Ensure `forge runserver` serves it under `/admin/assets/`.
+3. Add a build step (or auto-build in dev) that keeps hashed bundles in sync.
+4. Add a regression test that requests `/admin/` and all referenced assets.
 
-**Impact:** Better development experience
+Implementation areas:
 
-#### 11. Monitoring & Observability
-**Status:** 📋 Planned
+- `forge/admin/ui/*` (asset packaging)
+- `forge/server/static.go` (static serving)
+- `forge/cli/commands/server/runserver.go` (dev server behavior)
+- tests (new integration test under `tests/` or `forge/admin/ui`)
 
-- [ ] Metrics collection (Prometheus)
-- [ ] Health checks
-- [ ] Error tracking
-- [ ] Performance monitoring
-- [ ] Request tracing
-- [ ] Log aggregation
+Definition of done:
 
-**Impact:** Production readiness
+- No 404 on referenced admin assets in local dev.
+- Tests cover at least the admin index page + asset fetch.
 
-#### 12. Documentation Enhancements
-**Status:** ✅ Basic Complete, 🚧 Enhancements Needed
+### Epic 4.2 Make overrides first-class (reduce main.go wiring)
 
-- [ ] Auto-generated API docs
-- [ ] Interactive API documentation
-- [ ] More tutorials
-- [ ] Video tutorials
-- [ ] Best practices guide
-- [ ] Migration guides
+Archived docs repeatedly emphasize: built-in systems should not require manual registration in `main.go`, but should remain overridable.
 
-**Impact:** Better onboarding
+Deliverables:
 
----
+1. Document and implement a default auto-registration mechanism.
+2. Provide opt-out flags.
+3. Provide clear extension APIs:
+   - identity routes
+   - admin routes
+   - API routes
 
-### P3 - Nice to Have
+Implementation areas:
 
-#### 13. GraphQL Support
-**Status:** 📋 Planned
+- `forge/registry/*`
+- `forge/admin/core/registry.go`
+- `forge/identity/router.go`
+- `forge/server/router.go`
 
-- [ ] GraphQL schema generation
-- [ ] GraphQL resolvers
-- [ ] GraphQL subscriptions
-- [ ] GraphQL playground
+Definition of done:
 
-**Impact:** Alternative API style
+- A sample app can start with near-zero wiring.
+- Overrides can be applied by plugging into registries.
 
-#### 14. WebSocket Support
-**Status:** 📋 Planned
+### Epic 4.3 Migrations safety and ergonomics
 
-- [ ] WebSocket handlers
-- [ ] Real-time updates
-- [ ] WebSocket authentication
-- [ ] Channel management
+Deliverables:
 
-**Impact:** Real-time features
+1. Improve drift/lint output readability (`forge/db/migrate/verify/*`).
+2. Improve status output (`forge/db/migrate/execute/status.go`).
+3. Provide explicit migration dependency metadata.
 
-#### 15. Multi-Tenancy
-**Status:** 📋 Planned
+Definition of done:
 
-- [ ] Built-in multi-tenancy support
-- [ ] Tenant isolation
-- [ ] Tenant-aware queries
-- [ ] Tenant management
+- Incremental ecommerce migrations remain stable.
+- Developers can run `forge migrate status` and understand what is pending.
 
-**Impact:** SaaS applications
+### Epic 4.4 CLI docs and UX
 
-#### 16. Internationalization (i18n)
-**Status:** 📋 Planned
+Deliverables:
 
-- [ ] Translation system
-- [ ] Locale support
-- [ ] Date/time formatting
-- [ ] Number formatting
+1. Ensure CLI commands have consistent flags and help.
+2. Add missing parity commands from archived roadmap that are now partially present:
+   - startapp (alias for add app)
+   - dbshell
+   - collectstatic (if relevant)
 
-**Impact:** Global applications
+Definition of done:
 
----
+- CLI help is consistent.
+- CLI e2e tests cover the core commands.
 
-## Timeline
+## 5. Mid-term epics (3-6 months)
 
-### Q1 2025: Core Enhancements
+### Epic 5.1 Advanced ORM features (close the gap with archived API reference)
 
-**Focus:** Complete advanced ORM features and admin enhancements
+The archive lists SelectRelated, PrefetchRelated, aggregates, annotations, values, and F expressions as major features. The codebase already contains scaffolding and partial implementations.
 
-**Deliverables:**
-- SelectRelated/PrefetchRelated implementation
-- Aggregates and annotations
-- AST parser enhancements
-- Admin template rendering
-- Comprehensive testing suite
+Deliverables:
 
-**Success Metrics:**
-- Can perform complex queries with relations
-- Admin interface fully functional with templates
-- Test coverage > 80%
+1. Production-ready eager loading:
+   - Implement join generation for `SelectRelated`.
+   - Implement prefetch queries for `PrefetchRelated`.
+   - Ensure safety errors in `forge/orm/preload.go` are only triggered when appropriate.
+2. Aggregates and annotations:
+   - Implement aggregate SQL in `forge/orm/aggregates.go`.
+   - Implement annotation expressions in `forge/orm/annotations.go`.
+3. Values/ValuesList:
+   - Ensure projection SQL is correct.
+   - Ensure type-safe variants (field expressions) work alongside string-based forms.
 
----
+Tests:
 
-### Q2 2025: API & Performance
+- Expand `forge/orm/queryset_test.go`.
+- Add integration tests under `tests/integration/orm` verifying SQL results.
 
-**Focus:** Auto-generated APIs and performance improvements
+Definition of done:
 
-**Deliverables:**
-- REST API auto-generation
-- OpenAPI/Swagger documentation
-- Caching layer
-- Query optimization
-- Performance benchmarks
+- ORM advanced methods work in real Postgres.
+- No silent N+1 patterns.
 
-**Success Metrics:**
-- Can auto-generate complete APIs
-- API documentation auto-generated
-- Performance benchmarks meet targets
+### Epic 5.2 Admin UX (headless-first)
 
----
+Archived redesign documents push a headless admin with a modern frontend.
 
-### Q3 2025: Developer Experience
+Deliverables:
 
-**Focus:** Tools and documentation
+1. Solidify admin REST endpoints and models metadata format.
+2. Provide stable TypeScript types generation (if desired) using OpenAPI or direct codegen.
+3. Improve widget system:
+   - consistent schema -> widget mapping
+   - autocomplete endpoint
+   - global search
 
-**Deliverables:**
-- Complete CLI toolset
-- Development tools (hot reload, debug toolbar)
-- Enhanced documentation
-- More example applications
-- Testing utilities
+Definition of done:
 
-**Success Metrics:**
-- Developer onboarding < 1 hour
-- Complete documentation
-- 5+ example applications
+- Admin UI can list, edit, and filter ecommerce models reliably.
 
----
+### Epic 5.3 REST auto-generation
 
-### Q4 2025: Production & Ecosystem
+Deliverables:
 
-**Focus:** Production readiness and ecosystem
+1. Auto-generate serializers from schema definitions.
+2. Auto-generate viewsets from schema + serializer.
+3. Auto-register routes with a registry-based approach.
+4. Expand OpenAPI generator to include generated viewsets.
 
-**Deliverables:**
-- Production optimizations
-- Monitoring and observability
-- Deployment guides
-- Plugin system enhancements
-- Official plugins (auth, storage, email)
+Risks:
 
-**Success Metrics:**
-- Production deployments
-- 10+ community plugins
-- Performance benchmarks
+- Over-generation can create APIs without proper security. Ensure permissions are explicit.
 
----
+Definition of done:
 
-## Success Criteria
+- A project can expose CRUD REST APIs for selected models with minimal boilerplate.
 
-### MVP (Minimum Viable Product) ✅ ACHIEVED
+## 6. Longer-term epics (6-12 months)
 
-- [x] Can define models with schema
-- [x] Can generate code from schemas
-- [x] Can query database with type-safe API
-- [x] Can use admin interface for CRUD
-- [x] Can build a simple blog application
+### Epic 6.1 Observability and operational maturity
 
-**Status:** ✅ Complete
+Deliverables:
 
----
+- Structured logs across all HTTP surfaces.
+- Metrics hooks for request latency, errors, throttling events.
+- Health/readiness endpoints.
+- Tracing support (OpenTelemetry) as optional integration.
 
-### Beta Release (Target: Q2 2025)
+### Epic 6.2 Background tasks
 
-- [ ] All advanced ORM features working
-- [ ] REST API auto-generation
-- [ ] Comprehensive documentation
-- [ ] 5+ example applications
-- [ ] Enhanced plugin system
-- [ ] Performance benchmarks
+Deliverables:
 
-**Target:** End of Q2 2025
+- Task runner + worker process.
+- Admin actions can enqueue tasks.
+- Retry policy and dead-letter behavior.
 
----
+### Epic 6.3 Advanced migrations
 
-### 1.0 Release (Target: Q4 2025)
+Deliverables:
 
-- [ ] Production-ready
-- [ ] Performance benchmarks
-- [ ] Security audit
-- [ ] Plugin ecosystem
-- [ ] Community adoption
-- [ ] Production deployments
+- Drift detection with DB introspection (optional).
+- Schema checksums and verification.
+- Safe rollback policies.
 
-**Target:** End of Q4 2025
+## 7. Long-term bets (12+ months)
 
----
+### Epic 7.1 Multi-tenancy
 
-## Community Goals
+Deliverables:
 
-### Year 1
+- tenant-aware query building
+- tenant-aware migrations
+- admin for tenant management
 
-- **GitHub Stars:** 1,000+
-- **Contributors:** 20+
-- **Plugins:** 10+
-- **Production Users:** 50+
+### Epic 7.2 GraphQL and realtime
 
-### Year 2
+Deliverables:
 
-- **GitHub Stars:** 5,000+
-- **Contributors:** 50+
-- **Plugins:** 50+
-- **Production Users:** 500+
+- GraphQL schema generation for models.
+- WebSocket updates for admin dashboards.
 
----
+### Epic 7.3 Plugin ecosystem
 
-## Risk Mitigation
+Deliverables:
 
-### Technical Risks
+- Stable plugin API surface.
+- A curated plugin set for common needs (audit log, import/export, file manager).
 
-1. **Complex Query Features**
-   - **Mitigation:** Incremental implementation, use proven patterns
-   - **Status:** Structure ready, implementation in progress
+## 8. Ongoing quality work
 
-2. **Performance Issues**
-   - **Mitigation:** Benchmark early, optimize critical paths
-   - **Fallback:** Add caching layer
+These items are continuous and should not be treated as one-time epics.
 
-3. **Code Generation Complexity**
-   - **Mitigation:** Incremental development, comprehensive tests
-   - **Fallback:** Manual code templates
+### 8.1 Code quality and cleanup
 
-### Community Risks
+From `docs/archive/docs-new/TODOS.md`, the project tracks cleanup as "complete" but ongoing quality work remains:
 
-1. **Low Adoption**
-   - **Mitigation:** Great documentation, examples, tutorials
-   - **Fallback:** Focus on specific use cases
+- keep naming consistent
+- keep error mapping consistent
+- keep lint/staticcheck green
 
-2. **Maintenance Burden**
-   - **Mitigation:** Plugin system, community contributions
-   - **Fallback:** Core features only
+### 8.2 Examples consistency
 
----
+Examples are part of the product contract.
 
-## Next Steps
+- When schema/codegen changes, update `examples/ecommerce`.
+- Keep example admin code using generated field instances (this has been a source of breakage historically).
 
-### Immediate (This Month)
+### 8.3 Documentation
 
-1. Implement SelectRelated/PrefetchRelated
-2. Complete aggregates and annotations
-3. Enhance AST parser
-4. Add admin template rendering
+- Keep authoritative docs in `docs/` up to date.
+- Keep archive for context.
 
-### Short Term (This Quarter)
+## 9. Release process and definitions of done
 
-1. REST API auto-generation
-2. OpenAPI documentation
-3. Caching layer
-4. Comprehensive testing
+### 9.1 Definitions of done
 
-### Medium Term (This Year)
+A feature is "done" when:
 
-1. Complete CLI toolset
-2. Development tools
-3. Production optimizations
-4. Plugin ecosystem
+1. Code is implemented behind the intended extension points.
+2. Unit tests cover the feature where appropriate.
+3. Integration tests cover it if it touches migrations/CLI/admin.
+4. Examples compile.
+5. Docs are updated:
+   - architecture/design if structural
+   - PRD if product requirement
+   - roadmap if status changed
 
----
+### 9.2 Release checklist
 
-## Contributing
+- Run tests:
+  - `go test ./forge/...`
+  - `go test ./examples/ecommerce/...`
+  - `go test ./tests/...`
+- Run linters/checks:
+  - `forge check` (or equivalent)
+- Generate code and verify nothing unexpected changes:
+  - `forge generate`
+- Verify migrations:
+  - `forge makemigrations <name> --auto`
+  - review SQL
+  - `forge migrate up` on test DB
+- Verify admin assets:
+  - build admin UI assets
+  - run server and ensure no 404 on referenced bundles
 
-We welcome contributions! See [Development Guide](DEVELOPMENT.md) for how to contribute.
+## 10. Cross-references to archived plans
 
-Priority areas for contributions:
-- Advanced ORM features
-- Testing infrastructure
-- Documentation
-- Example applications
-- Plugin development
+This roadmap is rooted in, but not identical to, archived planning.
 
----
+- Archived long roadmap: `docs/archive/ROADMAP.md`.
+- Archived TODO tracker: `docs/archive/docs-new/TODOS.md`.
+- Archived design deep dives:
+  - `docs/archive/FRAMEWORK_ARCHITECTURE.md`
+  - `docs/archive/ADMIN_REDESIGN_ARCHITECTURE.md`
+  - `docs/archive/USER_SYSTEM_ARCHITECTURE.md`
 
-**Last Updated:** January 2025
+The rule is: archive documents are references; this file is the current plan.
+
+## Appendix A: Backlog inventory (expanded)
+
+This appendix enumerates backlog items from archived roadmaps and TODO lists, grouped by subsystem. It is intentionally exhaustive so future planning can prune rather than recreate.
+
+### A.1 ORM backlog
+
+- JOIN-based eager loading for `SelectRelated` (SQL builder + schema registry integration).
+- Prefetch queries for `PrefetchRelated` (batch load related sets).
+- Relation path resolution and validation.
+- Aggregates: Count, Sum, Avg, Min, Max.
+- Aggregation grouping.
+- Annotations: computed expressions.
+- Window functions.
+- Subqueries.
+- Raw SQL escape hatches with safe parameter binding.
+- BulkCreate and BulkUpdate improvements.
+- Values/ValuesList typed variants (field expressions strongly typed end-to-end).
+- ValuesList flat mode improvements.
+- Query plan introspection tooling.
+- Query caching hooks.
+
+### A.2 Filter system backlog
+
+- Persisted filter storage implementation (DB-backed).
+- Filter sharing/versioning.
+- More widgets for numeric, date ranges.
+- Better optimizer heuristics for EXISTS vs JOIN.
+- Cost model calibration.
+- Filter metadata schema improvements.
+- Better error messages for invalid deep paths.
+
+### A.3 Migration system backlog
+
+- DB introspection drift detection (optional).
+- Constraint diffing improvements (deferrable, match).
+- Index diffing improvements (partial indexes).
+- Safer down migrations.
+- Squash migrations stability.
+- Checksum storage and verification.
+- Migration graph visualization.
+- Migration lint rules for destructive changes.
+
+### A.4 Admin backlog
+
+- Robust SPA admin package integration (if SPA is chosen as default).
+- Better list view performance.
+- Autocomplete and global search endpoints.
+- Rich text editor.
+- File/image upload widget.
+- Audit history UI.
+- Model relationship navigation.
+- Inline editing.
+- Fieldsets and layout configuration.
+- Theme system.
+- Dashboard widgets library.
+
+### A.5 API framework backlog
+
+- Auto-generate serializers and viewsets from schema.
+- Route auto-registration.
+- API versioning strategy.
+- Interactive API docs (Swagger UI) for OpenAPI generator.
+- Better content negotiation customization.
+- Consistent pagination metadata schema.
+- Rate limiting policies and storage backends.
+- CORS configuration improvements.
+- API client generation.
+
+### A.6 Identity backlog
+
+- OAuth backend implementation.
+- MFA support.
+- Account lockout policies.
+- Email provider abstraction.
+- RBAC admin UI.
+- Permissions caching.
+
+### A.7 CLI/dev tooling backlog
+
+- startapp alias and improved scaffolds.
+- dbshell command.
+- collectstatic command (if needed for asset packaging).
+- createsuperuser improvements.
+- hot reload.
+- debug toolbar.
+- improved test runner output.
+
+### A.8 Observability backlog
+
+- Prometheus metrics.
+- request tracing.
+- structured audit logs.
+- log aggregation guidance.
+
+### A.9 Product-level backlog
+
+- Multi-tenancy.
+- i18n.
+- GraphQL.
+- WebSocket support.
+- Plugin marketplace.
+
+## Appendix B: Timeline template (fill per release)
+
+Use this template to plan releases without rewriting structure:
+
+- Release name:
+- Target date:
+- Epics:
+- Risks:
+- Test gates:
+- Docs updates required:
+- Examples updates required:
+
+## Appendix C: Milestones and checklists
+
+### C.1 Migration safety milestone
+
+- [ ] Improve drift detection output
+- [ ] Improve safety lint rules
+- [ ] Add destructive-change warnings
+- [ ] Add schema checksum verification
+- [ ] Add DB introspection mode (optional)
+- [ ] Add migration plan printing
+- [ ] Add migration dependency comments validation
+
+### C.2 Admin asset milestone
+
+- [ ] Define build directory contract
+- [ ] Ensure `runserver` serves build directory
+- [ ] Ensure `forge` CLI can build assets in dev
+- [ ] Add test to fetch `/admin/` and verify bundles exist
+- [ ] Add docs describing asset pipeline
+
+### C.3 Advanced ORM milestone
+
+- [ ] Implement join builder for select related
+- [ ] Implement prefetch strategy
+- [ ] Implement relation mapping and hydration
+- [ ] Add integration tests for eager loading
+- [ ] Expand aggregate SQL
+- [ ] Expand annotation expressions
+
+### C.4 API auto-generation milestone
+
+- [ ] Generate serializer skeletons from schema
+- [ ] Generate viewset skeletons
+- [ ] Register routes via registry
+- [ ] Expand OpenAPI to include generated APIs
+- [ ] Add a tutorial and an example
+
+### C.5 Identity milestone
+
+- [ ] Add OAuth backend interface
+- [ ] Add OAuth backend implementation
+- [ ] Add MFA primitives
+- [ ] Improve permissions caching
+
+### C.6 Observability milestone
+
+- [ ] Add request metrics
+- [ ] Add tracing hooks
+- [ ] Add admin audit events export
+

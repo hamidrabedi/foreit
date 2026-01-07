@@ -80,3 +80,4 @@ func formatData(data interface{}) string {
 		return fmt.Sprintf("%v", data)
 	}
 }
+

@@ -112,3 +112,4 @@ func TestMapPanic(t *testing.T) {
 		t.Errorf("Expected code '%s', got '%s'", CodeInternalError, problem.Code)
 	}
 }
+

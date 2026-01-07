@@ -2,6 +2,7 @@ package rest
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/forgego/forge/admin/core"
+	"github.com/forgego/forge/media"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -16,8 +18,9 @@ import (
 
 // Router handles all admin API routes
 type Router struct {
-	registry *core.Registry
-	prefix   string
+	registry    *core.Registry
+	prefix      string
+	mediaEngine *media.Engine
 }
 
 // NewRouter creates a new admin API router
@@ -26,6 +29,11 @@ func NewRouter(registry *core.Registry) *Router {
 		registry: registry,
 		prefix:   "/api",
 	}
+}
+
+// SetMediaEngine configures upload/media handling.
+func (r *Router) SetMediaEngine(engine *media.Engine) {
+	r.mediaEngine = engine
 }
 
 // RegisterRoutes registers all admin routes
@@ -73,6 +81,7 @@ func (r *Router) registerModelRoutes(router chi.Router) {
 				subDetail.Get("/", r.handleDetail(admin))
 				subDetail.Patch("/", r.handleUpdate(admin))
 				subDetail.Put("/", r.handleReplace(admin))
+				subDetail.Get("/history", r.handleHistory(admin))
 				subDetail.Delete("/", r.handleDelete(admin))
 			})
 
@@ -86,6 +95,12 @@ func (r *Router) registerModelRoutes(router chi.Router) {
 
 			// Autocomplete
 			sub.Get("/autocomplete", r.handleAutocomplete(admin))
+
+			// Upload
+			sub.Post("/upload", r.handleUpload(admin))
+
+			// Export
+			sub.Get("/export", r.handleExport(admin))
 		})
 	}
 }
@@ -110,8 +125,10 @@ func (r *Router) handleMetaList(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		// TODO: Get count from manager
 		count := int64(0)
+		if resp, err := admin.ListObjects(ctx, core.ListParams{Page: 1, PageSize: 1}); err == nil {
+			count = resp.Count
+		}
 
 		models = append(models, core.ModelListMetadata{
 			Name:              name,
@@ -123,8 +140,21 @@ func (r *Router) handleMetaList(w http.ResponseWriter, req *http.Request) {
 		})
 	}
 
+	allPlugins := r.registry.GetAllPlugins()
+	plugins := make([]core.PluginMetadata, 0, len(allPlugins))
+	for _, p := range allPlugins {
+		plugins = append(plugins, p.GetMetadata())
+	}
+
+	dashboard := r.registry.GetDashboardConfig()
+	dashboard.Widgets = append(dashboard.Widgets, collectPluginWidgets(allPlugins)...)
+
 	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"models": models,
+		"models":       models,
+		"plugins":      plugins,
+		"custom_pages": r.registry.GetCustomPages(),
+		"menu_entries": r.registry.GetMenuEntries(),
+		"dashboard":    dashboard,
 	})
 }
 
@@ -307,12 +337,46 @@ func (r *Router) handleReplace(admin core.AdminInterface) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Fetch object, parse request body, validate, replace object
-		_ = id
+		var data map[string]interface{}
+		if err := json.NewDecoder(req.Body).Decode(&data); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_body", err.Error(), nil)
+			return
+		}
 
-		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"message": "Object replaced",
-		})
+		obj, err := admin.UpdateObject(ctx, id, data)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "update_failed", err.Error(), nil)
+			return
+		}
+
+		respondJSON(w, http.StatusOK, obj)
+	}
+}
+
+// handleHistory returns history entries for a specific object.
+func (r *Router) handleHistory(admin core.AdminInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		user := getUserFromContext(ctx)
+		idStr := chi.URLParam(req, "id")
+
+		if idStr == "" {
+			respondError(w, http.StatusBadRequest, "invalid_id", "Invalid ID format", nil)
+			return
+		}
+
+		if !admin.HasViewPermission(ctx, user, nil) {
+			respondError(w, http.StatusForbidden, "permission_denied", "You don't have permission to view this object", nil)
+			return
+		}
+
+		history, err := admin.GetHistory(ctx, idStr)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "history_failed", err.Error(), nil)
+			return
+		}
+
+		respondJSON(w, http.StatusOK, history)
 	}
 }
 
@@ -358,11 +422,39 @@ func (r *Router) handleBulkCreate(admin core.AdminInterface) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Parse request body, validate, create objects
+		var payload interface{}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_body", err.Error(), nil)
+			return
+		}
+
+		records, err := coerceBulkCreatePayload(payload)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_body", err.Error(), nil)
+			return
+		}
+
+		created := 0
+		objects := make([]interface{}, 0, len(records))
+		errors := []core.BulkActionError{}
+
+		for idx, data := range records {
+			obj, err := admin.CreateObject(ctx, data)
+			if err != nil {
+				errors = append(errors, core.BulkActionError{
+					ID:      int64(idx),
+					Message: err.Error(),
+				})
+				continue
+			}
+			created++
+			objects = append(objects, obj)
+		}
 
 		respondJSON(w, http.StatusCreated, map[string]interface{}{
-			"created": 0,
-			"objects": []interface{}{},
+			"created": created,
+			"objects": objects,
+			"errors":  errors,
 		})
 	}
 }
@@ -379,10 +471,33 @@ func (r *Router) handleBulkUpdate(admin core.AdminInterface) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Parse request body, validate, update objects
+		var payload struct {
+			IDs  []interface{}          `json:"ids"`
+			Data map[string]interface{} `json:"data"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_body", err.Error(), nil)
+			return
+		}
+
+		updated := 0
+		errors := []core.BulkActionError{}
+		for _, rawID := range payload.IDs {
+			obj, err := admin.UpdateObject(ctx, rawID, payload.Data)
+			if err != nil {
+				errors = append(errors, core.BulkActionError{
+					ID:      toInt64(rawID),
+					Message: err.Error(),
+				})
+				continue
+			}
+			_ = obj
+			updated++
+		}
 
 		respondJSON(w, http.StatusOK, map[string]interface{}{
-			"updated": 0,
+			"updated": updated,
+			"errors":  errors,
 		})
 	}
 }
@@ -399,9 +514,31 @@ func (r *Router) handleBulkDelete(admin core.AdminInterface) http.HandlerFunc {
 			return
 		}
 
-		// TODO: Parse request body, validate, delete objects
+		var payload struct {
+			IDs []interface{} `json:"ids"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			respondError(w, http.StatusBadRequest, "invalid_body", err.Error(), nil)
+			return
+		}
 
-		w.WriteHeader(http.StatusNoContent)
+		deleted := 0
+		errors := []core.BulkActionError{}
+		for _, rawID := range payload.IDs {
+			if err := admin.DeleteObject(ctx, rawID); err != nil {
+				errors = append(errors, core.BulkActionError{
+					ID:      toInt64(rawID),
+					Message: err.Error(),
+				})
+				continue
+			}
+			deleted++
+		}
+
+		respondJSON(w, http.StatusOK, map[string]interface{}{
+			"deleted": deleted,
+			"errors":  errors,
+		})
 	}
 }
 
@@ -472,6 +609,39 @@ func (r *Router) handleAutocomplete(admin core.AdminInterface) http.HandlerFunc 
 	}
 }
 
+// handleUpload accepts a single file upload for a model.
+func (r *Router) handleUpload(admin core.AdminInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		user := getUserFromContext(ctx)
+
+		if !admin.HasChangePermission(ctx, user, nil) && !admin.HasAddPermission(ctx, user) {
+			respondError(w, http.StatusForbidden, "permission_denied", "You don't have permission to upload files for this model", nil)
+			return
+		}
+
+		if r.mediaEngine == nil {
+			respondError(w, http.StatusBadRequest, "upload_disabled", "File uploads are not configured", nil)
+			return
+		}
+
+		result, err := r.mediaEngine.SaveUploadFromRequest(req, "file", admin.ModelName())
+		if err != nil {
+			respondError(w, http.StatusBadRequest, "upload_failed", err.Error(), nil)
+			return
+		}
+
+		resp := core.UploadResponse{
+			URL:        result.URL,
+			Filename:   result.Filename,
+			Size:       result.Size,
+			MimeType:   result.MimeType,
+			UploadedAt: result.UploadedAt,
+		}
+		respondJSON(w, http.StatusOK, resp)
+	}
+}
+
 // handleGlobalSearch handles global search across all models
 func (r *Router) handleGlobalSearch(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
@@ -501,7 +671,7 @@ func (r *Router) handleGlobalSearch(w http.ResponseWriter, req *http.Request) {
 			group.Items = append(group.Items, core.SearchResultItem{
 				ID:    item.Value,
 				Title: item.Label,
-				URL:   fmt.Sprintf("/admin/%s/%v", name, item.Value),
+				URL:   fmt.Sprintf("/%s/%v", name, item.Value),
 			})
 		}
 
@@ -511,6 +681,135 @@ func (r *Router) handleGlobalSearch(w http.ResponseWriter, req *http.Request) {
 	respondJSON(w, http.StatusOK, core.SearchResponse{
 		Results: results,
 	})
+}
+
+// handleExport exports data for a model.
+func (r *Router) handleExport(admin core.AdminInterface) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		ctx := req.Context()
+		user := getUserFromContext(ctx)
+
+		if !admin.HasViewPermission(ctx, user, nil) {
+			respondError(w, http.StatusForbidden, "permission_denied", "You don't have permission to export this model", nil)
+			return
+		}
+
+		format := strings.ToLower(req.URL.Query().Get("format"))
+		if format == "" {
+			format = "json"
+		}
+
+		meta, err := admin.GetMetadata(ctx, user)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "metadata_failed", err.Error(), nil)
+			return
+		}
+
+		results, err := fetchAllForExport(ctx, admin)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "export_failed", err.Error(), nil)
+			return
+		}
+
+		switch format {
+		case "csv":
+			if err := writeCSVExport(w, meta.ListDisplay, results); err != nil {
+				respondError(w, http.StatusInternalServerError, "export_failed", err.Error(), nil)
+			}
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(results)
+		}
+	}
+}
+
+func collectPluginWidgets(plugins map[string]core.Plugin) []core.WidgetMeta {
+	result := []core.WidgetMeta{}
+	for _, p := range plugins {
+		meta := p.GetMetadata()
+		if len(meta.Widgets) > 0 {
+			result = append(result, meta.Widgets...)
+		}
+	}
+	return result
+}
+
+func fetchAllForExport(ctx context.Context, admin core.AdminInterface) ([]map[string]interface{}, error) {
+	page := 1
+	pageSize := 500
+	allResults := []map[string]interface{}{}
+
+	for {
+		resp, err := admin.ListObjects(ctx, core.ListParams{
+			Page:     page,
+			PageSize: pageSize,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		batch, err := coerceResults(resp.Results)
+		if err != nil {
+			return nil, err
+		}
+		allResults = append(allResults, batch...)
+
+		if page >= resp.TotalPages || len(batch) == 0 {
+			break
+		}
+		page++
+	}
+
+	return allResults, nil
+}
+
+func coerceResults(results interface{}) ([]map[string]interface{}, error) {
+	raw, err := json.Marshal(results)
+	if err != nil {
+		return nil, err
+	}
+
+	var decoded []map[string]interface{}
+	if err := json.Unmarshal(raw, &decoded); err == nil {
+		return decoded, nil
+	}
+
+	var single map[string]interface{}
+	if err := json.Unmarshal(raw, &single); err == nil && len(single) > 0 {
+		return []map[string]interface{}{single}, nil
+	}
+
+	return []map[string]interface{}{}, nil
+}
+
+func writeCSVExport(w http.ResponseWriter, columns []string, rows []map[string]interface{}) error {
+	if len(columns) == 0 && len(rows) > 0 {
+		for key := range rows[0] {
+			columns = append(columns, key)
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	writer := csv.NewWriter(w)
+	if err := writer.Write(columns); err != nil {
+		return err
+	}
+
+	for _, row := range rows {
+		record := make([]string, len(columns))
+		for i, col := range columns {
+			if val, ok := row[col]; ok && val != nil {
+				record[i] = fmt.Sprintf("%v", val)
+			} else {
+				record[i] = ""
+			}
+		}
+		if err := writer.Write(record); err != nil {
+			return err
+		}
+	}
+	writer.Flush()
+	return writer.Error()
 }
 
 // Helper types and functions
@@ -551,6 +850,62 @@ func parseListParams(req *http.Request) core.ListParams {
 	}
 
 	return params
+}
+
+func coerceBulkCreatePayload(payload interface{}) ([]map[string]interface{}, error) {
+	switch typed := payload.(type) {
+	case []interface{}:
+		records := make([]map[string]interface{}, 0, len(typed))
+		for _, item := range typed {
+			mapped, ok := item.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("bulk create expects array of objects")
+			}
+			records = append(records, mapped)
+		}
+		return records, nil
+	case map[string]interface{}:
+		if raw, ok := typed["objects"]; ok {
+			return coerceBulkCreatePayload(raw)
+		}
+		return nil, fmt.Errorf("bulk create expects array of objects")
+	default:
+		return nil, fmt.Errorf("bulk create expects array of objects")
+	}
+}
+
+func toInt64(value interface{}) int64 {
+	switch v := value.(type) {
+	case int:
+		return int64(v)
+	case int8:
+		return int64(v)
+	case int16:
+		return int64(v)
+	case int32:
+		return int64(v)
+	case int64:
+		return v
+	case uint:
+		return int64(v)
+	case uint8:
+		return int64(v)
+	case uint16:
+		return int64(v)
+	case uint32:
+		return int64(v)
+	case uint64:
+		return int64(v)
+	case float32:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return parsed
+		}
+	}
+	return 0
 }
 
 type contextKey string

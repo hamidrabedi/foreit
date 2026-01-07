@@ -7,9 +7,12 @@ import (
 
 // Registry manages all registered admin instances
 type Registry struct {
-	admins  map[string]AdminInterface
-	plugins map[string]Plugin
-	mu      sync.RWMutex
+	admins    map[string]AdminInterface
+	plugins   map[string]Plugin
+	pages     []CustomPage
+	menu      []MenuEntry
+	dashboard DashboardConfig
+	mu        sync.RWMutex
 }
 
 // NewRegistry creates a new registry
@@ -17,6 +20,8 @@ func NewRegistry() *Registry {
 	return &Registry{
 		admins:  make(map[string]AdminInterface),
 		plugins: make(map[string]Plugin),
+		pages:   []CustomPage{},
+		menu:    []MenuEntry{},
 	}
 }
 
@@ -144,6 +149,58 @@ func (r *Registry) GetAllPlugins() map[string]Plugin {
 	return result
 }
 
+// RegisterCustomPage registers a custom admin page.
+func (r *Registry) RegisterCustomPage(page CustomPage) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.pages = append(r.pages, page)
+}
+
+// GetCustomPages returns registered custom pages.
+func (r *Registry) GetCustomPages() []CustomPage {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]CustomPage, len(r.pages))
+	copy(result, r.pages)
+	return result
+}
+
+// RegisterMenuEntry registers a custom menu entry.
+func (r *Registry) RegisterMenuEntry(entry MenuEntry) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.menu = append(r.menu, entry)
+}
+
+// GetMenuEntries returns registered menu entries.
+func (r *Registry) GetMenuEntries() []MenuEntry {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	result := make([]MenuEntry, len(r.menu))
+	copy(result, r.menu)
+	return result
+}
+
+// SetDashboardConfig sets dashboard configuration.
+func (r *Registry) SetDashboardConfig(config DashboardConfig) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.dashboard = config
+}
+
+// GetDashboardConfig returns dashboard configuration.
+func (r *Registry) GetDashboardConfig() DashboardConfig {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	return r.dashboard
+}
+
 // Global registry instance
 var globalRegistry = NewRegistry()
 
@@ -156,3 +213,4 @@ func GetGlobalRegistry() *Registry {
 func Register[T any](admin *Admin[T]) error {
 	return globalRegistry.Register(admin)
 }
+

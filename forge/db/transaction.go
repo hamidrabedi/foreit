@@ -78,3 +78,4 @@ func (sp *Savepoint) ReleaseSavepoint() error {
 	_, err := sp.tx.Exec("RELEASE SAVEPOINT " + sp.name)
 	return err
 }
+

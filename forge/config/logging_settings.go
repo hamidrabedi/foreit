@@ -90,3 +90,4 @@ type HTTPSettings struct {
 	IncludeLinkHeader        bool
 	ProblemJSONContentType   bool
 }
+

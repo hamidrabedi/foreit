@@ -46,3 +46,4 @@ func (g *MigrateGroup) Execute(ctx *core.Context, args []string) error {
 func (g *MigrateGroup) Commands() []core.Command {
 	return g.commands
 }
+

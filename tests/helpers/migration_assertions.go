@@ -248,13 +248,7 @@ func GetMigrationFiles(migrationsDir string) ([]MigrationInfo, error) {
 		baseWithoutDirection := baseWithoutExt[:len(baseWithoutExt)-len(parts)]
 
 		// Split by _ to get version and name
-		underscoreIdx := -1
-		for i := 0; i < len(baseWithoutDirection) && i < 6; i++ {
-			if baseWithoutDirection[i] == '_' {
-				underscoreIdx = i
-				break
-			}
-		}
+		underscoreIdx := strings.IndexRune(baseWithoutDirection, '_')
 
 		if underscoreIdx == -1 {
 			continue

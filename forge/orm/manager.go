@@ -38,6 +38,16 @@ func (m *Manager[T]) SetDB(database *db.DB) {
 	m.db = database
 }
 
+func (m *Manager[T]) getDB() *db.DB {
+	if m.db != nil {
+		return m.db
+	}
+	if fallback := GetDefaultDB(); fallback != nil {
+		m.db = fallback
+	}
+	return m.db
+}
+
 // FieldAccessor returns a field accessor for type-safe field operations.
 // The field accessor provides a way to reference model fields in a type-safe manner
 // for building queries and expressions.
@@ -50,10 +60,11 @@ func (m *Manager[T]) FieldAccessor() (*FieldAccessor[T], error) {
 // Deprecated: Use FieldAccessor() instead (Go convention: getters don't have Get prefix).
 // GetFieldAccessor will be removed in v3.0.
 // Migration:
-//   // Old
-//   fa, err := manager.GetFieldAccessor()
-//   // New
-//   fa, err := manager.FieldAccessor()
+//
+//	// Old
+//	fa, err := manager.GetFieldAccessor()
+//	// New
+//	fa, err := manager.FieldAccessor()
 func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
 	return m.FieldAccessor()
 }
@@ -65,8 +76,8 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 		return nil, err
 	}
 
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if database := m.getDB(); database != nil {
+		qs = qs.SetDB(database)
 	}
 
 	return qs.Filter(expr), nil
@@ -79,9 +90,10 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 // Use Manager.Get() when you know the primary key, use QuerySet.Get() when filtering.
 //
 // Example:
-//   user, err := userManager.Get(ctx, 42)  // Get user with ID 42
+//
+//	user, err := userManager.Get(ctx, 42)  // Get user with ID 42
 func (m *Manager[T]) Get(ctx context.Context, id int64) (*T, error) {
-	if m.db == nil {
+	if m.getDB() == nil {
 		return nil, errors.NewNotImplementedError("Manager.Get() - database connection not set")
 	}
 
@@ -111,8 +123,8 @@ func (m *Manager[T]) All(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if database := m.getDB(); database != nil {
+		qs = qs.SetDB(database)
 	}
 
 	return qs.All(ctx)
@@ -120,7 +132,8 @@ func (m *Manager[T]) All(ctx context.Context) ([]*T, error) {
 
 // Create creates a new model instance
 func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	database := m.getDB()
+	if database == nil {
 		return errors.NewNotImplementedError("Manager.Create() - database connection not set")
 	}
 
@@ -152,7 +165,7 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	}
 
 	// Execute INSERT and get generated ID
-	id, err := ExecuteInsert(ctx, m.db, sql, args)
+	id, err := ExecuteInsert(ctx, database, sql, args)
 	if err != nil {
 		return err
 	}
@@ -191,7 +204,8 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 
 // BulkCreate creates multiple model instances efficiently using a single INSERT statement
 func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
-	if m.db == nil {
+	database := m.getDB()
+	if database == nil {
 		return errors.NewNotImplementedError("Manager.BulkCreate() - database connection not set")
 	}
 
@@ -235,7 +249,7 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 	}
 
 	// Execute bulk INSERT and get generated IDs
-	ids, err := ExecuteBulkInsert(ctx, m.db, sql, args)
+	ids, err := ExecuteBulkInsert(ctx, database, sql, args)
 	if err != nil {
 		return err
 	}
@@ -280,7 +294,8 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 
 // Update updates an existing model instance
 func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	database := m.getDB()
+	if database == nil {
 		return errors.NewNotImplementedError("Manager.Update() - database connection not set")
 	}
 
@@ -333,7 +348,7 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 	}
 
 	// Execute UPDATE
-	rowsAffected, err := ExecuteUpdate(ctx, m.db, sql, args)
+	rowsAffected, err := ExecuteUpdate(ctx, database, sql, args)
 	if err != nil {
 		return err
 	}
@@ -381,7 +396,8 @@ func (m *Manager[T]) Save(ctx context.Context, instance *T) error {
 
 // Delete deletes a model instance
 func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	database := m.getDB()
+	if database == nil {
 		return errors.NewNotImplementedError("Manager.Delete() - database connection not set")
 	}
 
@@ -417,7 +433,7 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 	sql, args := BuildDeleteSQL(m.tableName, "id", id)
 
 	// Execute DELETE
-	rowsAffected, err := ExecuteDelete(ctx, m.db, sql, args)
+	rowsAffected, err := ExecuteDelete(ctx, database, sql, args)
 	if err != nil {
 		return err
 	}
@@ -438,6 +454,9 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 
 // UpdateFields updates specific fields type-safely
 func (m *Manager[T]) UpdateFields(ctx context.Context, id int64, updates UpdateMap) error {
+	if m.getDB() == nil {
+		return errors.NewNotImplementedError("Manager.UpdateFields() - database connection not set")
+	}
 	// Validate all fields exist
 	for fieldName := range updates {
 		fieldInfo := m.schema.GetField(fieldName)
@@ -476,3 +495,6 @@ func (m *Manager[T]) UpdateFields(ctx context.Context, id int64, updates UpdateM
 	_, err = ub.Execute(ctx)
 	return err
 }
+
+
+

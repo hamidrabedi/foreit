@@ -192,3 +192,4 @@ func GetUserFromContext(ctx context.Context) (*models.User, bool) {
 
 	return nil, false
 }
+

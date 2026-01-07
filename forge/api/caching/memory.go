@@ -111,3 +111,4 @@ func (c *MemoryCache) cleanup() {
 		c.mutex.Unlock()
 	}
 }
+

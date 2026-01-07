@@ -17,11 +17,31 @@ type baseBuilder struct {
 // BuildColumnDefinition builds SQL column definition from field
 func (b *baseBuilder) BuildColumnDefinition(field generator.FieldDefinition) (string, error) {
 	columnName := field.Name
+	if dbColumn, ok := field.Options["db_column"].(string); ok && dbColumn != "" {
+		columnName = dbColumn
+	}
 	sqlType := mapFieldTypeToSQL(field, b.isSQLite, b.isPostgres)
 
 	var parts []string
 	parts = append(parts, fmt.Sprintf(`"%s"`, columnName))
 	parts = append(parts, sqlType)
+
+	isGenerated := false
+	if generated, ok := field.Options["generated"].(bool); ok && generated {
+		if expr, ok := field.Options["generated_expr"].(string); ok && expr != "" {
+			parts = append(parts, fmt.Sprintf("GENERATED ALWAYS AS (%s)", expr))
+			if b.isPostgres {
+				parts = append(parts, "STORED")
+			} else if b.isSQLite {
+				if stored, ok := field.Options["generated_stored"].(bool); ok && stored {
+					parts = append(parts, "STORED")
+				} else {
+					parts = append(parts, "VIRTUAL")
+				}
+			}
+			isGenerated = true
+		}
+	}
 
 	// Handle primary key and auto-increment
 	if b.isSQLite {
@@ -46,27 +66,31 @@ func (b *baseBuilder) BuildColumnDefinition(field generator.FieldDefinition) (st
 
 	// Handle default values
 	// Check for AutoNowAdd or AutoNow options first (these imply DEFAULT now())
-	if autoNowAdd, ok := field.Options["auto_now_add"].(bool); ok && autoNowAdd {
-		parts = append(parts, "DEFAULT now()")
-		// Make created_at NOT NULL when AutoNowAdd is set
-		if !field.Required && !field.PrimaryKey {
-			// Check if NOT NULL is already in parts
-			hasNotNull := false
-			for _, part := range parts {
-				if part == "NOT NULL" {
-					hasNotNull = true
-					break
+	if !isGenerated {
+		if dbDefault, ok := field.Options["db_default"].(string); ok && dbDefault != "" {
+			parts = append(parts, fmt.Sprintf("DEFAULT %s", dbDefault))
+		} else if autoNowAdd, ok := field.Options["auto_now_add"].(bool); ok && autoNowAdd {
+			parts = append(parts, "DEFAULT now()")
+			// Make created_at NOT NULL when AutoNowAdd is set
+			if !field.Required && !field.PrimaryKey {
+				// Check if NOT NULL is already in parts
+				hasNotNull := false
+				for _, part := range parts {
+					if part == "NOT NULL" {
+						hasNotNull = true
+						break
+					}
+				}
+				if !hasNotNull {
+					parts = append(parts, "NOT NULL")
 				}
 			}
-			if !hasNotNull {
-				parts = append(parts, "NOT NULL")
-			}
+		} else if autoNow, ok := field.Options["auto_now"].(bool); ok && autoNow {
+			parts = append(parts, "DEFAULT now()")
+		} else if field.Default != nil {
+			defaultVal := formatDefaultValue(field.Default, field.GoType, field.Type, field.Options, b.isSQLite)
+			parts = append(parts, fmt.Sprintf("DEFAULT %s", defaultVal))
 		}
-	} else if autoNow, ok := field.Options["auto_now"].(bool); ok && autoNow {
-		parts = append(parts, "DEFAULT now()")
-	} else if field.Default != nil {
-		defaultVal := formatDefaultValue(field.Default, field.GoType, field.Type, field.Options, b.isSQLite)
-		parts = append(parts, fmt.Sprintf("DEFAULT %s", defaultVal))
 	}
 
 	// Handle unique constraint

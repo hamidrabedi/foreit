@@ -149,3 +149,4 @@ func TestBaseSerializer_Errors(t *testing.T) {
 	// (This depends on validation implementation)
 	_ = errors
 }
+

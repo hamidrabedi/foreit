@@ -306,3 +306,4 @@ func (qb *QueryBuilder[T]) OrFilter(fieldPath string) *FilterBuilder[T] {
 	// For now, just use Where
 	return qb.Where(fieldPath)
 }
+

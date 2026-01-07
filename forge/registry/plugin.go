@@ -383,3 +383,4 @@ func (p *ExampleAuthPlugin) GetAdminActions(modelName string) []AdminAction {
 	}
 	return nil
 }
+

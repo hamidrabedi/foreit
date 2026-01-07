@@ -38,3 +38,4 @@ func (f *BooleanField) ToInternalValue(data interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("%s: Expected boolean, got %T", f.FieldName, data)
 	}
 }
+

@@ -204,3 +204,4 @@ func FormatDependencyComment(dep core.Dependency) string {
 	}
 	return fmt.Sprintf("-- DEPENDS: %s", dep.Version)
 }
+

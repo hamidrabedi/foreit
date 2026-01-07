@@ -39,15 +39,15 @@ func FromSchema[T any](schemaInstance schema.Schema) *TypedValidator[T] {
 
 		// Apply schema constraints
 		if field.Required {
-			fieldBuilder = fieldBuilder.Required()
+			fieldBuilder = fieldBuilder.WithRequired()
 		}
 
 		if field.MinLength != nil {
-			fieldBuilder = fieldBuilder.MinLength(*field.MinLength)
+			fieldBuilder = fieldBuilder.WithMinLength(*field.MinLength)
 		}
 
 		if field.MaxLength != nil {
-			fieldBuilder = fieldBuilder.MaxLength(*field.MaxLength)
+			fieldBuilder = fieldBuilder.WithMaxLength(*field.MaxLength)
 		}
 
 		if field.MinValue != nil {
@@ -70,7 +70,7 @@ func FromSchema[T any](schemaInstance schema.Schema) *TypedValidator[T] {
 
 		// Unique constraint
 		if field.Unique {
-			fieldBuilder = fieldBuilder.Unique()
+			fieldBuilder = fieldBuilder.WithUnique()
 		}
 
 		// Choices
@@ -79,9 +79,11 @@ func FromSchema[T any](schemaInstance schema.Schema) *TypedValidator[T] {
 			for i, choice := range field.Choices {
 				choices[i] = choice.Value
 			}
-			fieldBuilder = fieldBuilder.Choices(choices...)
+			fieldBuilder = fieldBuilder.WithChoices(choices...)
 		}
 	}
 
 	return builder.Build()
 }
+
+

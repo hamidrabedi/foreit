@@ -349,3 +349,4 @@ func (c *FakeCommand) validateMigrationExists(migrationsPath string, versionStr 
 
 	return nil
 }
+

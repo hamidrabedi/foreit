@@ -289,3 +289,4 @@ func addTraceLevel() {
 	// This is a no-op but documents the approach
 	// TRACE = DebugLevel - 1
 }
+

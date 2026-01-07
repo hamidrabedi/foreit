@@ -93,3 +93,4 @@ func ValidateModelWithSchema(v *Validator, instance interface{}, fields []schema
 	fv := NewFieldValidator(v)
 	return fv.ValidateModel(instance, fields)
 }
+

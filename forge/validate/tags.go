@@ -104,3 +104,4 @@ func BuildTagString(tags ...string) string {
 	}
 	return strings.Join(validTags, ",")
 }
+

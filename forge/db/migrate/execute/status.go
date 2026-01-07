@@ -87,6 +87,17 @@ func (r *StatusReporter) GetDetailedStatus(ctx context.Context) (*DetailedStatus
 		// If we can't get applied versions, assume none are applied
 		appliedVersions = make(map[uint]bool)
 	}
+	if len(appliedVersions) <= 1 && version > 0 {
+		for _, mig := range allMigrations {
+			migVersion, err := parseVersion(mig.Version)
+			if err != nil {
+				continue
+			}
+			if migVersion <= version {
+				appliedVersions[migVersion] = true
+			}
+		}
+	}
 
 	// Categorize migrations
 	for _, mig := range allMigrations {

@@ -119,3 +119,4 @@ func SetDefaultThrottles(throttleClasses ...throttling.Throttle) {
 func SetExceptionHandler(handler exceptions.ExceptionHandler) {
 	exceptions.SetExceptionHandler(handler)
 }
+

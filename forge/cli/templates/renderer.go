@@ -81,3 +81,4 @@ func WriteTemplateFile(filePath string, templateName string, data TemplateData, 
 
 	return os.WriteFile(filePath, content, perm)
 }
+

@@ -23,11 +23,11 @@ func main() {
 	ctx := context.Background()
 	fmt.Println("🛒 Forge Ecommerce System")
 	fmt.Println("=" + string(make([]byte, 50)))
-	
+
 	// Initialize Admin Site
 	adminSite := admin.DefaultSite
 	adminSite.Title = "Forge Ecommerce Admin"
-	
+
 	// Register application admins
 	catalog.RegisterAdmin(ctx)
 	orders.RegisterAdmin(ctx)
@@ -39,20 +39,20 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	
+
 	// Admin handler (handles both REST API and UI)
 	r.Mount("/admin", adminSite.Handler())
-	
+
 	// Health check
 	r.Get("/health", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"healthy","message":"Forge Ecommerce Example is running"}`)
+		fmt.Fprint(w, `{"status":"healthy","message":"Forge Ecommerce Example is running"}`)
 	})
-	
+
 	// Homepage
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, `
+		fmt.Fprint(w, `
 <!DOCTYPE html>
 <html>
 <head>
@@ -103,13 +103,13 @@ func main() {
 </html>
 		`)
 	})
-	
+
 	port := ":8003"
 	fmt.Printf("\n✨ Forge Ecommerce is Alive ✨\n")
 	fmt.Printf("------------------------------\n")
 	fmt.Printf("🏠 Homepage: http://localhost%s\n", port)
 	fmt.Printf("🛠️  Premium Admin: http://localhost%s/admin/\n", port)
 	fmt.Printf("------------------------------\n\n")
-	
+
 	log.Fatal(http.ListenAndServe(port, r))
 }

@@ -118,3 +118,4 @@ func GetModelName(instance interface{}) string {
 	
 	return typ.Name()
 }
+

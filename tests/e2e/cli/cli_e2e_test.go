@@ -28,10 +28,22 @@ func TestCLIMakemigrations(t *testing.T) {
 	// Write sample model file
 	sampleModel := `package models
 
+import "github.com/forgego/forge/schema"
+
 type User struct {
-	ID int64
-	Username string
-	Email string
+	schema.BaseSchema
+}
+
+func (User) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("username").WithRequired().WithMaxLength(150),
+		schema.String("email").WithRequired().WithMaxLength(254).WithUnique(),
+	}
+}
+
+func (User) Relations() []schema.Relation {
+	return []schema.Relation{}
 }
 `
 	testhelpers.WriteFileString(t, filepath.Join(modelsDir, "user.go"), sampleModel)
@@ -40,7 +52,14 @@ type User struct {
 	env := map[string]string{
 		"MODELS_DIR": modelsDir,
 	}
-	stdout, stderr, err := testhelpers.RunCLI(ctx, workdir, env, []string{"makemigrations"}, 10*time.Second)
+	args := []string{
+		"makemigrations",
+		"init",
+		"--auto",
+		"--models", modelsDir,
+		"--path", filepath.Join(workdir, "migrations"),
+	}
+	stdout, stderr, err := testhelpers.RunCLI(ctx, workdir, env, args, 10*time.Second)
 
 	t.Logf("stdout: %s", stdout)
 	if err != nil {

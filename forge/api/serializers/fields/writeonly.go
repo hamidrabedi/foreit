@@ -29,3 +29,4 @@ func (f *WriteOnlyField) ToInternalValue(data interface{}) (interface{}, error) 
 	}
 	return data, nil
 }
+

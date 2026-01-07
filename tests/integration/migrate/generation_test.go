@@ -52,9 +52,9 @@ type User struct {
 
 func (User) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("email").Required().MaxLength(255).Unique().Build(),
-		schema.String("username").Required().MaxLength(150).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("email").WithRequired().WithMaxLength(255).WithUnique(),
+		schema.String("username").WithRequired().WithMaxLength(150),
 	}
 }
 
@@ -154,8 +154,8 @@ type User struct {
 
 func (User) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("email").Required().MaxLength(255).Unique().Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("email").WithRequired().WithMaxLength(255).WithUnique(),
 	}
 }
 
@@ -196,9 +196,9 @@ type User struct {
 
 func (User) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("email").Required().MaxLength(255).Unique().Build(),
-		schema.String("username").Required().MaxLength(150).Build(),
+		schema.Int64("id").WithPrimary().WithAutoIncrement(),
+		schema.String("email").WithRequired().WithMaxLength(255).WithUnique(),
+		schema.String("username").WithRequired().WithMaxLength(150),
 	}
 }
 

@@ -100,3 +100,4 @@ func GetDialectAdapter(dialect string) DialectAdapter {
 		return &PostgresAdapter{}
 	}
 }
+

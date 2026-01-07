@@ -37,3 +37,6 @@ type ErrRelationNotLoaded struct {
 func (e ErrRelationNotLoaded) Error() string {
 	return fmt.Sprintf("relation '%s' accessed but not preloaded - use Preload() or PrefetchRelated() to prevent N+1 queries", e.Relation)
 }
+
+
+

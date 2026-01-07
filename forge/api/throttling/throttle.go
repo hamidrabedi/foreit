@@ -46,3 +46,4 @@ func NewThrottledError(waitDuration time.Duration) *ThrottledError {
 func (e *ThrottledError) Error() string {
 	return "Request was throttled"
 }
+

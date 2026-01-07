@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/forgego/forge/admin/core"
@@ -22,7 +23,7 @@ func RegisterWithSite[T any](s *Site, config *core.Config[T]) (*core.Admin[T], e
 	// T must implement schema.Schema
 	var schemaInstance schema.Schema
 	var ok bool
-	
+
 	// Try pointer first (common for models)
 	schemaInstance, ok = any(new(T)).(schema.Schema)
 	if !ok {
@@ -37,7 +38,7 @@ func RegisterWithSite[T any](s *Site, config *core.Config[T]) (*core.Admin[T], e
 
 	// Get table name from schema for manager
 	tableName := schemaInstance.Meta().TableName
-	
+
 	manager, err := orm.NewManager[T](tableName)
 	if err != nil {
 		return nil, err
@@ -48,6 +49,8 @@ func RegisterWithSite[T any](s *Site, config *core.Config[T]) (*core.Admin[T], e
 	if err != nil {
 		return nil, err
 	}
+
+	orm.RegisterManagerFor[T](manager)
 
 	// Register with site
 	if err := s.registry.Register(admin); err != nil {
@@ -72,3 +75,9 @@ type Method = core.Method
 
 // Computed creates a safe reference to a method or computed field
 var Computed = core.Computed
+
+// NewAction creates a new admin action.
+func NewAction[T any](name, label string, handler func(ctx context.Context, instances []*T) error) core.Action[T] {
+	return core.NewAction(name, label, handler)
+}
+

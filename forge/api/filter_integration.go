@@ -40,3 +40,4 @@ func EnhanceResponseWithFilters[T any](data map[string]interface{}, r *http.Requ
 	integration := NewFilterSetIntegration(fs)
 	return integration.EnhanceViewSetResponse(data, r)
 }
+

@@ -50,3 +50,4 @@ func (v *URLPathVersioning) Reverse(name string, version string, args ...interfa
 	// Simplified - full implementation would use URL reversing
 	return ""
 }
+

@@ -204,3 +204,4 @@ type MockViewSet struct{}
 func (m *MockViewSet) GetAction() string     { return "list" }
 func (m *MockViewSet) GetDetail() bool       { return false }
 func (m *MockViewSet) GetModel() interface{} { return nil }
+

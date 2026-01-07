@@ -118,3 +118,4 @@ func extractVersionAndName(filename string) (version, name string) {
 	}
 	return "", basename
 }
+

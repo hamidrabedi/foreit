@@ -19,3 +19,4 @@ func NewParseError(message string) *ParseError {
 		),
 	}
 }
+

@@ -349,3 +349,4 @@ func (r *PerformanceImpactRule) Check(filePath, content string, lines []string) 
 
 	return results
 }
+

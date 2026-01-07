@@ -19,20 +19,23 @@ type TableParser struct {
 // NewTableParser creates a new table parser
 func NewTableParser() *TableParser {
 	return &TableParser{
-		createTableRegex: regexp.MustCompile(`(?i)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?\s*\(([^)]+)\)`),
+		createTableRegex: regexp.MustCompile(`(?i)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?(\w+)["']?`),
 		columnRegex:      regexp.MustCompile(`["']?(\w+)["']?\s+(\w+(?:\([^)]+\))?)\s*(.*?)(?:,|$)`),
 	}
 }
 
 // ParseCreateTable parses a CREATE TABLE statement and returns a CreateTable change
 func (p *TableParser) ParseCreateTable(sql string) (*core.CreateTable, error) {
-	matches := p.createTableRegex.FindStringSubmatch(sql)
-	if len(matches) < 3 {
+	matches := p.createTableRegex.FindStringSubmatchIndex(sql)
+	if len(matches) < 4 {
 		return nil, fmt.Errorf("could not parse CREATE TABLE statement")
 	}
 
-	tableName := matches[1]
-	columnsDef := matches[2]
+	tableName := sql[matches[2]:matches[3]]
+	columnsDef, err := extractColumnDefinitions(sql, matches[1])
+	if err != nil {
+		return nil, err
+	}
 
 	// Parse columns
 	var fields []generator.FieldDefinition
@@ -57,6 +60,28 @@ func (p *TableParser) ParseCreateTable(sql string) (*core.CreateTable, error) {
 	}
 
 	return &core.CreateTable{Table: def}, nil
+}
+
+func extractColumnDefinitions(sql string, searchStart int) (string, error) {
+	openIdx := strings.Index(sql[searchStart:], "(")
+	if openIdx == -1 {
+		return "", fmt.Errorf("could not locate column definitions")
+	}
+	openIdx += searchStart
+
+	depth := 0
+	for i := openIdx; i < len(sql); i++ {
+		switch sql[i] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return sql[openIdx+1 : i], nil
+			}
+		}
+	}
+	return "", fmt.Errorf("could not parse column definitions")
 }
 
 // parseColumnDefinition parses a single column definition

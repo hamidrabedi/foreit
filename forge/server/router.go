@@ -132,3 +132,4 @@ func (r *Router) MethodNotAllowed(handler http.HandlerFunc) {
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	r.Router.ServeHTTP(w, req)
 }
+

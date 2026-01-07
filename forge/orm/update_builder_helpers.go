@@ -24,3 +24,6 @@ type querySetWrapper[T any] struct {
 func (w *querySetWrapper[T]) Update(ctx context.Context, updates UpdateMap) (int64, error) {
 	return w.qs.Update(ctx, updates)
 }
+
+
+

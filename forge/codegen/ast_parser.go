@@ -262,6 +262,9 @@ func (p *ASTParser) extractFieldFromCall(call *ast.CallExpr) *FieldDefinition {
 	} else if pk, ok := options["primary_key"].(bool); ok {
 		primaryKey = pk
 	}
+	if primaryKey {
+		required = true
+	}
 
 	autoIncrement := false
 	if ai, ok := options["auto_increment"].(bool); ok {
@@ -314,9 +317,8 @@ func (p *ASTParser) extractOptionsFromChain(expr ast.Expr, options map[string]in
 		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
 			methodName := sel.Sel.Name
 
-			// Skip Build() - it's just a finalizer
 			// Skip field builder methods (Int64, String, etc.) - we already handled those
-			if methodName != "Build" && !p.isFieldBuilder(methodName) {
+			if !p.isFieldBuilder(methodName) {
 				// Extract option from this method call
 				p.extractOptionFromMethod(methodName, x, options)
 			}
@@ -401,96 +403,182 @@ func (p *ASTParser) mapFieldTypeToGoType(fieldType string) string {
 // extractOptionFromMethod extracts option value from a method call
 func (p *ASTParser) extractOptionFromMethod(methodName string, call *ast.CallExpr, options map[string]interface{}) {
 	switch methodName {
-	case "Primary":
+	case "WithPrimary":
 		options["primary"] = true
 		options["primary_key"] = true
-	case "AutoIncrement":
+	case "WithAutoIncrement":
 		options["auto_increment"] = true
-	case "Required":
+	case "WithRequired":
 		options["required"] = true
-	case "Optional":
+	case "WithOptional":
 		options["required"] = false
-	case "Unique":
+	case "WithUnique":
 		options["unique"] = true
-	case "Blank":
+	case "WithBlank":
 		options["blank"] = true
-	case "DBIndex":
+	case "WithDBIndex":
 		options["db_index"] = true
-	case "DBColumn":
+	case "WithDBColumn":
 		if len(call.Args) > 0 {
 			if colName := p.extractStringArg(call); colName != "" {
 				options["db_column"] = colName
 			}
 		}
-	case "MaxLength":
+	case "WithMaxLength":
 		if len(call.Args) > 0 {
 			if maxLen := p.extractIntArg(call); maxLen != nil {
 				options["max_length"] = *maxLen
 			}
 		}
-	case "MinLength":
+	case "WithMinLength":
 		if len(call.Args) > 0 {
 			if minLen := p.extractIntArg(call); minLen != nil {
 				options["min_length"] = *minLen
 			}
 		}
-	case "MaxValue":
+	case "WithMaxValue":
 		if len(call.Args) > 0 {
 			if maxVal := p.extractFloatArg(call); maxVal != nil {
 				options["max_value"] = *maxVal
 			}
 		}
-	case "MinValue":
+	case "WithMinValue":
 		if len(call.Args) > 0 {
 			if minVal := p.extractFloatArg(call); minVal != nil {
 				options["min_value"] = *minVal
 			}
 		}
-	case "Default":
+	case "WithDefault":
 		if len(call.Args) > 0 {
 			if defaultValue := p.extractDefaultValue(call); defaultValue != nil {
 				options["default"] = defaultValue
 			}
 		}
-	case "HelpText":
+	case "WithDefaultUUID":
+		if len(call.Args) > 0 {
+			if defaultValue := p.extractDefaultValue(call); defaultValue != nil {
+				options["default"] = defaultValue
+			}
+		}
+	case "WithDefaultNewUUID":
+		options["default"] = "uuid.NewString()"
+	case "WithHelpText":
 		if len(call.Args) > 0 {
 			if helpText := p.extractStringArg(call); helpText != "" {
 				options["help_text"] = helpText
 			}
 		}
-	case "VerboseName":
+	case "WithVerboseName":
 		if len(call.Args) > 0 {
 			if verboseName := p.extractStringArg(call); verboseName != "" {
 				options["verbose_name"] = verboseName
 			}
 		}
-	case "AutoNow":
+	case "WithAutoNow":
 		options["auto_now"] = true
-	case "AutoNowAdd":
+	case "WithAutoNowAdd":
 		options["auto_now_add"] = true
-	case "WriteOnly":
+	case "WithWriteOnly":
 		options["write_only"] = true
-	case "Editable":
+	case "WithEditable":
 		if len(call.Args) > 0 {
 			if editable := p.extractBoolArg(call); editable != nil {
 				options["editable"] = *editable
 			}
 		}
-	case "Choices":
+	case "WithSerialize":
+		if len(call.Args) > 0 {
+			if serialize := p.extractBoolArg(call); serialize != nil {
+				options["serialize"] = *serialize
+			}
+		}
+	case "WithValidators":
+		options["has_validators"] = true
+	case "WithChoices":
 		// Choices is more complex, extract if needed
 		if len(call.Args) > 0 {
 			options["has_choices"] = true
 		}
-	case "MaxDigits":
+	case "WithChoicesFromPairs":
+		if len(call.Args) > 0 {
+			options["has_choices"] = true
+		}
+	case "WithMaxDigits":
 		if len(call.Args) > 0 {
 			if maxDigits := p.extractIntArg(call); maxDigits != nil {
 				options["max_digits"] = *maxDigits
 			}
 		}
-	case "DecimalPlaces":
+	case "WithDecimalPlaces":
 		if len(call.Args) > 0 {
 			if decimalPlaces := p.extractIntArg(call); decimalPlaces != nil {
 				options["decimal_places"] = *decimalPlaces
+			}
+		}
+	case "WithUniqueForDate":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["unique_for_date"] = val
+			}
+		}
+	case "WithUniqueForMonth":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["unique_for_month"] = val
+			}
+		}
+	case "WithUniqueForYear":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["unique_for_year"] = val
+			}
+		}
+	case "WithDBType":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["db_type"] = val
+			}
+		}
+	case "WithDBCollation":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["db_collation"] = val
+			}
+		}
+	case "WithDBComment":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["db_comment"] = val
+			}
+		}
+	case "WithDBTablespace":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["db_tablespace"] = val
+			}
+		}
+	case "WithDBDefault":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["db_default"] = val
+			}
+		}
+	case "WithGeneratedColumn":
+		options["generated"] = true
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["generated_expr"] = val
+			}
+		}
+		if len(call.Args) > 1 {
+			if stored := p.extractBoolArg(call); stored != nil {
+				options["generated_stored"] = *stored
+			}
+		}
+	case "WithValidationTag":
+		if len(call.Args) > 0 {
+			if val := p.extractStringArg(call); val != "" {
+				options["validation_tag"] = val
 			}
 		}
 	}
@@ -587,7 +675,7 @@ func (p *ASTParser) extractDefaultValue(call *ast.CallExpr) interface{} {
 func (p *ASTParser) buildValidationTag(fieldType string, options map[string]interface{}) string {
 	var tags []string
 
-	// Check if Required() was called
+	// Check if WithRequired() was called
 	if required, ok := options["required"].(bool); ok && required {
 		tags = append(tags, "required")
 	}
@@ -683,11 +771,11 @@ func (p *ASTParser) extractRelationFromExpr(expr ast.Expr) *RelationDefinition {
 							relation.Options["related_name"] = val
 						}
 					case "OnDelete":
-						if val := p.extractStringFromExpr(kv.Value); val != "" {
+						if val := p.extractCascadeValue(kv.Value); val != "" {
 							relation.Options["on_delete"] = val
 						}
 					case "OnUpdate":
-						if val := p.extractStringFromExpr(kv.Value); val != "" {
+						if val := p.extractCascadeValue(kv.Value); val != "" {
 							relation.Options["on_update"] = val
 						}
 					case "Through":
@@ -752,10 +840,7 @@ func (p *ASTParser) extractRelationOptionsFromChain(expr ast.Expr, options map[s
 		if sel, ok := x.Fun.(*ast.SelectorExpr); ok {
 			methodName := sel.Sel.Name
 
-			// Skip Build() - it's just a finalizer
-			if methodName != "Build" {
-				p.extractRelationOptionFromMethod(methodName, x, options)
-			}
+			p.extractRelationOptionFromMethod(methodName, x, options)
 
 			// Continue traversing down the chain
 			p.extractRelationOptionsFromChain(sel.X, options)
@@ -770,44 +855,56 @@ func (p *ASTParser) extractRelationOptionsFromChain(expr ast.Expr, options map[s
 // extractRelationOptionFromMethod extracts option value from a relation method call
 func (p *ASTParser) extractRelationOptionFromMethod(methodName string, call *ast.CallExpr, options map[string]interface{}) {
 	switch methodName {
-	case "OnDelete":
+	case "WithOnDelete":
 		if len(call.Args) > 0 {
-			if sel, ok := call.Args[0].(*ast.SelectorExpr); ok {
-				// Handle schema.CascadeCASCADE, etc.
-				if pkgIdent, ok := sel.X.(*ast.Ident); ok && pkgIdent.Name == "schema" {
-					// Extract the constant name (e.g., "CascadeCASCADE")
-					options["on_delete"] = sel.Sel.Name
-				}
-			} else if val := p.extractStringFromExpr(call.Args[0]); val != "" {
+			if val := p.extractCascadeValue(call.Args[0]); val != "" {
 				options["on_delete"] = val
 			}
 		}
-	case "OnUpdate":
+	case "WithOnUpdate":
 		if len(call.Args) > 0 {
-			if sel, ok := call.Args[0].(*ast.SelectorExpr); ok {
-				// Handle schema.CascadeCASCADE, etc.
-				if pkgIdent, ok := sel.X.(*ast.Ident); ok && pkgIdent.Name == "schema" {
-					options["on_update"] = sel.Sel.Name
-				}
-			} else if val := p.extractStringFromExpr(call.Args[0]); val != "" {
+			if val := p.extractCascadeValue(call.Args[0]); val != "" {
 				options["on_update"] = val
 			}
 		}
-	case "RelatedName":
+	case "WithRelatedName":
 		if len(call.Args) > 0 {
 			if val := p.extractStringFromExpr(call.Args[0]); val != "" {
 				options["related_name"] = val
 			}
 		}
-	case "Through", "ThroughTable":
+	case "WithThrough", "WithThroughTable":
 		if len(call.Args) > 0 {
 			if val := p.extractStringFromExpr(call.Args[0]); val != "" {
 				options["through"] = val
 			}
 		}
-	case "CascadeOnDelete":
+	case "WithCascadeOnDelete":
 		options["on_delete"] = "CASCADE"
 	}
+}
+
+func (p *ASTParser) extractCascadeValue(expr ast.Expr) string {
+	switch value := expr.(type) {
+	case *ast.SelectorExpr:
+		if pkgIdent, ok := value.X.(*ast.Ident); ok && pkgIdent.Name == "schema" {
+			return normalizeCascadeName(value.Sel.Name)
+		}
+	case *ast.Ident:
+		return normalizeCascadeName(value.Name)
+	case *ast.BasicLit:
+		if value.Kind == token.STRING {
+			return p.extractStringFromExpr(value)
+		}
+	}
+	return ""
+}
+
+func normalizeCascadeName(name string) string {
+	if strings.HasPrefix(name, "Cascade") {
+		return strings.TrimPrefix(name, "Cascade")
+	}
+	return name
 }
 
 // extractStringFromExpr extracts a string value from an AST expression
@@ -1002,8 +1099,75 @@ func (p *ASTParser) extractBoolFromExpr(expr ast.Expr) *bool {
 func (p *ASTParser) extractHooks(method *ast.FuncDecl) (HooksDefinition, error) {
 	hooks := HooksDefinition{}
 
-	// TODO: Implement hooks extraction
-	// Extract hook function names or references
+	if method.Body == nil {
+		return hooks, nil
+	}
+
+	for _, stmt := range method.Body.List {
+		retStmt, ok := stmt.(*ast.ReturnStmt)
+		if !ok || len(retStmt.Results) == 0 {
+			continue
+		}
+
+		expr := retStmt.Results[0]
+		if unary, ok := expr.(*ast.UnaryExpr); ok && unary.Op == token.AND {
+			expr = unary.X
+		}
+
+		compLit, ok := expr.(*ast.CompositeLit)
+		if !ok {
+			continue
+		}
+
+		for _, elt := range compLit.Elts {
+			kv, ok := elt.(*ast.KeyValueExpr)
+			if !ok {
+				continue
+			}
+			key, ok := kv.Key.(*ast.Ident)
+			if !ok {
+				continue
+			}
+
+			valueName := p.extractFuncRef(kv.Value)
+			if valueName == "" {
+				continue
+			}
+
+			switch key.Name {
+			case "BeforeCreate":
+				hooks.BeforeCreate = valueName
+			case "AfterCreate":
+				hooks.AfterCreate = valueName
+			case "BeforeUpdate":
+				hooks.BeforeUpdate = valueName
+			case "AfterUpdate":
+				hooks.AfterUpdate = valueName
+			case "BeforeSave":
+				hooks.BeforeSave = valueName
+			case "AfterSave":
+				hooks.AfterSave = valueName
+			case "BeforeDelete":
+				hooks.BeforeDelete = valueName
+			case "AfterDelete":
+				hooks.AfterDelete = valueName
+			case "Clean":
+				hooks.Clean = valueName
+			}
+		}
+	}
 
 	return hooks, nil
+}
+
+func (p *ASTParser) extractFuncRef(expr ast.Expr) string {
+	switch v := expr.(type) {
+	case *ast.Ident:
+		return v.Name
+	case *ast.SelectorExpr:
+		if ident, ok := v.X.(*ast.Ident); ok {
+			return ident.Name + "." + v.Sel.Name
+		}
+	}
+	return ""
 }

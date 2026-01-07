@@ -124,6 +124,10 @@ func formatDefaultValue(value interface{}, goType string, fieldType string, fiel
 
 // mapFieldTypeToSQL maps field types to SQL types
 func mapFieldTypeToSQL(field generator.FieldDefinition, isSQLite, isPostgres bool) string {
+	if dbType, ok := field.Options["db_type"].(string); ok && dbType != "" {
+		return dbType
+	}
+
 	switch field.Type {
 	case "Decimal":
 		maxDigits := 10

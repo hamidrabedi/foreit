@@ -44,3 +44,4 @@ func (a *SessionAuthentication) Authenticate(r *http.Request) (*AuthResult, erro
 func (a *SessionAuthentication) AuthenticateHeader(r *http.Request) string {
 	return ""
 }
+

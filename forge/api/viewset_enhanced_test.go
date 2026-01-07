@@ -300,3 +300,4 @@ func (m *MockAuth) Authenticate(r *http.Request) (*authentication.AuthResult, er
 func (m *MockAuth) AuthenticateHeader(r *http.Request) string {
 	return "Mock"
 }
+

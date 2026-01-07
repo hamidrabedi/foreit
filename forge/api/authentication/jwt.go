@@ -121,3 +121,4 @@ func (a *JWTAuthentication) Authenticate(r *http.Request) (*AuthResult, error) {
 func (a *JWTAuthentication) AuthenticateHeader(r *http.Request) string {
 	return "Bearer"
 }
+

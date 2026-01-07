@@ -1,668 +1,556 @@
-# forge Framework - Architecture Documentation
-
-## Overview
-
-forge is a Django-like Go framework that prioritizes type safety while offering dynamic capabilities. It provides a full-stack web framework with ORM, admin interface, code generation, and extensibility.
-
-## Table of Contents
-
-- [Core Philosophy](#core-philosophy)
-- [Architecture Layers](#architecture-layers)
-- [Component Architecture](#component-architecture)
-  - [Schema Definition System](#1-schema-definition-system)
-  - [Code Generation System](#2-code-generation-system)
-  - [Query System](#3-query-system)
-  - [Database Layer](#4-database-layer)
-  - [HTTP & Routing](#5-http--routing)
-  - [Admin System](#6-admin-system)
-  - [Security](#7-security)
-  - [Validation](#8-validation)
-  - [Authentication](#9-authentication)
-  - [Configuration](#10-configuration)
-  - [Logging](#11-logging)
-  - [Utilities](#12-utilities)
-- [Data Flow](#data-flow)
-- [Extension Points](#extension-points)
-- [Technology Stack](#technology-stack)
-- [Design Principles](#design-principles)
-- [Detailed Architecture](#detailed-architecture)
-  - [QuerySet Architecture](#queryset-architecture)
-  - [Schema Architecture Details](#schema-architecture-details)
-  - [API Design Principles](#api-design-principles)
-
-## Core Philosophy
-
-1. **Type-Safe First**: Primary API uses generics for compile-time safety
-2. **Dynamic When Needed**: Secondary API for runtime flexibility
-3. **Convention over Configuration**: Sensible defaults everywhere
-4. **Fully Extensible**: Everything can be extended/overridden
-5. **Security by Default**: Built-in protections
-6. **Code Generation**: AST-based generation for type-safe code
-
-## Architecture Layers
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    User Application                      │
-│  (Schema Definitions, Models, Views, Controllers)        │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Code Generation Layer                        │
-│  (AST Parser → SQL Generation → Go Code Generation)      │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Framework API Layer                          │
-│  (QuerySet, Manager, FieldExpr, QueryExpr)               │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Database Layer                               │
-│  (SQL Builder, Parameter Binding, Transactions)          │
-└─────────────────────────────────────────────────────────┘
-                          ↓
-┌─────────────────────────────────────────────────────────┐
-│              Infrastructure Layer                         │
-│  (HTTP Router, Middleware, Security, Config, Logging)     │
-└─────────────────────────────────────────────────────────┘
-```
-
-## Component Architecture
-
-### 1. Schema Definition System
-
-**Location:** `pkg/schema/`
-
-**Purpose:** Define models declaratively in Go code
-
-**Components:**
-- `schema.go` - Core Schema interface
-- `field.go` - Field definitions with builders
-- `relation.go` - Relationship definitions
-- `meta.go` - Model metadata
-- `hooks.go` - Lifecycle hooks
-- `constraint_builder.go` - Database constraint builders
-
-**Example:**
-```go
-type User struct {
-    schema.Schema
-}
-
-func (User) Fields() []schema.Field {
-    return []schema.Field{
-        fields.Int64("id").Primary().AutoIncrement(),
-        fields.String("username").Unique().Required(),
-        fields.String("email").Unique().Required(),
-    }
-}
-```
-
-### 2. Code Generation System
-
-**Location:** `pkg/generator/`
-
-**Purpose:** Generate type-safe Go code from schema definitions
-
-**Components:**
-- `generator.go` - Main generation orchestrator
-- `ast_parser.go` - Go AST parser for schema extraction
-- `writer.go` - Code file writer
-- `templates.go` - Code generation templates
-- `templates/` - Template files for Manager and QuerySet generation
-
-**Generated Files:**
-- `models/*.gen.go` - Model structs
-- `models/*_fields.gen.go` - FieldExpr definitions
-- `models/*_manager.gen.go` - Manager with CRUD operations ✅
-- `models/*_queryset.gen.go` - Type-safe QuerySet wrapper ✅
-
-**Generation Pattern:**
-```go
-// Generated UserQuerySet embeds BaseQuerySet
-type UserQuerySet struct {
-    *query.BaseQuerySet[User]
-}
-
-// Generated Manager provides CRUD operations
-type UserManagerType struct {
-    db *db.DB
-}
-```
-
-### 3. Query System
-
-**Location:** `pkg/query/`
-
-**Purpose:** Type-safe and dynamic query building
-
-**Components:**
-- `field_expr.go` - Type-safe field accessors (`FieldExpr[T]`)
-- `query_expr.go` - Query conditions (`QueryExpr`)
-- `queryset.go` - QuerySet implementation with `BaseQuerySet[T]`
-- `manager.go` - Manager with CRUD operations
-- `dynamic.go` - Dynamic query API
-- `aggregates.go` - Aggregate functions (structure ready)
-- `annotations.go` - Annotation support (structure ready)
-
-**Architecture:**
-- `BaseQuerySet[T]` - Exported base implementation that generated QuerySets embed
-- Generated QuerySets (e.g., `UserQuerySet`) embed `*query.BaseQuerySet[User]`
-- All QuerySet methods delegate to embedded `BaseQuerySet` for consistency
-- Type safety maintained through generics at compile time
-
-**Usage:**
-```go
-// Type-safe
-users, err := User.Objects.Filter(
-    User.Fields.IsActive.Equals(true).And(
-        User.Fields.DateJoined.Greater(lastMonth),
-    ),
-).All(ctx)
-
-// Dynamic
-users, err := User.Objects.FilterDynamic(
-    query.Q("is_active", true),
-).All(ctx)
-```
-
-### 4. Database Layer
-
-**Location:** `pkg/db/`
-
-**Purpose:** Database connection, transactions, migrations
-
-**Components:**
-- `db.go` - Database connection wrapper
-- `transaction.go` - Transaction management
-- `migrations.go` - Migration system integration
-
-**Migration System:** `pkg/migrations/` and `pkg/migrate/`
-- Complete migration system with state management
-- Schema detection and diff generation
-- SQL builder for migrations
-
-**Features:**
-- Connection pooling
-- Transaction support with savepoints
-- Migration management
-- SQL builder with proper escaping and parameter binding
-
-### 5. HTTP & Routing
+﻿# forge Architecture (comprehensive, code-aligned)
+
+## Table of contents
+
+- [1. Scope and non-goals](#1-scope-and-non-goals)
+- [2. Core philosophy](#2-core-philosophy)
+- [3. Package map](#3-package-map)
+- [4. End-to-end flows](#4-end-to-end-flows)
+- [5. Schema system](#5-schema-system)
+- [6. Code generation](#6-code-generation)
+- [7. ORM and QuerySet](#7-orm-and-queryset)
+- [8. Filtering system](#8-filtering-system)
+- [9. Migration system](#9-migration-system)
+- [10. Admin system](#10-admin-system)
+- [11. API framework](#11-api-framework)
+- [12. Identity system](#12-identity-system)
+- [13. Server, middleware, security](#13-server-middleware-security)
+- [14. Config, logging, validation](#14-config-logging-validation)
+- [15. Extension points](#15-extension-points)
+- [16. Testing architecture](#16-testing-architecture)
+- [17. Alignment with archived docs](#17-alignment-with-archived-docs)
 
-**Location:** `pkg/http/`
+## 1. Scope and non-goals
 
-**Purpose:** HTTP server and routing (chi wrapper)
+This document describes how the current codebase is organized and how major runtime and generation flows work. It is not a line-by-line code reference. Historical long-form narratives and comparisons live under `docs/archive/`.
 
-**Components:**
-- `router.go` - Chi router wrapper
-- `middleware.go` - Middleware layer
-- `context.go` - Request context utilities
-- `server.go` - Server wrapper
+Non-goals:
+- Reproducing every archived document verbatim.
+- Promising features that are not present in `forge/` (we call those out as roadmap items instead).
 
-**Middleware Stack:**
-1. Request ID
-2. Real IP
-3. Recoverer
-4. Logger (zap)
-5. Session (scs)
-6. CSRF (gorilla/csrf)
-7. Authentication
+## 2. Core philosophy
 
-### 6. Admin System
+Forge is a Django-inspired framework for Go. The implemented philosophy, consistent with the archive, is:
 
-**Location:** `pkg/admin/`
+- Type-safe first: generated models/managers/querysets provide compile-time safety.
+- Dynamic when needed: runtime filter expressions and generic field references exist for edge cases.
+- Convention over configuration: standard folder structure and CLI workflows.
+- Extensible: registries and interfaces are preferred over hard-coded wiring.
+- Security by default: middleware and identity system are built-in and test-covered.
 
-**Purpose:** Type-safe admin interface with full CRUD operations
+## 3. Package map
 
-**Components:**
-- `admin.go` - Type-safe Admin[T] and Config[T]
-- `registry.go` - Admin model registry
-- `list_view.go` - List view with pagination, search, filtering
-- `detail_view.go` - Detail view
-- `form_view.go` - Create/update forms
-- `fields.go` - Type-safe field expressions
-- `filters.go` - Filter system
-- `actions.go` - Bulk actions
-- `widgets.go` - Form widgets
-- `export.go` - CSV/JSON export
-- `http/` - HTTP handlers and routing
+The canonical implementation lives in the `forge/` module. The most important packages and why they exist:
 
-**Features:**
-- ✅ Type-safe with generics
-- ✅ Complete HTTP handlers (List, Detail, Create, Update, Delete)
-- ✅ Rich form widgets
-- ✅ Filters, search, pagination
-- ✅ Bulk actions
-- ✅ Export functionality
-- ✅ Inlines and fieldsets
+- `forge/schema/`: the schema DSL (fields, relations, meta, hooks, registries).
+- `forge/codegen/`: parses Go source using AST and generates strongly typed model helpers.
+- `forge/orm/`: the type-safe ORM core (BaseQuerySet, expressions, managers, update builders, projections).
+- `forge/filter/`: a reusable filter AST + filterset engine used by admin and API.
+- `forge/db/` + `forge/db/migrate/`: database connection wrappers and the migration engine (state, diff, sql builder, execution).
+- `forge/admin/`: admin registry, metadata builder, handlers, utilities, and UI helpers.
+- `forge/api/`: DRF-like API framework (serializers, viewsets, auth, permissions, throttling, parsing/rendering, OpenAPI generator).
+- `forge/identity/`: users/sessions/tokens + backends + middleware + services.
+- `forge/server/`: server/router/middleware integration (chi router wrappers, security helpers).
+- `forge/config/`, `forge/log/`, `forge/validate/`, `forge/utils/`: infrastructure.
+- `forge/registry/`: registries/plugins/extensions.
+
+Supporting modules:
+- `examples/`: example projects used as references and by tests.
+- `tests/`: integration and end-to-end tests (CLI, migrations, schema, ORM).
+
+## 4. End-to-end flows
+
+### 4.1 Model -> generated code
+
+1. You implement a schema type in Go, usually embedding `schema.BaseSchema`.
+2. You implement (some subset of) `Fields()`, `Relations()`, `Meta()`, `Hooks()`.
+3. `forge generate` scans model directories and parses them using `forge/codegen/ast_parser.go`.
+4. Codegen emits:
+   - field expressions used for typed query building
+   - a typed manager with CRUD helpers
+   - a typed QuerySet wrapper embedding `forge/orm.BaseQuerySet`
 
-### 7. Security
+The ecommerce example under `examples/ecommerce/app/*` and `examples/ecommerce/models/*` is used by migration and CLI tests.
 
-**Location:** `pkg/security/`
+### 4.2 HTTP request flow (server + middleware)
 
-**Purpose:** Security features
+A typical request path:
+
+1. Incoming request hits the server/router layer (`forge/server/router.go`).
+2. Middleware stack runs (security, logging, identity, etc.).
+3. The route handler is either:
+   - an admin handler from `forge/admin/*` (list/detail/create/update/delete)
+   - an API handler/viewset from `forge/api/*`
+4. Handlers call into ORM/query layers to build SQL.
+5. Database operations go through `forge/db` wrappers (transactions, connections).
+6. Response is rendered using API renderers or admin templates/UI helpers.
 
-**Components:**
-- `csrf.go` - CSRF protection (gorilla/csrf)
-- `sessions.go` - Session management (scs)
-- `xss.go` - XSS protection
-- `sql_injection.go` - SQL injection prevention
+### 4.3 Migration workflow
 
-### 8. Validation
+1. `forge makemigrations <name>` scans models and computes a schema diff.
+2. Diffing uses:
+   - AST model definitions from `forge/codegen`.
+   - previous schema state loaded from existing migration SQL via `forge/db/migrate/state/loader.go`.
+   - change detection in `forge/db/migrate/generate/detector.go`.
+3. SQL generation uses `forge/db/migrate/sql/*` (driver-specific builders).
+4. Execution uses `forge/db/migrations.go` (golang-migrate integration), plus recovery/status helpers under `forge/db/migrate/execute/*`.
 
-**Location:** `pkg/validation/`
+### 4.4 Admin and identity integration
 
-**Purpose:** Data validation
+Admin is designed to work out-of-the-box with identity and permissions:
 
-**Components:**
-- `validator.go` - Validator wrapper (go-playground/validator)
-- `tags.go` - Validation tag helpers
-- `integration.go` - Schema integration
+- Identity provides authentication middleware and session/token handling (`forge/identity/middleware/*`).
+- Admin uses registry + metadata to render forms and enforce permissions.
+- The design goal from the archive ("built-in auth but overridable") is met by ensuring admin and identity wire through registries/interfaces rather than requiring hard-coded calls.
 
-### 9. Authentication
+## 5. Schema system
 
-**Location:** `pkg/auth/` and `pkg/users/`
+The schema DSL is implemented under `forge/schema/` and is the foundational contract for code generation and migrations.
 
-**Purpose:** Authentication and authorization
+### 5.1 Schema interface and BaseSchema
 
-**Components:**
-- `pkg/auth/password.go` - Password hashing (bcrypt)
-- `pkg/users/` - Complete user system with:
-  - User management (CRUD)
-  - Authentication services
-  - Session management
-  - Permission system (RBAC)
-  - Password management
-  - Authentication backends (password, token)
+Schemas are plain Go types that implement some subset of these methods:
 
-### 10. Configuration
+- `Fields() []schema.Field`
+- `Relations() []schema.Relation`
+- `Meta() schema.Meta`
+- `Hooks() *schema.ModelHooks` (or equivalent; see `forge/schema/hooks.go`)
 
-**Location:** `pkg/config/`
+Most schemas embed `schema.BaseSchema` for conventions and for codegen discovery.
 
-**Purpose:** Application configuration
+### 5.2 Field types
 
-**Components:**
-- `config.go` - Viper wrapper
-- `settings.go` - Framework settings structure
+The type constructors in `forge/schema/typed_builders.go` include:
 
-### 11. Logging
+- Numeric: `schema.Int64`, `schema.Int32`, `schema.Float64`, `schema.Float32`, `schema.Decimal`
+- Text: `schema.String`, `schema.Text`, `schema.Email`, `schema.URL`
+- Boolean: `schema.Bool`
+- Temporal: `schema.Time`, `schema.Date`, `schema.DateTime`
+- Special: `schema.JSON`, `schema.Bytes`, `schema.UUID`
 
-**Location:** `pkg/logging/`
+Field values are configured via chain methods on `schema.Field` (see `forge/schema/field_methods.go`).
 
-**Purpose:** Structured logging
+### 5.3 Field options and how they map to DB and admin
 
-**Components:**
-- `logger.go` - Zap logger wrapper
-- `middleware.go` - Request logging middleware
-
-### 12. Utilities
-
-**Location:** `pkg/utils/`
-
-**Purpose:** Helper utilities
-
-**Components:**
-- `strcase.go` - String case conversion (strcase)
-- `uuid.go` - UUID utilities (google/uuid)
-
-### 13. API Framework
-
-**Location:** `pkg/api/`
-
-**Purpose:** DRF-like REST API framework
-
-**Components:**
-- `serializers/` - Complete serializer system with field types
-- `viewset.go` - BaseViewSet with CRUD operations
-- `authentication/` - Token, JWT, Basic, Session, API Key auth
-- `permissions/` - Permission system (AllowAny, IsAuthenticated, IsAdminUser, etc.)
-- `throttling/` - Rate limiting (AnonRateThrottle, UserRateThrottle, ScopedRateThrottle)
-- `renderers/` - JSON, XML, YAML, HTML, CSV renderers
-- `parsers/` - JSON, XML, Form, MultiPart parsers
-- `filters/` - Field filtering and search
-- `pagination.go` - PageNumber and LimitOffset pagination
-- `exceptions/` - Complete exception hierarchy
-- `versioning/` - API versioning support
-- `caching/` - Cache backends
-- `docs/` - OpenAPI documentation generation
-
-**Status:** ✅ Complete - Production ready
-
-### 14. User System
-
-**Location:** `pkg/users/`
-
-**Purpose:** Complete user management and authentication
-
-**Components:**
-- `models/` - User, Session, Permission, Group, Token models
-- `repository/` - Data access layer (Repository pattern)
-- `service/` - Business logic layer (User, Auth, Password, Permission services)
-- `backends/` - Authentication backends (password, token)
-- `serializers/` - API serializers
-- `handlers/` - HTTP handlers/viewsets
-- `middleware/` - Authentication middleware
-
-**Status:** ✅ Complete - Production ready
-
-### 15. CLI Tools
-
-**Location:** `pkg/cli/`
-
-**Purpose:** Command-line interface for framework operations
-
-**Components:**
-- `commands/` - CLI commands (new, generate, migrate, runserver, etc.)
-- `templates/` - Project and code templates
-- `root.go` - CLI root command
-
-**Status:** ✅ Complete
-
-## Data Flow
-
-### Request Flow
-
-```
-HTTP Request
-  ↓
-Chi Router
-  ↓
-Middleware Stack
-  ↓
-Framework Handler
-  ↓
-QuerySet / Manager
-  ↓
-SQL Builder (with parameter binding)
-  ↓
-PostgreSQL
-  ↓
-Response (JSON/HTML)
-```
-
-### Code Generation Flow
-
-```
-Schema Definition (Go)
-  ↓
-AST Parser
-  ↓
-Model Definition
-  ↓
-Code Generator
-  ↓
-Generated Files:
-  - Model structs
-  - FieldExpr
-  - Manager/QuerySet
-  - SQL Builder generates SQL with parameter binding
-  - Proper identifier escaping
-  - Type-safe query execution
-```
-
-## Extension Points
-
-### 1. Model Extensions
-- Add fields to existing models
-- Add relations
-- Add hooks
-- Override methods
-
-### 2. Admin Extensions
-- Customize list display
-- Add filters
-- Add actions
-- Custom widgets
-
-### 3. Query Extensions
-- Custom QuerySet methods
-- Custom aggregates
-- Custom annotations
-
-### 4. Middleware
-- Custom middleware injection
-- Request/response modification
-
-### 5. Plugin System
-- Register plugins
-- Plugin lifecycle hooks
-- Plugin dependencies
-
-## Technology Stack
-
-### Core
-- **Go 1.21+** - Programming language
-- **database/sql** - Database interface
-- **go/ast** - Code generation
-
-### HTTP & Routing
-- **chi/v5** - HTTP router
-- **chi/middleware** - Middleware
-
-### Database
-- **database/sql** - Standard library SQL interface
-- **lib/pq** - PostgreSQL driver
-- **golang-migrate/v4** - Migrations
-
-### Security
-- **gorilla/csrf** - CSRF protection
-- **alexedwards/scs/v2** - Sessions
-- **golang.org/x/crypto/bcrypt** - Password hashing
-
-### Validation & Configuration
-- **go-playground/validator/v10** - Validation
-- **spf13/viper** - Configuration
-
-### Logging & Templates
-- **zap** - Structured logging
-- **Masterminds/sprig/v3** - Template functions
-
-### Utilities
-- **stretchr/testify** - Testing
-- **iancoleman/strcase** - String utilities
-- **google/uuid** - UUID generation
-
-## Design Principles
-
-1. **Wrap, Don't Expose**: All third-party libraries are wrapped
-2. **Type-Safe First**: Primary API uses generics
-3. **Convention over Configuration**: Sensible defaults
-4. **Extensibility**: Everything can be extended
-5. **Security by Default**: Built-in protections
-6. **Code Generation**: Reduce boilerplate
-
-## Detailed Architecture
-
-### QuerySet Architecture
-
-The QuerySet system provides a type-safe, Django-like query interface using Go generics.
-
-**BaseQuerySet Structure:**
-```go
-type BaseQuerySet[T any] struct {
-    table           string
-    conditions      []QueryExpr
-    excludes        []QueryExpr
-    orderBy         []string
-    limitVal        *int
-    offsetVal       *int
-    distinct        bool
-    selectFields    []string
-    selectRelated   []string
-    prefetchRelated []string
-    onlyFields      []string
-    deferFields     []string
-    aggregates      []Aggregate
-    annotations     []AnnotationExpr
-    db              interface{}  // Database connection
-}
-```
-
-**Key Design Decisions:**
-1. **Exported Type**: `BaseQuerySet` is exported so generated code can embed it
-2. **Generic Type Parameter**: `[T any]` ensures type safety for model instances
-3. **Composition**: Generated QuerySets embed `*BaseQuerySet[T]` for all functionality
-4. **Database Connection**: QuerySets can hold DB connection or get from context
-
-**Generated QuerySet Pattern:**
-```go
-type UserQuerySet struct {
-    *query.BaseQuerySet[User]
-}
-
-func NewUserQuerySet() *UserQuerySet {
-    base := query.NewBaseQuerySet[User]("users")
-    return &UserQuerySet{BaseQuerySet: base}
-}
-```
-
-**Query Execution Flow:**
-1. Query construction via method chaining
-2. `buildSQL()` constructs SQL from conditions using SQL builder
-3. SQL executed via `database/sql` with proper parameter binding
-4. Rows scanned into model instances using reflection
-5. Relations loaded if `SelectRelated`/`PrefetchRelated` used
-
-**Implementation Status:**
-- ✅ Query building (Filter, Exclude, OrderBy, Limit, Offset, Distinct)
-- ✅ Query execution (All, Get, First, Last, Count, Exists)
-- ✅ SQL generation from QueryExpr
-- ✅ Row scanning into model instances
-- ✅ SQL builder with proper escaping and parameter binding
-- ✅ Manager CRUD operations (Create, Update, Delete with hooks)
-- 🚧 SelectRelated/PrefetchRelated (structure ready)
-- 🚧 Aggregates execution (structure ready)
-- 🚧 Annotations execution (structure ready)
-
-### Schema Architecture Details
-
-**Field Structure:**
-```go
-type Field struct {
-    Name          string
-    Type          FieldType
-    Required      bool
-    Blank         bool
-    Default       interface{}
-    HelpText      string
-    VerboseName   string
-    DBColumn      string
-    DBIndex       bool
-    Unique        bool
-    PrimaryKey    bool
-    AutoIncrement bool
-    Validators    []Validator
-    ValidationTag string
-    MaxLength     *int
-    MinLength     *int
-    Choices       []Choice
-    Editable      bool
-    AutoNow       bool
-    AutoNowAdd    bool
-}
-```
-
-**Relation Structure:**
-```go
-type Relation struct {
-    Name        string
-    Type        RelationType  // ForeignKey, OneToOne, OneToMany, ManyToMany
-    Target      string
-    Required    bool
-    OnDelete    CascadeType
-    OnUpdate    CascadeType
-    RelatedName string
-    Through     string  // For ManyToMany
-}
-```
-
-**Meta Structure:**
-```go
-type Meta struct {
-    TableName          string
-    OrderBy            []string
-    VerboseName        string
-    VerboseNamePlural  string
-    Indexes            []Index
-    UniqueTogether     [][]string
-    Constraints        []UniqueConstraint
-    Permissions        []Permission
-    DefaultPermissions bool
-}
-```
-
-**Hook Execution Order:**
-
-Create: `BeforeSave` → `BeforeCreate` → Database Insert → `AfterCreate` → `AfterSave`
-
-Update: `BeforeSave` → `BeforeUpdate` → Database Update → `AfterUpdate` → `AfterSave`
-
-Delete: `BeforeDelete` → Database Delete → `AfterDelete`
-
-### API Design Principles
-
-1. **Type-Safe First**: Primary API uses generics for compile-time safety
-2. **Django-Inspired**: Familiar patterns for Django developers
-3. **Composable**: APIs can be combined
-4. **Extensible**: Everything can be extended
-5. **Convention over Configuration**: Sensible defaults
-
-**API Patterns:**
-- **Fluent Interface**: Method chaining for queries
-- **Builder Pattern**: Chainable field builders
-- **Factory Pattern**: Router, server creation
-- **Registry Pattern**: Model and extension registration
-
-**Database Schema Mapping:**
-
-| Go Type | PostgreSQL Type | Nullable |
-|---------|----------------|----------|
-| `int64` | `BIGINT` | No |
-| `*int64` | `BIGINT` | Yes |
-| `int32` | `INTEGER` | No |
-| `string` | `TEXT` or `VARCHAR(n)` | No |
-| `*string` | `TEXT` or `VARCHAR(n)` | Yes |
-| `bool` | `BOOLEAN` | No |
-| `time.Time` | `TIMESTAMP` | No |
-| `*time.Time` | `TIMESTAMP` | Yes |
-| `float64` | `DOUBLE PRECISION` | No |
-| `[]byte` | `BYTEA` or `JSONB` | No |
-
-## Package Structure Summary
-
-The framework is organized into the following packages under `pkg/`:
-
-```
-pkg/
-├── admin/          # Type-safe admin interface ✅
-├── api/            # REST API framework ✅
-├── auth/           # Basic authentication utilities
-├── cli/            # Command-line interface ✅
-├── config/         # Configuration management
-├── db/             # Database connection and transactions
-├── errors/         # Error handling
-├── generator/      # Code generation system ✅
-├── http/           # HTTP routing and middleware
-├── logging/        # Structured logging
-├── migrate/        # Migration system ✅
-├── migrations/     # Migration utilities
-├── models/         # Base models
-├── query/          # Type-safe ORM ✅
-├── registry/       # Extension registry
-├── schema/         # Schema definition system ✅
-├── security/       # Security features
-├── users/          # User system ✅
-├── utils/          # Utility functions
-└── validation/     # Validation system
-```
-
-**Status Legend:**
-- ✅ Complete and production-ready
-- 🚧 In progress / structure ready
-- 📋 Planned
-
-For detailed architecture of specific packages, see:
-- [API Architecture](API_ARCHITECTURE.md) - API framework details
-- [User System Architecture](USER_SYSTEM_ARCHITECTURE.md) - User system details
+Common options (non-exhaustive; see `forge/schema/field.go` and `forge/schema/field_methods.go`):
+
+- Required / optional:
+  - `WithRequired()` -> NOT NULL
+  - `WithOptional()` -> NULL
+- Key and identity:
+  - `WithPrimary()` -> primary key
+  - `WithAutoIncrement()` -> identity/serial behavior (driver-specific)
+- Uniqueness and indexing:
+  - `WithUnique()` -> unique constraint
+  - `WithDBIndex()` / index helpers -> index creation
+- Column metadata:
+  - `WithDBColumn("...")` -> custom column name
+  - `WithDBType("...")` -> custom database type
+  - `WithDBDefault("...")` -> SQL default (driver-specific)
+- Text constraints:
+  - `WithMaxLength(n)`, `WithMinLength(n)`
+- Temporal automation:
+  - `WithAutoNowAdd()` implies DEFAULT now() and NOT NULL for created-at semantics
+  - `WithAutoNow()` implies DEFAULT now() for updated-at semantics
+- Generated columns:
+  - `WithGeneratedColumn(expression, stored)` -> generated SQL (handled in migrations).
+
+These options are consumed by:
+
+- `forge/codegen/ast_parser.go` when producing `FieldDefinition.Options`.
+- `forge/db/migrate/sql/base.go` when mapping field options into DDL.
+
+### 5.4 Relations
+
+Relations are defined via constructors in `forge/schema/relation.go`:
+
+- `schema.ForeignKey(columnName, "TargetModel")`
+- `schema.OneToOne(columnName, "TargetModel")`
+- `schema.ManyToMany(name, "TargetModel")`
+- `schema.OneToMany(name, "TargetModel", fkColumn)` (reverse relation helper)
+
+Key relation options:
+
+- `WithRelatedName("...")` and `WithRelatedQueryName("...")`
+- `WithOnDelete(schema.CascadeCASCADE|CascadeSET_NULL|CascadePROTECT|...)`
+- `WithOnUpdate(...)`
+- `WithThroughTable("...")` (many-to-many join tables)
+- Constraint tuning: `WithDBConstraint(bool)`, `WithConstraintName`, `WithDeferrable`, `WithMatch`
+
+Migrations translate these into foreign keys (`ON DELETE`, `ON UPDATE`, constraint names, etc.) in `forge/db/migrate/sql/*`.
+
+### 5.5 Meta options
+
+The meta definition (see `forge/schema/meta.go`) includes table name, indexes, constraints, ordering hints, and naming helpers. Codegen and migrations read meta to ensure stable naming and to create secondary indexes/constraints.
+
+### 5.6 Hooks
+
+The hook system (see `forge/schema/hooks.go`) provides lifecycle entry points (before/after create/update/save/delete) to match Django-like behavior.
+
+Design note: hooks are invoked in managers and/or model instance methods generated by codegen; changes to hook signatures should be coordinated with template updates.
+
+### 5.7 Registries
+
+Forge uses registries to avoid hard-coded global wiring:
+
+- `forge/schema/registry.go` registers field and relation factories.
+- `forge/registry/*` provides broader extension registries.
+
+This design supports "auto discovery" and pluggability described in `docs/archive/AUTO_DISCOVERY.md`.
+
+## 6. Code generation
+
+Code generation is responsible for turning schema definitions into a type-safe developer API.
+
+### 6.1 Inputs
+
+- Model schema files in user apps and examples.
+- Schema builders and relation definitions in `forge/schema`.
+
+### 6.2 AST parser responsibilities
+
+`forge/codegen/ast_parser.go`:
+
+- Walks Go files and identifies schema types and their methods.
+- Extracts:
+  - Fields and their builder chains (options like `required`, `unique`, `primary`, `db_column`, `db_default`, `generated_column`).
+  - Relations and relation chains (options like `on_delete`, `on_update`, `related_name`, `through`).
+  - Meta (table name, indexes, constraints).
+
+Important invariants:
+
+- Primary keys must be treated as required (NOT NULL). The parser ensures this so migrations do not attempt to make identity primary keys nullable.
+- Cascade constants are normalized and passed through as SQL cascade actions.
+
+### 6.3 Templates and writer
+
+`forge/codegen/writer.go` and templates under `forge/codegen/templates/`:
+
+- Manage consistent file layout and imports.
+- Emit:
+  - Field expression types used for query building.
+  - Manager types used for CRUD.
+  - QuerySet wrapper types that embed `forge/orm.BaseQuerySet`.
+
+### 6.4 Generated API surface
+
+Generated code provides:
+
+- `Model.Fields.<FieldName>` typed expressions (used for `Eq`, `Gt`, `Contains`, etc.).
+- `Model.Objects` or manager instances with `All`, `Get`, `Create`, `Update`, `Delete`.
+- `Model.Objects.Filter(...).OrderBy(...).Limit(...).All(ctx)` style chainable QuerySets.
+
+See `forge/orm/TYPE_SAFE_API.md` for usage patterns and `forge/orm/queryset.go` for the canonical interface.
+
+### 6.5 Codegen and migrations coupling
+
+The migration generator loads model definitions via AST parser. If codegen and schema builders diverge, migrations become incorrect. Any new schema option must be represented in:
+
+- AST parser extraction.
+- migration SQL mapping (`forge/db/migrate/sql/*`).
+- state conversion (`forge/db/migrate/state/*`) if state needs to preserve the option.
+
+## 7. ORM and QuerySet
+
+The ORM core lives in `forge/orm/`.
+
+### 7.1 Core types
+
+- `BaseQuerySet[T]` in `forge/orm/queryset.go` is the chainable query builder.
+- Field expressions and query expressions live across `forge/orm/field_expr.go`, `query_expr.go`, and `expression.go`.
+- Managers provide CRUD entry points and coordinate hook invocation (`forge/orm/manager.go`, plus generated managers).
+
+### 7.2 QuerySet surface
+
+The QuerySet interface supports:
+
+- Filtering and exclusion: `Filter(...)`, `Exclude(...)`.
+- Ordering: `OrderBy(...)`.
+- Pagination: `Limit(...)`, `Offset(...)`.
+- Projections: `Select(...)`, `Only(...)`, `Defer(...)`.
+- Relation controls: `SelectRelated(...)`, `PrefetchRelated(...)`.
+- Value projections: `Values(...)`, `ValuesList(...)`.
+
+See:
+
+- `forge/orm/queryset.go` for the authoritative interface and implementations.
+- `forge/orm/queryset_test.go` for behavioral expectations (SelectRelated/PrefetchRelated/Values/ValuesList).
+
+### 7.3 Field expressions
+
+Generated FieldExprs provide typed conditions. They should map to:
+
+- equality: `Eq`, `Ne`
+- comparisons: `Gt`, `Gte`, `Lt`, `Lte`
+- membership: `In`, `NotIn`
+- null checks: `IsNull`, `IsNotNull`
+- strings: `Contains`, `StartsWith`, `EndsWith`, case-insensitive variants
+
+The archived API reference contained many examples; the up-to-date implementations live in `forge/orm/field_expr.go` and related helpers.
+
+### 7.4 Runtime field references
+
+When a field is determined at runtime, use the runtime field reference helpers documented in `docs/archive/MIGRATION_V1_TO_V2.md` (historical) and implemented in `forge/orm`.
+
+Patterns:
+
+- SQL-like: `Where("field", OpGreater, 18)`
+- Django-like: `F("field").Gt(18)`
+
+### 7.5 Relations and N+1 protection
+
+`forge/orm/preload.go` defines errors and guardrails around accessing relations without preloading. This supports the design goal of preventing accidental N+1 query patterns.
+
+### 7.6 Transactions
+
+Transactions are provided by `forge/db/transaction.go` and used by managers/services. Long-running workflows should use transaction boundaries that match business logic rather than per-request implicit transactions.
+
+### 7.7 Performance considerations
+
+- QuerySet operations are lazy and only execute on terminal operations (`All`, `Get`, `Count`, etc.).
+- Filters and projections should be pushed into SQL rather than applied in Go.
+- Avoid deep dynamic filters without whitelisting (see filtering system security below).
+
+## 8. Filtering system
+
+The filtering system lives in `forge/filter/` and provides a shared filter AST and execution pipeline used by:
+
+- Admin list pages
+- REST API list endpoints
+- Direct ORM usage
+
+This subsystem was heavily described in the archive (`docs/archive/FILTERING_SYSTEM.md`). The current implementation includes:
+
+### 8.1 Filter AST
+
+- A serializable representation of filter trees (AND/OR/NOT) suitable for persistence and transport.
+- Parsing helpers for query params and UI payloads.
+
+See: `forge/filter/ast.go`, `forge/filter/parser.go`.
+
+### 8.2 FilterSet
+
+- `FilterSet[T]` binds a filter schema to a queryset and request context.
+- Provides both an imperative builder API and declarative filters under `forge/filter/filters/*`.
+
+See: `forge/filter/filterset.go`, `forge/filter/filters/*`.
+
+### 8.3 Deep relation lookups
+
+The system supports deep field paths like `author__company__country`. Implementations depend on the ORM schema registry and safe path resolution.
+
+See: `forge/filter/relations.go`, `forge/filter/security.go`.
+
+### 8.4 Security hardening
+
+Filtering is a potential attack surface. The filter system defends with:
+
+- field whitelisting / schema-based validation
+- lookup whitelisting
+- cost-based throttling and query planning
+
+See: `forge/filter/security.go`, `forge/filter/optimizer.go`, `forge/filter/metrics.go`.
+
+### 8.5 UI and tooling
+
+Widgets for admin and debug tools for SQL previews are in `forge/filter/widgets/*`.
+
+## 9. Migration system
+
+Migrations are implemented in `forge/db/migrate/*` and orchestrated via `forge/db/migrations.go` and CLI commands.
+
+### 9.1 Goals
+
+- Generate deterministic up/down SQL migrations from schema diffs.
+- Load previous state from existing migration files (not from database introspection) to support incremental generation in CI.
+- Execute migrations via golang-migrate with recovery tools for dirty state.
+
+### 9.2 Components
+
+- Diff detection: `forge/db/migrate/generate/detector.go`
+- State tracking: `forge/db/migrate/state/*`
+  - File state loader parses existing `*.up.sql` migrations and reconstructs an in-memory schema model.
+  - Converter turns schema state back into model definitions for diffing.
+- SQL generation: `forge/db/migrate/sql/*`
+  - Driver-specific DDL mapping, column type mapping, defaults, generated columns.
+- Execution and verification: `forge/db/migrate/execute/*`, `forge/db/migrate/verify/*`
+  - Status reporting reads `schema_migrations`.
+  - Recovery handles dirty states.
+  - Verification contains checksum/drift/safety checks.
+
+### 9.3 Bookkeeping table
+
+First migrations include a bookkeeping table (`schema_migrations`) so execution/status tools can determine applied versions. This is generated by `forge/db/migrate/generate/generator.go`.
+
+Design guardrail: migration diffs must ignore internal bookkeeping tables when comparing schema state to current models.
+
+### 9.4 Generated columns and DB-specific options
+
+Field options like `db_type`, `db_default`, and generated columns are mapped in `forge/db/migrate/sql/base.go` and `forge/db/migrate/sql/common.go`.
+
+### 9.5 Testing
+
+The migration system is heavily tested under `tests/integration/migrate/*`. In particular:
+
+- Incremental ecommerce migrations validate state loader correctness across multiple phases.
+- Advanced fields tests validate generated/default columns.
+- Recovery/status tests validate dirty state handling and status reporting.
+
+## 10. Admin system
+
+The admin system lives in `forge/admin/`. The archive contains extensive admin design notes and comparisons (Django admin comparison, system comparison, widget API specs). The current implementation contains:
+
+### 10.1 Admin entry points
+
+- `forge/admin/admin.go`: public entry points and wiring.
+- `forge/admin/site.go`: Admin site abstraction, route binding, and high-level lifecycle.
+
+### 10.2 Core registry and metadata
+
+- Registry: `forge/admin/core/registry.go` stores model registrations and configuration.
+- Metadata: `forge/admin/core/metadata.go` and `metadata_builder.go` build field lists, labels, widget hints, and permissions.
+
+This registry is the intended override point: apps can replace or extend how models are presented without editing generated code.
+
+### 10.3 API-first admin endpoints
+
+`forge/admin/api/rest/router.go` implements a REST layer for admin UI interactions. This aligns with the archived redesign direction (headless admin) but is implemented inside the Go package rather than requiring a separate server.
+
+### 10.4 UI layer
+
+`forge/admin/ui/*` contains UI helpers, templates or template hooks, and widget definitions. The admin UI can be served as static assets or via server-rendered templates depending on configuration.
+
+### 10.5 History, notifications, and plugins
+
+- History/audit: `forge/admin/core/history.go`
+- Notifications: `forge/admin/core/notifications.go`
+- Plugins: `forge/admin/core/plugin.go`
+
+### 10.6 Testing and examples
+
+The ecommerce example (`examples/ecommerce/app/*/admin.go`) exercises how admin interacts with generated field instances and typed schemas.
+
+## 11. API framework
+
+The API framework lives in `forge/api/` and was originally described in archived docs as a DRF-like stack. The current implementation includes:
+
+### 11.1 ViewSets
+
+- Base and enhanced viewsets (`forge/api/viewset.go`, `viewset_enhanced*.go`) implement CRUD flows.
+- Integration helpers (`forge/api/integration.go`) connect serializers, permissions, throttles, renderers, and parsers.
+
+### 11.2 Serializers
+
+- Core serializer interfaces in `forge/api/serializer.go`.
+- Field-level serializers under `forge/api/serializers/fields/*`.
+- Typed/enhanced serializers for structured output.
+
+### 11.3 Authentication and permissions
+
+- Auth backends under `forge/api/authentication/*` (API key, basic, JWT, session, token).
+- Permission classes under `forge/api/permissions/*`.
+
+Identity (forge/identity) provides the persistent user/session/token model layer; API auth focuses on request authentication and context population.
+
+### 11.4 Throttling
+
+- `forge/api/throttling/*` provides anon/user rate throttles, throttle parsing, and errors.
+
+### 11.5 Content negotiation
+
+- Parsers: `forge/api/parsers/*`
+- Renderers: `forge/api/renderers/*`
+
+### 11.6 Errors and exceptions
+
+- Exceptions: `forge/api/exceptions/*`
+- Problem+code mapping: `forge/api/errors/*`
+
+### 11.7 OpenAPI
+
+- `forge/api/docs/openapi.go` provides an OpenAPI 3.0 generator and HTTP handler.
+
+### 11.8 Tests
+
+The API framework is well-covered by unit tests in `forge/api/*_test.go`, including permissions, throttling, parsers/renderers, and viewset behavior.
+
+## 12. Identity system
+
+Identity is implemented under `forge/identity/` and follows the architecture described in `docs/archive/USER_SYSTEM_ARCHITECTURE.md` and `docs/archive/docs-new/features/identity-system.md`, updated to match the current package layout.
+
+### 12.1 Layers
+
+- Models: `forge/identity/models/*` (user, session, permission, group, tokens).
+- Repository: `forge/identity/repository/*` (data access boundaries).
+- Services: `forge/identity/service/*` (business logic, validations).
+- Backends: `forge/identity/backends/*` (authentication strategy registry: password, token, etc.).
+- Serializers: `forge/identity/serializers/*` (API-facing DTO conversion).
+- Handlers: `forge/identity/handlers/*` (HTTP endpoints).
+- Middleware: `forge/identity/middleware/*` (request authentication).
+
+### 12.2 Extension points
+
+- Add a new authentication mechanism by implementing the backend interface and registering it in `forge/identity/backends/registry.go`.
+- Override routes by composing your own router that wraps `forge/identity/router.go`.
+
+### 12.3 Testing
+
+Identity behavior is covered by unit tests under `forge/identity/*/*_test.go`.
+
+## 13. Server, middleware, security
+
+`forge/server/` is responsible for HTTP integration:
+
+- Router wiring and request context helpers.
+- Security middleware in `forge/server/security.go`.
+- Rate limiting and health endpoints.
+
+When debugging 404s, static asset resolution, or middleware order, this is the first layer to inspect.
+
+## 14. Config, logging, validation
+
+- Config: `forge/config/*` (viper-based settings and environment support).
+- Logging: `forge/log/*` (zap-based structured logging, exporters, hooks, middleware).
+- Validation: `forge/validate/*` (schema validation tags and validators).
+
+These packages are intentionally separate to keep core ORM/admin/API logic independent of specific logging or configuration frameworks.
+
+## 15. Extension points
+
+Forge is designed to be extended without editing core code. Common extension points:
+
+- Schema: add new field/relation factories in `forge/schema/registry.go`.
+- Codegen: extend templates and AST extraction (`forge/codegen/templates`, `forge/codegen/ast_parser.go`).
+- ORM: add new expressions/operators in `forge/orm/expression.go`.
+- Filter: register custom filters and widgets in `forge/filter/custom.go` and `forge/filter/widgets/*`.
+- Admin: register plugins and override metadata/handlers via `forge/admin/core/plugin.go` and registry hooks.
+- API: add auth, permissions, throttles, renderers, parsers using the existing interfaces.
+- Identity: add backends and middleware.
+
+## 16. Testing architecture
+
+Tests are split across:
+
+- `forge/` module tests: unit tests for API, filter, orm, identity.
+- `examples/ecommerce`: example module tests.
+- `tests/`: integration tests that exercise real CLI and migration flows.
+
+If you change schema parsing or migration SQL generation, `tests/integration/migrate/*` is the critical suite.
+
+## 17. Alignment with archived docs
+
+The archive contains more detail than we keep in this canonical architecture file. The rule is:
+
+- If a claim is implemented and test-covered, it belongs here.
+- If a claim is conceptual or planned, it belongs in `docs/ROADMAP.md`.
+- If a claim is historical context, comparisons, or a deep dive, it stays in `docs/archive/`.
+
+Recommended archived references by topic:
+
+- Deep architecture narrative: `docs/archive/FRAMEWORK_ARCHITECTURE.md`, `docs/archive/ARCHITECTURE.md`.
+- Schema reference: `docs/archive/SCHEMA_REFERENCE.md`.
+- API usage examples: `docs/archive/API_REFERENCE.md`, `docs/archive/REST_API.md`.
+- Filtering deep dive: `docs/archive/FILTERING_SYSTEM.md`.
+- Identity patterns: `docs/archive/USER_SYSTEM_ARCHITECTURE.md`.
+- Admin deep dives: `docs/archive/ADMIN_*`.
+

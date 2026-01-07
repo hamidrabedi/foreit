@@ -26,3 +26,4 @@ func getField(obj interface{}, fieldName string) reflect.Value {
 	}
 	return v.FieldByName(fieldName)
 }
+

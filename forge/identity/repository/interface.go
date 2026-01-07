@@ -158,3 +158,4 @@ type TokenRepository interface {
 	// DeleteExpiredTokens deletes all expired tokens
 	DeleteExpiredTokens(ctx context.Context) error
 }
+

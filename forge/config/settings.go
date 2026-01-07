@@ -1,5 +1,7 @@
 package config
 
+import "strings"
+
 // Settings represents framework settings structure
 type Settings struct {
 	Admin    AdminSettings
@@ -26,6 +28,9 @@ type ServerSettings struct {
 	ReadTimeout     int    // seconds
 	WriteTimeout    int    // seconds
 	StaticFilesPath string // path to static files directory
+	StaticFilesURL  string // url prefix for static files
+	UploadsPath     string // path to uploads directory
+	UploadsURL      string // url prefix for uploads
 	HealthCheckPath string // path for health check endpoint
 	MetricsEnabled  bool   // enable metrics endpoint
 	MetricsPath     string // path for metrics endpoint
@@ -51,9 +56,10 @@ type DatabaseSettings struct {
 
 // SecuritySettings contains security-related settings
 type SecuritySettings struct {
-	SecretKey     string
-	CSRFSecretKey string
-	SessionSecret string
+	SecretKey       string
+	CSRFSecretKey   string
+	SessionSecret   string
+	CSRFExemptPaths []string
 }
 
 // AdminSettings contains admin interface settings
@@ -80,6 +86,9 @@ func LoadSettings(cfg *Config) *Settings {
 			ReadTimeout:     cfg.GetInt("server.read_timeout", 30),
 			WriteTimeout:    cfg.GetInt("server.write_timeout", 30),
 			StaticFilesPath: cfg.GetString("server.static_files_path", ""),
+			StaticFilesURL:  cfg.GetString("server.static_files_url", "/static"),
+			UploadsPath:     cfg.GetString("server.uploads_path", ""),
+			UploadsURL:      cfg.GetString("server.uploads_url", "/media"),
 			HealthCheckPath: cfg.GetString("server.health_check_path", "/health"),
 			MetricsEnabled:  cfg.GetBool("server.metrics_enabled", false),
 			MetricsPath:     cfg.GetString("server.metrics_path", "/metrics"),
@@ -101,13 +110,14 @@ func LoadSettings(cfg *Config) *Settings {
 			ConnMaxIdleTime: cfg.GetInt("database.conn_max_idle_time", 600),
 		},
 		Security: SecuritySettings{
-			SecretKey:     cfg.GetString("security.secret_key", "change-me-in-production"),
-			CSRFSecretKey: cfg.GetString("security.csrf_secret_key", "change-me-in-production"),
-			SessionSecret: cfg.GetString("security.session_secret", "change-me-in-production"),
+			SecretKey:       cfg.GetString("security.secret_key", "change-me-in-production"),
+			CSRFSecretKey:   cfg.GetString("security.csrf_secret_key", "change-me-in-production"),
+			SessionSecret:   cfg.GetString("security.session_secret", "change-me-in-production"),
+			CSRFExemptPaths: cfg.GetStringSlice("security.csrf_exempt_paths", nil),
 		},
 		Admin: AdminSettings{
 			Enabled:     cfg.GetBool("admin.enabled", true),
-			Path:        cfg.GetString("admin.path", "/admin"),
+			Path:        normalizePathPrefix(cfg.GetString("admin.path", "/admin")),
 			Title:       cfg.GetString("admin.title", "forge Admin"),
 			HeaderTitle: cfg.GetString("admin.header_title", "forge"),
 			SiteName:    cfg.GetString("admin.site_name", "forge"),
@@ -119,8 +129,8 @@ func LoadSettings(cfg *Config) *Settings {
 		},
 		Errors: ErrorSettings{
 			ProblemDetails: ProblemDetailsSettings{
-				TypeBaseURL:           cfg.GetString("errors.problem_details.type_base_url", "https://api.example.com/problems"),
-				IncludeStackTrace:     cfg.GetBool("errors.problem_details.include_stack_trace", false),
+				TypeBaseURL:            cfg.GetString("errors.problem_details.type_base_url", "https://api.example.com/problems"),
+				IncludeStackTrace:      cfg.GetBool("errors.problem_details.include_stack_trace", false),
 				IncludeInternalDetails: cfg.GetBool("errors.problem_details.include_internal_details", false),
 			},
 			RequestID: RequestIDSettings{
@@ -134,10 +144,10 @@ func LoadSettings(cfg *Config) *Settings {
 				RedactPII:          cfg.GetBool("errors.sanitization.redact_pii", true),
 			},
 			Idempotency: IdempotencySettings{
-				Enabled:        cfg.GetBool("errors.idempotency.enabled", true),
-				HeaderName:     cfg.GetString("errors.idempotency.header_name", "Idempotency-Key"),
-				CacheTTL:       cfg.GetInt("errors.idempotency.cache_ttl", 3600),
-				StoreType:      cfg.GetString("errors.idempotency.store_type", "memory"),
+				Enabled:         cfg.GetBool("errors.idempotency.enabled", true),
+				HeaderName:      cfg.GetString("errors.idempotency.header_name", "Idempotency-Key"),
+				CacheTTL:        cfg.GetInt("errors.idempotency.cache_ttl", 3600),
+				StoreType:       cfg.GetString("errors.idempotency.store_type", "memory"),
 				MaxNestingDepth: cfg.GetInt("errors.idempotency.max_nesting_depth", 10),
 			},
 			HTTP: HTTPSettings{
@@ -147,4 +157,19 @@ func LoadSettings(cfg *Config) *Settings {
 			},
 		},
 	}
+}
+
+func normalizePathPrefix(input string) string {
+	pathValue := strings.TrimSpace(input)
+	if pathValue == "" || pathValue == "/" {
+		return ""
+	}
+	if !strings.HasPrefix(pathValue, "/") {
+		pathValue = "/" + pathValue
+	}
+	pathValue = strings.TrimRight(pathValue, "/")
+	if pathValue == "/" {
+		return ""
+	}
+	return pathValue
 }

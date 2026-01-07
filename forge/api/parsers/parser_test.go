@@ -96,3 +96,4 @@ func TestXMLParser_MediaType(t *testing.T) {
 	parser := NewXMLParser()
 	assert.Equal(t, "application/xml", parser.MediaType())
 }
+

@@ -177,3 +177,4 @@ func createLogger(cfg *config.Config) (*log.Logger, error) {
 	settings := config.LoadSettings(cfg)
 	return log.NewLogger(settings.App.Debug)
 }
+

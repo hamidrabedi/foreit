@@ -57,3 +57,4 @@ func (p *MultiPartParser) Parse(r io.Reader, v interface{}) error {
 func (p *MultiPartParser) MediaType() string {
 	return "multipart/form-data"
 }
+

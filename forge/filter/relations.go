@@ -156,3 +156,4 @@ func DeduplicateJoins(joins []string) []string {
 
 	return result
 }
+

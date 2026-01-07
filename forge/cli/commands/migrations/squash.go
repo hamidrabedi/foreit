@@ -52,3 +52,4 @@ func (c *SquashCommand) Execute(ctx *core.Context, args []string) error {
 	fmt.Println("  The new migration includes a 'replaces' field listing the squashed migrations")
 	return nil
 }
+

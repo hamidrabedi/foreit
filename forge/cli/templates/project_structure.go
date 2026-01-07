@@ -102,3 +102,4 @@ func GetStructure(template ProjectTemplate) *ProjectStructure {
 		return GetSimpleStructure()
 	}
 }
+

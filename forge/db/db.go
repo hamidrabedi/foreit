@@ -35,7 +35,36 @@ func NewDBFromConfig(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("unsupported database driver: %s", driver)
 	}
 
-	return NewDB(dsn)
+	return NewDBWithDriver(driver, dsn)
+}
+
+// NewDBWithDriver creates a new database connection using the specified driver.
+// This avoids falling back to a different database when a driver is explicitly configured.
+func NewDBWithDriver(driver, dsn string) (*DB, error) {
+	switch driver {
+	case "postgres", "postgresql":
+		sqlDB, err := sql.Open("postgres", dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open postgres database: %w", err)
+		}
+		if err := sqlDB.Ping(); err != nil {
+			sqlDB.Close()
+			return nil, fmt.Errorf("failed to ping postgres database: %w", err)
+		}
+		return &DB{DB: sqlDB, Driver: "postgres"}, nil
+	case "sqlite", "sqlite3":
+		sqlDB, err := sql.Open("sqlite3", dsn)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open sqlite database: %w", err)
+		}
+		if err := sqlDB.Ping(); err != nil {
+			sqlDB.Close()
+			return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
+		}
+		return &DB{DB: sqlDB, Driver: "sqlite3"}, nil
+	default:
+		return nil, fmt.Errorf("unsupported database driver: %s", driver)
+	}
 }
 
 // NewDB creates a new database connection
@@ -81,10 +110,11 @@ func (db *DB) RebindPlaceholders(query string) string {
 //
 // Deprecated: Use RebindPlaceholders() for clarity. Rebind will be removed in v3.0.
 // Migration:
-//   // Old
-//   sql := db.Rebind(query)
-//   // New
-//   sql := db.RebindPlaceholders(query)
+//
+//	// Old
+//	sql := db.Rebind(query)
+//	// New
+//	sql := db.RebindPlaceholders(query)
 func (db *DB) Rebind(query string) string {
 	return db.RebindPlaceholders(query)
 }
@@ -94,3 +124,4 @@ var paramRegex = regexp.MustCompile(`\$([0-9]+)`)
 func rebindPostgresToSQLite(query string) string {
 	return paramRegex.ReplaceAllString(query, "?$1")
 }
+

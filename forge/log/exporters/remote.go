@@ -137,3 +137,4 @@ func (w *remoteWriter) Sync() error {
 	}
 	return nil
 }
+

@@ -2,7 +2,7 @@ package customers
 
 import (
 	"context"
-	
+
 	"github.com/forgego/forge/api"
 	"github.com/forgego/forge/db"
 )
@@ -20,7 +20,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"name", "created_at"},
 		PerPage:      20,
 	})
-	
+
 	// Customer API
 	router.Register("customers", &api.ViewSetConfig{
 		Model:        &Customer{},
@@ -32,7 +32,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"first_name", "last_name", "created_at", "-total_spent"},
 		PerPage:      20,
 	})
-	
+
 	// Address API
 	router.Register("addresses", &api.ViewSetConfig{
 		Model:        &Address{},
@@ -44,7 +44,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"customer_id", "-is_default_shipping", "-is_default_billing"},
 		PerPage:      20,
 	})
-	
+
 	// WishList API
 	router.Register("wish-lists", &api.ViewSetConfig{
 		Model:        &WishList{},
@@ -56,7 +56,7 @@ func RegisterAPI(ctx context.Context, router *api.Router, database *db.DB) {
 		Ordering:     []string{"customer_id", "-is_default", "-created_at"},
 		PerPage:      20,
 	})
-	
+
 	// WishListItem API
 	router.Register("wish-list-items", &api.ViewSetConfig{
 		Model:        &WishListItem{},

@@ -9,7 +9,7 @@ import (
 var (
 	// schemaNameRegistry maps type names to reflect.Type
 	schemaNameRegistry = make(map[string]reflect.Type)
-	schemaNameMu      sync.RWMutex
+	schemaNameMu       sync.RWMutex
 )
 
 // RegisterModelType registers a model type by name
@@ -51,7 +51,7 @@ func GetModelSchemaByType(typ reflect.Type) (*ModelSchema, error) {
 	// Try to build schema from type
 	// This requires the type to implement schema.Schema interface
 	instanceValue := reflect.New(typ).Elem()
-	
+
 	// Try to get schema interface
 	schemaInstance, ok := instanceValue.Interface().(interface {
 		Fields() interface{} // Would need actual schema.Schema
@@ -78,3 +78,6 @@ func getRegisteredTypeNames() []string {
 	}
 	return names
 }
+
+
+

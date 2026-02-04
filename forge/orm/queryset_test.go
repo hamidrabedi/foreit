@@ -227,11 +227,11 @@ type testModel struct {
 // Fields returns field definitions
 func (testModel) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().Build(),
-		schema.String("email").Build(),
-		schema.Float64("price").Default(0.0).Build(),
-		schema.Bool("available").Default(true).Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required()),
+		schema.StringField("email"),
+		schema.Float64Field("price", schema.Default(0.0)),
+		schema.BoolField("available", schema.Default(true)),
 	}
 }
 

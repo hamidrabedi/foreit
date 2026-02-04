@@ -2,16 +2,14 @@ package service
 
 import (
 	"context"
-	"database/sql"
 	"testing"
 
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/identity/repository"
+	"github.com/forgego/forge/identity/testutils"
 	"github.com/forgego/forge/identity/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	_ "github.com/mattn/go-sqlite3"
 )
 
 func setupUserServiceTest(t *testing.T) (UserService, *db.DB, context.Context) {
@@ -23,53 +21,7 @@ func setupUserServiceTest(t *testing.T) (UserService, *db.DB, context.Context) {
 }
 
 func setupTestDB(t *testing.T) *db.DB {
-	sqlDB, err := sql.Open("sqlite3", ":memory:")
-	require.NoError(t, err)
-	// Ensure single connection for in-memory DB
-	sqlDB.SetMaxOpenConns(1)
-
-	testDB := &db.DB{DB: sqlDB, Driver: "sqlite3"}
-
-	_, err = testDB.Exec(`
-		CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			username VARCHAR(150) UNIQUE NOT NULL,
-			email VARCHAR(254) UNIQUE NOT NULL,
-			password VARCHAR(128) NOT NULL,
-			first_name VARCHAR(150),
-			last_name VARCHAR(150),
-			bio TEXT,
-			website VARCHAR(255),
-			location VARCHAR(255),
-			avatar VARCHAR(255),
-			phone_number VARCHAR(20),
-			phone_verified BOOLEAN DEFAULT 0,
-			timezone VARCHAR(50),
-			locale VARCHAR(10),
-			language VARCHAR(10),
-			is_active BOOLEAN DEFAULT 1,
-			is_staff BOOLEAN DEFAULT 0,
-			is_superuser BOOLEAN DEFAULT 0,
-			is_locked BOOLEAN DEFAULT 0,
-			email_verified BOOLEAN DEFAULT 0,
-			password_changed_at TIMESTAMP,
-			password_expires_at TIMESTAMP,
-			must_change_password BOOLEAN DEFAULT 0,
-			locked_at TIMESTAMP,
-			locked_reason VARCHAR(255),
-			failed_login_attempts INTEGER DEFAULT 0,
-			last_failed_login_at TIMESTAMP,
-			email_verified_at TIMESTAMP,
-			date_joined TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			last_login TIMESTAMP,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			deleted_at TIMESTAMP
-		);
-	`)
-	require.NoError(t, err)
-
-	return testDB
+	return testutils.SetupTestDB(t)
 }
 
 func TestUserService_Register(t *testing.T) {
@@ -232,20 +184,30 @@ func TestUserService_UpdateUser(t *testing.T) {
 	})
 
 	t.Run("fails to update with duplicate email", func(t *testing.T) {
-		// Create second user
-		user2, _ := service.Register(ctx, &RegisterRequest{
-			Username: "user2",
-			Email:    "user2@example.com",
+		// Create user A
+		userA, err := service.Register(ctx, &RegisterRequest{
+			Username: "userA",
+			Email:    "usera@example.com",
 			Password: "password123",
 		})
+		require.NoError(t, err)
 
-		// Try to update user2's email to user1's email
-		duplicateEmail := user.Email
+		// Create user B
+		userB, err := service.Register(ctx, &RegisterRequest{
+			Username: "userB",
+			Email:    "userb@example.com",
+			Password: "password123",
+		})
+		require.NoError(t, err)
+
+		// Try to update userB's email to userA's email
+		duplicateEmail := userA.Email
 		updateReq := &UpdateUserRequest{
 			Email: &duplicateEmail,
 		}
-		_, err := service.UpdateUser(ctx, user2.ID, updateReq)
+		_, err = service.UpdateUser(ctx, userB.ID, updateReq)
 		assert.Error(t, err)
+		assert.Equal(t, ErrEmailExists, err)
 	})
 }
 
@@ -365,7 +327,7 @@ func TestUserService_UpdateUser_Deactivate(t *testing.T) {
 
 		// Verify user exists in database
 		var count int
-		err = testDB.QueryRow("SELECT COUNT(*) FROM users WHERE id = ? AND deleted_at IS NULL", user.ID).Scan(&count)
+		err = testDB.QueryRow("SELECT COUNT(*) FROM users WHERE id = $1 AND deleted_at IS NULL", user.ID).Scan(&count)
 		require.NoError(t, err)
 		require.Equal(t, 1, count, "User should exist in database")
 
@@ -396,7 +358,7 @@ func TestUserService_UpdateUser_ChangeEmail(t *testing.T) {
 
 		// Verify user exists in database
 		var count int
-		err = testDB.QueryRow("SELECT COUNT(*) FROM users WHERE id = ? AND deleted_at IS NULL", user.ID).Scan(&count)
+		err = testDB.QueryRow("SELECT COUNT(*) FROM users WHERE id = $1 AND deleted_at IS NULL", user.ID).Scan(&count)
 		require.NoError(t, err)
 		require.Equal(t, 1, count, "User should exist in database")
 

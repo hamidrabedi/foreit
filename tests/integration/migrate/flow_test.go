@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/forgego/forge/db"
-	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/db/migrate"
 	"github.com/forgego/forge/tests/infra/docker"
 	"github.com/forgego/forge/tests/infra/filesystem"
 )
@@ -21,7 +21,7 @@ import (
 func TestMigrationFlow_MigrateToVersion(t *testing.T) {
 	opts := docker.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",
@@ -145,7 +145,7 @@ func (Item%d) Relations() []schema.Relation {
 func TestMigrationFlow_NoChangesDetected(t *testing.T) {
 	opts := docker.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",

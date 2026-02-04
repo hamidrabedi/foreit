@@ -43,6 +43,11 @@ func RegisterWithSite[T any](s *Site, config *core.Config[T]) (*core.Admin[T], e
 		return nil, err
 	}
 
+	// Set DB if available on site
+	if s.db != nil {
+		manager.SetDB(s.db)
+	}
+
 	// Create admin instance
 	admin, err := core.NewAdmin(schemaInstance, manager, config)
 	if err != nil {

@@ -2,13 +2,18 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/forgego/forge/admin"
-	"github.com/go-chi/chi/v5"
+	"github.com/forgego/forge/api"
+	"github.com/forgego/forge/db"
+	"github.com/forgego/forge/server"
 	"github.com/go-chi/chi/v5/middleware"
+	_ "github.com/lib/pq" // Import postgres driver
 
 	"examples/ecommerce/app/catalog"
 	"examples/ecommerce/app/customers"
@@ -23,23 +28,83 @@ func main() {
 	ctx := context.Background()
 	fmt.Println("🛒 Forge Ecommerce System")
 	fmt.Println("=" + string(make([]byte, 50)))
-	
-	// Initialize Admin Site
+    
+    // 1. Initialize Database
+    // Ensure Postgres is running and database 'forge_ecommerce' exists
+    // We try to create it if it doesn't exist
+    defaultDSN := "postgres://postgres:123@127.0.0.1:5432/postgres?sslmode=disable"
+    if defaultDB, err := sql.Open("postgres", defaultDSN); err == nil {
+        defer defaultDB.Close()
+        var exists bool
+        defaultDB.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = 'forge_ecommerce')").Scan(&exists)
+        if !exists {
+            if _, err := defaultDB.Exec("CREATE DATABASE forge_ecommerce"); err != nil {
+                log.Printf("Warning: Failed to create database: %v", err)
+            } else {
+                log.Println("Created database forge_ecommerce")
+            }
+        }
+    }
+
+    dsn := "postgres://postgres:123@127.0.0.1:5432/forge_ecommerce?sslmode=disable"
+	database, err := db.NewDB(dsn)
+	if err != nil {
+		log.Printf("Failed to connect to database: %v", err)
+        log.Fatal("Make sure Postgres is running and database 'forge_ecommerce' exists.")
+	}
+    defer database.Close()
+    
+    // 2. Setup Schema
+    SetupSchema(database)
+    
+    // 3. Initialize Apps
+    catalog.Init(database)
+    customers.Init(database)
+    inventory.Init(database)
+    marketing.Init(database)
+    orders.Init(database)
+    
+    // 4. Initialize Admin Site
 	adminSite := admin.DefaultSite
 	adminSite.Title = "Forge Ecommerce Admin"
 	
+	// Set UI Prefix
+	uiConfig := adminSite.GetUIConfig()
+	uiConfig.Prefix = "/admin"
+	adminSite.WithUIConfig(uiConfig)
+
+	adminSite.SetDB(database)
+	
 	// Register application admins
 	catalog.RegisterAdmin(ctx)
-	orders.RegisterAdmin(ctx)
 	customers.RegisterAdmin(ctx)
 	inventory.RegisterAdmin(ctx)
 	marketing.RegisterAdmin(ctx)
+	orders.RegisterAdmin(ctx)
+	
+	// Register Plugins
+	adminSite.RegisterPlugin(ctx, &ReportsPlugin{})
 
-	// Create a new Router
-	r := chi.NewRouter()
+	// Setup Dashboard
+	SetupDashboard()
+
+	// 5. Setup API Router
+    apiRouter := api.NewRouter("/api/v1")
+    catalog.RegisterAPI(ctx, apiRouter, database)
+    customers.RegisterAPI(ctx, apiRouter, database)
+    inventory.RegisterAPI(ctx, apiRouter, database)
+    marketing.RegisterAPI(ctx, apiRouter, database)
+    orders.RegisterAPI(ctx, apiRouter, database)
+
+	// 6. Create Server Router
+	r := server.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
+	r.Use(middleware.Timeout(60 * time.Second))
 	
+    // Register API routes
+    apiRouter.RegisterRoutes(r)
+
 	// Admin handler (handles both REST API and UI)
 	r.Mount("/admin", adminSite.Handler())
 	
@@ -52,7 +117,7 @@ func main() {
 	// Homepage
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		fmt.Fprintf(w, `
+        fmt.Fprintf(w, `
 <!DOCTYPE html>
 <html>
 <head>
@@ -60,48 +125,23 @@ func main() {
 	<style>
 		body { font-family: Inter, system-ui, sans-serif; max-width: 900px; margin: 50px auto; padding: 20px; background: #0f172a; color: #f8fafc; }
 		h1 { color: #38bdf8; border-bottom: 2px solid #334155; padding-bottom: 10px; }
-		.section { margin: 20px 0; padding: 20px; background: #1e293b; border-radius: 12px; border: 1px solid #334155; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
-		.section h2 { color: #7dd3fc; margin-top: 0; }
 		a { color: #38bdf8; text-decoration: none; font-weight: 500; }
 		a:hover { color: #7dd3fc; }
-		ul { list-style: none; padding: 0; }
-		li { margin: 10px 0; padding: 12px; background: #334155; border-radius: 8px; border-left: 4px solid #38bdf8; }
-		.badge { background: #0ea5e9; color: white; padding: 2px 8px; border-radius: 6px; font-size: 11px; margin-left: 10px; font-weight: bold; }
-		.btn-admin { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; border-radius: 8px; font-weight: bold; margin-top: 20px; transition: all 0.2s; }
-		.btn-admin:hover { background: #0284c7; transform: translateY(-1px); }
+		.btn { display: inline-block; background: #0ea5e9; color: white; padding: 12px 24px; border-radius: 8px; margin-right: 10px; }
 	</style>
 </head>
 <body>
 	<h1>🛒 Forge Ecommerce</h1>
-	<p><strong>Experience the next generation of Admin Frameworks</strong></p>
-	
-	<div class="section">
-		<h2>🚀 Premium Admin Experience</h2>
-		<p>The entire admin interface is now powered by our new, world-class system featuring:</p>
-		<ul>
-			<li>✨ <strong>High-Performance UI</strong> - Built with React 18, Vite, and Shadcn UI</li>
-			<li>📊 <strong>Dynamic Dashboards</strong> - Auto-generated analytics and charts</li>
-			<li>🛠️ <strong>Deep Customization</strong> - Full override engine for every component</li>
-			<li>🔗 <strong>Smart Relations</strong> - Advanced M2M and FK handling</li>
-		</ul>
-		<a href="/admin/" class="btn-admin">Launch Admin Panel</a>
-	</div>
-	
-	<div class="section">
-		<h2>📊 Project Statistics</h2>
-		<ul>
-			<li>📈 <strong>Total Models:</strong> 29 (Across 5 applications)</li>
-			<li>🔧 <strong>Deep Customization:</strong> 100% Component & Template Overrides</li>
-			<li>🛠️ <strong>Automated Logic:</strong> AI-driven smart filtering and search</li>
-		</ul>
-	</div>
-
-	<footer style="margin-top: 40px; text-align: center; color: #64748b; font-size: 0.875rem;">
-		<p>Built with ❤️ using the new Forge World-Class Admin Framework</p>
-	</footer>
+	<p>Example application showcasing the Forge Framework.</p>
+    <p>
+        <a href="/admin/" class="btn">Admin Panel</a>
+        <a href="/api/v1/categories" class="btn">Categories API</a>
+        <a href="/api/v1/products" class="btn">Products API</a>
+        <a href="/api/v1/orders" class="btn">Orders API</a>
+    </p>
 </body>
 </html>
-		`)
+`)
 	})
 	
 	port := ":8003"

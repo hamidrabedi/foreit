@@ -48,3 +48,4 @@ dist/
 build/
 
 helper-projects
+node_modules

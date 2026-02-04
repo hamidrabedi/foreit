@@ -11,6 +11,7 @@ import (
 	"github.com/forgego/forge/admin/api/rest"
 	"github.com/forgego/forge/admin/core"
 	"github.com/forgego/forge/admin/ui"
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/server"
 )
 
@@ -21,6 +22,7 @@ type Site struct {
 	Header     string
 	IndexTitle string
 	SiteURL    string
+	db         *db.DB
 	registry   *core.Registry
 	uiConfig   UIConfig
 }
@@ -68,6 +70,16 @@ func (s *Site) WithUIConfig(config UIConfig) *Site {
 	return s
 }
 
+// SetDB sets the database connection for the site and all registered admins
+func (s *Site) SetDB(database *db.DB) *Site {
+	s.db = database
+	// Propagate to existing admins
+	for _, admin := range s.registry.GetAll() {
+		admin.SetDB(database)
+	}
+	return s
+}
+
 // GetUIConfig returns the current UI configuration
 func (s *Site) GetUIConfig() UIConfig {
 	return s.uiConfig
@@ -83,7 +95,7 @@ func (s *Site) RegisterPlugin(ctx context.Context, p core.Plugin) error {
 	if err := s.registry.RegisterPlugin(p); err != nil {
 		return err
 	}
-	return p.Initialize(ctx, s)
+	return p.Init(ctx, s)
 }
 
 // IndexView handles the admin index/dashboard
@@ -101,9 +113,13 @@ func (s *Site) IndexView() http.HandlerFunc {
 		}
 
 		allPlugins := s.registry.GetAllPlugins()
-		plugins := make([]core.PluginMetadata, 0, len(allPlugins))
+		plugins := make([]map[string]interface{}, 0, len(allPlugins))
 		for _, p := range allPlugins {
-			plugins = append(plugins, p.GetMetadata())
+			plugins = append(plugins, map[string]interface{}{
+				"id":          p.ID(),
+				"name":        p.Name(),
+				"menuEntries": p.GetMenuItems(),
+			})
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -126,38 +142,33 @@ func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 func (s *Site) Handler() http.Handler {
 	r := chi.NewRouter()
 
-	// Test route to verify handler is working
-	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte("Admin handler is working!"))
-	})
-
 	// 1. Register API Routes
 	apiRouter := rest.NewRouter(s.registry)
 	apiRouter.RegisterRoutes(r)
-
-	// Register Plugin Routes
-	for _, p := range s.registry.GetAllPlugins() {
-		p.RegisterRoutes(r)
-	}
 
 	// 2. Serve Static UI Assets
 	prefix := s.uiConfig.Prefix
 	
 	// Determine the route pattern
+	// Since we might be mounted, we should use a wildcard that matches everything passed to this handler
+	// If prefix is set, StaticFS will handle stripping it from the path
 	routePattern := "/*"
-	if prefix != "" {
-		routePattern = prefix + "/*"
-	}
 
 	if s.uiConfig.Source == UISourceStatic && s.uiConfig.StaticDir != "" {
 		// Serve from local directory
-		r.Handle(routePattern, server.StaticFiles("", s.uiConfig.StaticDir, server.WithPrefix(prefix), server.WithIndexFiles("index.html")))
+		handler := server.StaticFiles("", s.uiConfig.StaticDir, server.WithPrefix(prefix), server.WithIndexFiles("index.html"), server.WithFallback("index.html"))
+		r.Handle(routePattern, handler)
+		if prefix == "" {
+			r.Handle("/", handler)
+		}
 	} else if s.uiConfig.Source == UISourceEmbedded && s.uiConfig.EmbedFS != nil {
 		// Serve from embedded FS
-		r.Handle(routePattern, server.StaticFS("", s.uiConfig.EmbedFS, server.WithPrefix(prefix), server.WithIndexFiles("index.html")))
+		handler := server.StaticFS("", s.uiConfig.EmbedFS, server.WithPrefix(prefix), server.WithIndexFiles("index.html"), server.WithFallback("index.html"), server.WithDisableCache(true))
+		r.Handle(routePattern, handler)
+		if prefix == "" {
+			r.Handle("/", handler)
+		}
 	}
 
 	return r
 }
-

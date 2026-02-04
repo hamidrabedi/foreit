@@ -132,6 +132,8 @@ type BaseQuerySet[T any] struct {
 	selectRelated   []string
 	prefetchRelated []string
 	preloaded       map[string]bool // Track which relations are preloaded (N+1 prevention)
+	joins           []string
+	joinMap         map[string]bool
 	aggregates      []Aggregate
 	annotations     []AnnotationExpr // Using existing AnnotationExpr type
 	db              interface{}      // *db.DB
@@ -155,6 +157,8 @@ func NewQuerySet[T any](tableName string) (QuerySet[T], error) {
 		excludes:   []Expression{},
 		orderBy:    []OrderField{},
 		preloaded:  make(map[string]bool),
+		joins:      []string{},
+		joinMap:    make(map[string]bool),
 	}, nil
 }
 
@@ -189,6 +193,8 @@ func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 		selectRelated:   append([]string{}, qs.selectRelated...),
 		prefetchRelated: append([]string{}, qs.prefetchRelated...),
 		preloaded:       make(map[string]bool),
+		joins:           append([]string{}, qs.joins...),
+		joinMap:         make(map[string]bool),
 		aggregates:      append([]Aggregate{}, qs.aggregates...),
 		annotations:     append([]AnnotationExpr{}, qs.annotations...),
 		db:              qs.db,
@@ -196,6 +202,10 @@ func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 	// Copy preloaded map
 	for k, v := range qs.preloaded {
 		clone.preloaded[k] = v
+	}
+	// Copy joinMap
+	for k, v := range qs.joinMap {
+		clone.joinMap[k] = v
 	}
 	return clone
 }
@@ -428,12 +438,25 @@ func (qs *BaseQuerySet[T]) All(ctx context.Context) ([]*T, error) {
 	}
 	defer rows.Close()
 
-	return qs.scanRows(rows)
+	results, err := qs.scanRows(rows)
+	if err != nil {
+		return nil, err
+	}
+
+	// Prefetch related objects
+	if err := qs.prefetch(ctx, results); err != nil {
+		return nil, err
+	}
+
+	return results, nil
 }
 
 // buildSQL builds the SQL query
 func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	builder := NewSQLBuilder()
+
+	// Build JOINs first (populates qs.joins and qs.joinMap)
+	qs.buildJoinClause(builder)
 
 	// Build SELECT clause
 	selectClause := qs.buildSelectClause(builder)
@@ -453,6 +476,9 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 
 	// Combine all parts
 	parts := []string{selectClause, fromClause}
+	if len(qs.joins) > 0 {
+		parts = append(parts, strings.Join(qs.joins, " "))
+	}
 	if whereClause != "" {
 		parts = append(parts, whereClause)
 	}
@@ -471,6 +497,80 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	args = append(args, whereArgs...)
 
 	return sql, args, nil
+}
+
+// buildJoinClause builds the JOIN clause
+func (qs *BaseQuerySet[T]) buildJoinClause(builder *SQLBuilder) {
+	qs.joins = []string{}
+	qs.joinMap = make(map[string]bool)
+
+	for _, path := range qs.selectRelated {
+		if qs.joinMap[path] {
+			continue
+		}
+
+		// Resolve path to relation
+		// For MVP, support single level: "User"
+		rel := qs.schema.GetRelation(path)
+		if rel == nil {
+			continue
+		}
+
+		// Get target schema
+		targetSchema, err := GetModelSchemaByName(rel.TargetModel)
+		if err != nil {
+			continue
+		}
+
+		joinTable := EscapeIdentifier(targetSchema.TableName)
+		alias := EscapeIdentifier(rel.Name)
+		mainTable := EscapeIdentifier(qs.table)
+
+		// Try to find the FK column
+		// Strategy:
+		// 1. Look for field with DBColumn = rel.Name + "_id" (lowercase)
+		// 2. Look for field with Name = rel.Name + "ID"
+		fkColumn := ""
+		
+		// Try to find field that corresponds to this relation
+		for _, f := range qs.schema.Fields {
+			// Check common naming conventions
+			if f.StructFieldName == rel.Name+"ID" {
+				fkColumn = f.DBColumn
+				break
+			}
+			if strings.EqualFold(f.DBColumn, rel.Name+"_id") {
+				fkColumn = f.DBColumn
+				break
+			}
+			// Fallback: if field name ends in ID and matches relation prefix
+			if strings.HasSuffix(f.Name, "ID") && strings.HasPrefix(f.Name, rel.Name) {
+				fkColumn = f.DBColumn
+				break
+			}
+		}
+
+		if fkColumn == "" {
+			// Try "user_id" for "User" relation
+			guess := strings.ToLower(rel.Name) + "_id"
+			if f := qs.schema.GetField(guess); f != nil {
+				fkColumn = f.DBColumn
+			}
+		}
+		
+		if fkColumn == "" {
+			continue // Could not determine join condition
+		}
+
+		// JOIN target_table "Alias" ON main_table.fk = "Alias".pk
+		joinSQL := fmt.Sprintf("LEFT OUTER JOIN %s %s ON %s.%s = %s.%s",
+			joinTable, alias,
+			mainTable, EscapeIdentifier(fkColumn),
+			alias, EscapeIdentifier(targetSchema.PrimaryKey))
+		
+		qs.joins = append(qs.joins, joinSQL)
+		qs.joinMap[path] = true
+	}
 }
 
 // buildSelectClause builds the SELECT clause
@@ -511,6 +611,30 @@ func (qs *BaseQuerySet[T]) buildSelectClause(builder *SQLBuilder) string {
 		selectClause += "DISTINCT "
 	}
 	selectClause += strings.Join(fields, ", ")
+
+	// Add related fields
+	for _, path := range qs.selectRelated {
+		if !qs.joinMap[path] {
+			continue
+		}
+		rel := qs.schema.GetRelation(path)
+		if rel == nil {
+			continue
+		}
+		targetSchema, err := GetModelSchemaByName(rel.TargetModel)
+		if err != nil {
+			continue
+		}
+
+		// Select all fields from target schema
+		for _, f := range targetSchema.Fields {
+			alias := EscapeIdentifier(rel.Name)
+			col := EscapeIdentifier(f.DBColumn)
+			colAlias := EscapeIdentifier(rel.Name + "__" + f.DBColumn)
+
+			selectClause += fmt.Sprintf(", %s.%s AS %s", alias, col, colAlias)
+		}
+	}
 
 	return selectClause
 }
@@ -595,10 +719,15 @@ func (qs *BaseQuerySet[T]) scanRows(rows *sql.Rows) ([]*T, error) {
 	var results []*T
 	for rows.Next() {
 		instance := new(T)
-		scanArgs := qs.prepareScanArgs(instance, columns, fieldMap)
+		scanArgs, postScan := qs.prepareScanArgs(instance, columns, fieldMap)
 
 		if err := rows.Scan(scanArgs...); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %w", err)
+		}
+
+		// Post-process related fields
+		if postScan != nil {
+			postScan()
 		}
 
 		results = append(results, instance)
@@ -611,14 +740,58 @@ func (qs *BaseQuerySet[T]) scanRows(rows *sql.Rows) ([]*T, error) {
 	return results, nil
 }
 
+type scanField struct {
+	fieldInfo    *FieldInfo
+	relationName string
+}
+
 // buildFieldMap creates a mapping from column names to field info
-func (qs *BaseQuerySet[T]) buildFieldMap(columns []string) map[string]*FieldInfo {
-	fieldMap := make(map[string]*FieldInfo)
+func (qs *BaseQuerySet[T]) buildFieldMap(columns []string) map[string]scanField {
+	fieldMap := make(map[string]scanField)
 	for _, col := range columns {
+		// Check related columns first (Relation__Column)
+		if strings.Contains(col, "__") {
+			parts := strings.SplitN(col, "__", 2)
+			relName := parts[0]
+			relCol := parts[1]
+
+			if !qs.joinMap[relName] {
+				// Might be a manual alias or something else, skip relation logic
+				continue
+			}
+
+			rel := qs.schema.GetRelation(relName)
+			if rel == nil {
+				continue
+			}
+			targetSchema, err := GetModelSchemaByName(rel.TargetModel)
+			if err != nil {
+				continue
+			}
+
+			// Find field in target schema
+			var targetField *FieldInfo
+			for i := range targetSchema.Fields {
+				f := &targetSchema.Fields[i]
+				if strings.EqualFold(f.DBColumn, relCol) || strings.EqualFold(f.Name, relCol) {
+					targetField = f
+					break
+				}
+			}
+
+			if targetField != nil {
+				fieldMap[col] = scanField{
+					fieldInfo:    targetField,
+					relationName: relName,
+				}
+				continue
+			}
+		}
+
 		for i := range qs.schema.Fields {
 			field := &qs.schema.Fields[i]
 			if strings.EqualFold(field.DBColumn, col) || strings.EqualFold(field.Name, col) {
-				fieldMap[col] = field
+				fieldMap[col] = scanField{fieldInfo: field}
 				break
 			}
 		}
@@ -627,28 +800,123 @@ func (qs *BaseQuerySet[T]) buildFieldMap(columns []string) map[string]*FieldInfo
 }
 
 // prepareScanArgs prepares scan arguments using schema
-func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldMap map[string]*FieldInfo) []interface{} {
+func (qs *BaseQuerySet[T]) prepareScanArgs(instance *T, columns []string, fieldMap map[string]scanField) ([]interface{}, func()) {
 	scanArgs := make([]interface{}, len(columns))
 	instanceValue := reflect.ValueOf(instance).Elem()
 
+	// Map relationName -> map[fieldName]holder
+	relatedHolders := make(map[string]map[string]*interface{})
+
 	for i, col := range columns {
-		fieldInfo, ok := fieldMap[col]
+		info, ok := fieldMap[col]
 		if !ok {
 			var val interface{}
 			scanArgs[i] = &val
 			continue
 		}
 
-		field := instanceValue.FieldByName(fieldInfo.Name)
-		if field.IsValid() && field.CanSet() {
-			scanArgs[i] = field.Addr().Interface()
+		if info.relationName != "" {
+			// Related field
+			holder := new(interface{})
+			scanArgs[i] = holder
+
+			if relatedHolders[info.relationName] == nil {
+				relatedHolders[info.relationName] = make(map[string]*interface{})
+			}
+			relatedHolders[info.relationName][info.fieldInfo.Name] = holder
 		} else {
-			var val interface{}
-			scanArgs[i] = &val
+			// Local field
+			field := instanceValue.FieldByName(info.fieldInfo.Name)
+			if info.fieldInfo.StructFieldName != "" {
+				field = instanceValue.FieldByName(info.fieldInfo.StructFieldName)
+			}
+			if field.IsValid() && field.CanSet() {
+				scanArgs[i] = field.Addr().Interface()
+			} else {
+				var val interface{}
+				scanArgs[i] = &val
+			}
 		}
 	}
 
-	return scanArgs
+	postScan := func() {
+		for relName, fields := range relatedHolders {
+			rel := qs.schema.GetRelation(relName)
+			if rel == nil {
+				continue
+			}
+
+			targetSchema, err := GetModelSchemaByName(rel.TargetModel)
+			if err != nil {
+				continue
+			}
+
+			// Check PK
+			pkField := targetSchema.PrimaryKey
+			// Find holder for PK
+			var pkFieldName string
+			for _, f := range targetSchema.Fields {
+				if f.DBColumn == pkField {
+					pkFieldName = f.Name
+					break
+				}
+			}
+
+			pkHolder, ok := fields[pkFieldName]
+			if !ok || pkHolder == nil || *pkHolder == nil {
+				continue // No PK -> relation is nil
+			}
+
+			// Allocate relation struct
+			relField := instanceValue.FieldByName(relName)
+			// Handle pointer to struct
+			if relField.IsValid() && relField.CanSet() && relField.Kind() == reflect.Ptr {
+				val := reflect.New(relField.Type().Elem())
+				relField.Set(val)
+
+				nestedVal := val.Elem()
+
+				// Populate fields
+				for fName, holder := range fields {
+					if holder == nil || *holder == nil {
+						continue
+					}
+
+					fInfo := targetSchema.GetField(fName)
+					if fInfo == nil {
+						continue
+					}
+
+					structField := nestedVal.FieldByName(fInfo.Name)
+					if fInfo.StructFieldName != "" {
+						structField = nestedVal.FieldByName(fInfo.StructFieldName)
+					}
+
+					if structField.IsValid() && structField.CanSet() {
+						setFieldValue(structField, *holder)
+					}
+				}
+			}
+		}
+	}
+
+	return scanArgs, postScan
+}
+
+// Helper to set field value with type conversion
+func setFieldValue(field reflect.Value, value interface{}) {
+	val := reflect.ValueOf(value)
+	if val.Type().ConvertibleTo(field.Type()) {
+		field.Set(val.Convert(field.Type()))
+	} else {
+		// Handle []byte to string
+		if b, ok := value.([]byte); ok && field.Kind() == reflect.String {
+			field.SetString(string(b))
+			return
+		}
+		// Handle int64/float64 mismatch if needed
+		// For now rely on basic conversion or driver compatibility
+	}
 }
 
 // Get retrieves a single model instance from the filtered queryset.
@@ -729,7 +997,7 @@ func (qs *BaseQuerySet[T]) Count(ctx context.Context) (int64, error) {
 
 	builder := NewSQLBuilder()
 	selectClause := fmt.Sprintf("SELECT COUNT(*) FROM %s", EscapeIdentifier(qs.table))
-	whereClause, whereArgs := qs.buildWhereClause(builder)
+	whereClause, _ := qs.buildWhereClause(builder)
 
 	sql := selectClause
 	if whereClause != "" {
@@ -737,7 +1005,7 @@ func (qs *BaseQuerySet[T]) Count(ctx context.Context) (int64, error) {
 	}
 
 	var count int64
-	err = db.QueryRowContext(ctx, sql, whereArgs...).Scan(&count)
+	err = db.QueryRowContext(ctx, sql, builder.Args()...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("count query failed: %w", err)
 	}
@@ -766,7 +1034,6 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 
 	// Build SET clause
 	var setParts []string
-	var updateArgs []interface{}
 
 	for fieldName, value := range updates {
 		escapedField := EscapeIdentifier(fieldName)
@@ -774,27 +1041,23 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 		// Check if value is an Expression
 		if expr, ok := value.(Expression); ok {
 			// Build expression SQL
-			exprSQL, exprArgs, err := expr.ToSQL(builder)
+			exprSQL, _, err := expr.ToSQL(builder)
 			if err != nil {
 				return 0, fmt.Errorf("failed to build expression SQL for field %s: %w", fieldName, err)
 			}
 			setParts = append(setParts, fmt.Sprintf("%s = %s", escapedField, exprSQL))
-			updateArgs = append(updateArgs, exprArgs...)
 		} else {
 			// Regular value
 			placeholder := builder.AddArg(value)
 			setParts = append(setParts, fmt.Sprintf("%s = %s", escapedField, placeholder))
-			updateArgs = append(updateArgs, value)
 		}
 	}
 
 	// Build WHERE clause
-	whereClause, whereArgs := qs.buildWhereClause(builder)
+	whereClause, _ := qs.buildWhereClause(builder)
 
 	// Combine all args
 	allArgs := builder.Args()
-	allArgs = append(allArgs, updateArgs...)
-	allArgs = append(allArgs, whereArgs...)
 
 	// Build SQL
 	updateSQL := fmt.Sprintf("UPDATE %s SET %s", EscapeIdentifier(qs.table), strings.Join(setParts, ", "))
@@ -841,8 +1104,11 @@ func (qs *BaseQuerySet[T]) Delete(ctx context.Context) (int64, error) {
 		deleteSQL += " " + whereClause
 	}
 
+	args := builder.Args()
+	args = append(args, whereArgs...)
+
 	// Execute
-	result, err := db.ExecContext(ctx, deleteSQL, whereArgs...)
+	result, err := db.ExecContext(ctx, deleteSQL, args...)
 	if err != nil {
 		return 0, fmt.Errorf("delete query failed: %w", err)
 	}

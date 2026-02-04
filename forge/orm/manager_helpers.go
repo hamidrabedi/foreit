@@ -10,6 +10,7 @@ import (
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/errors"
 	"github.com/forgego/forge/schema"
+	"github.com/forgego/forge/utils"
 )
 
 // ExecuteHooks executes model hooks in the correct order
@@ -125,42 +126,68 @@ func BuildInsertSQL(instance interface{}, tableName string) (sql string, values 
 
 	// Iterate schema fields first, then get values only for those fields
 	schemaFields := schemaInstance.Fields()
+	fmt.Printf("DEBUG: BuildInsertSQL for table %s, fields: %d\n", tableName, len(schemaFields))
 
 	var insertColumns []string
 	var insertPlaceholders []string
 	var insertValues []interface{}
 	columnIndex := 1
 
-	for _, schemaField := range schemaFields {
-		// Skip primary key if auto-increment
-		if schemaField.PrimaryKey && schemaField.AutoIncrement {
-			continue
+	if len(schemaFields) > 0 {
+		for _, schemaField := range schemaFields {
+			if schemaField.PrimaryKey && schemaField.AutoIncrement {
+				continue
+			}
+			fieldValue, err := getFieldValueByName(instance, schemaField.Name)
+			if err != nil {
+				fmt.Printf("DEBUG: Field %s error: %v\n", schemaField.Name, err)
+				continue
+			}
+			fieldValueReflect := reflect.ValueOf(fieldValue)
+			if !schemaField.Required && fieldValueReflect.IsZero() {
+				continue
+			}
+			columnName := schemaField.DBColumn
+			if columnName == "" {
+				columnName = schemaField.Name
+			}
+			insertColumns = append(insertColumns, columnName)
+			insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", columnIndex))
+			insertValues = append(insertValues, fieldValue)
+			columnIndex++
 		}
-
-		// Get field value using helper function
-		fieldValue, err := getFieldValueByName(instance, schemaField.Name)
-		if err != nil {
-			// Field not found or not accessible - skip it
-			continue
+	} else {
+		// Fallback: derive columns from struct fields and tags
+		typ := instanceValue.Type()
+		for i := 0; i < typ.NumField(); i++ {
+			sf := typ.Field(i)
+			// Skip unexported
+			if sf.PkgPath != "" {
+				continue
+			}
+			tag := sf.Tag.Get("db")
+			col := tag
+			if col == "" || col == "-" {
+				col = strings.ToLower(sf.Name)
+			}
+			// Skip id auto-increment
+			if col == "id" {
+				continue
+			}
+			val := instanceValue.Field(i)
+			if !val.IsValid() || !val.CanInterface() {
+				continue
+			}
+			if isZeroValue(val) {
+				continue
+			}
+			insertColumns = append(insertColumns, col)
+			insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", columnIndex))
+			insertValues = append(insertValues, val.Interface())
+			columnIndex++
 		}
-
-		// Check if value is zero and field is not required
-		fieldValueReflect := reflect.ValueOf(fieldValue)
-		if !schemaField.Required && fieldValueReflect.IsZero() {
-			continue
-		}
-
-		// Get column name from schema (DBColumn or Name)
-		columnName := schemaField.DBColumn
-		if columnName == "" {
-			columnName = schemaField.Name
-		}
-
-		insertColumns = append(insertColumns, columnName)
-		insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", columnIndex))
-		insertValues = append(insertValues, fieldValue)
-		columnIndex++
 	}
+	fmt.Printf("DEBUG: Insert columns: %v\n", insertColumns)
 
 	if len(insertColumns) == 0 {
 		return "", nil, nil, fmt.Errorf("no fields to insert")
@@ -201,6 +228,10 @@ func getFieldValueByName(instance interface{}, fieldName string) (interface{}, e
 
 	fieldValue := instanceValue.FieldByName(fieldName)
 	if !fieldValue.IsValid() {
+		// Try PascalCase
+		fieldValue = instanceValue.FieldByName(utils.ToPascal(fieldName))
+	}
+	if !fieldValue.IsValid() {
 		return nil, fmt.Errorf("field %s not found", fieldName)
 	}
 
@@ -209,6 +240,25 @@ func getFieldValueByName(instance interface{}, fieldName string) (interface{}, e
 	}
 
 	return fieldValue.Interface(), nil
+}
+
+func isZeroValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String:
+		return v.Len() == 0
+	case reflect.Bool:
+		return v.Bool() == false
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Pointer, reflect.Interface:
+		return v.IsNil()
+	default:
+		return v.IsZero()
+	}
 }
 
 // BuildUpdateSQL builds an UPDATE SQL statement from a model instance

@@ -1,16 +1,12 @@
 ---
-sidebar_position: 0
-description: Complete architecture documentation for the forge framework. Learn about system architecture, component design, data flows, extension points, and technology stack.
-keywords:
-  - forge architecture
-  - system architecture
-  - component architecture
-  - framework design
-  - forge internals
-image: /img/forge-social-card.jpg
+id: architecture
+title: Architecture
+sidebar_label: Architecture
 ---
 
-# Architecture
+# forge Framework - Architecture Documentation
+
+## Overview
 
 forge is a full-stack web framework for Go that provides Django-like functionality with type safety. This document describes the complete architecture of the framework.
 
@@ -300,7 +296,7 @@ type Schema interface {
 
 **Components:**
 - CSRF protection
-- XSS prevention
+- XSS protection
 - SQL injection prevention
 - Input sanitization
 

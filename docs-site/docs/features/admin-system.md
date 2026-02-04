@@ -1,380 +1,402 @@
 ---
-sidebar_position: 2
-description: Auto-generated Django-style admin interface for forge models. Full CRUD, filtering, search, and more - all type-safe.
-keywords:
-  - forge admin
-  - django admin go
-  - auto-generated admin
-  - crud interface
-  - admin panel
-image: /img/forge-social-card.jpg
+id: admin-system
+title: Admin System
+sidebar_label: Admin System
 ---
 
-# Admin System
+# Admin System Feature
 
-The admin system gives you a complete CRUD interface for your models, automatically. If you've used Django's admin, you know how powerful this is - but forge's version is type-safe and doesn't use reflection magic.
+## Overview
 
-## Getting Started
+The Admin System provides a Django-like admin interface with full type safety using Go generics. It includes complete CRUD operations, filtering, searching, widgets, actions, and export functionality.
 
-Register a model and you're done:
+## Location
+
+`forge/admin/`
+
+## Status
+
+✅ **Complete** - Production ready
+
+## Core Components
+
+### 1. Admin Interface (`admin.go`)
+
+Type-safe admin interface:
 
 ```go
-import "github.com/forgego/forge/admin"
-
-func main() {
-    // Register your models
-    admin.RegisterModel(&models.User{})
-    admin.RegisterModel(&models.Post{})
-    admin.RegisterModel(&models.Category{})
-    
-    // Start your server
-    server.Run()
+type Admin[T any] struct {
+    model   T
+    manager *query.Manager[T]
+    config  *Config[T]
+    name    string
 }
 ```
 
-Visit `/admin/` and you'll see a full admin interface for all your registered models.
+**Key Methods:**
+- `Register()` - Register a model with admin
+- `GetQueryset()` - Get base queryset
+- `SaveModel()` - Save model instance
+- `DeleteModel()` - Delete model instance
+- `HasAddPermission()` - Check add permission
+- `HasChangePermission()` - Check change permission
+- `HasDeletePermission()` - Check delete permission
 
-## Basic Configuration
+### 2. Admin Configuration (`config.go`)
 
-Customize how your model appears in the admin:
+Complete configuration system with all Django admin options:
+
+**List View Configuration:**
+- `ListDisplay` - Fields to display in list view
+- `ListDisplayLinks` - Fields that link to detail view
+- `ListEditable` - Fields editable in list view
+- `ListFilter` - Filters for list view
+- `SearchFields` - Fields searchable in list view
+- `DateHierarchy` - Field for date-based navigation
+- `Ordering` - Default ordering
+- `ListPerPage` - Items per page
+- `ListMaxShowAll` - Maximum items for "show all"
+- `ListSelectRelated` - Fields for select_related optimization
+- `ListPrefetchRelated` - Fields for prefetch_related optimization
+- `ShowFullResultCount` - Show full vs filtered count
+- `PreserveFilters` - Preserve filters when navigating
+- `EmptyValueDisplay` - Display value for empty/null fields
+- `SortableBy` - Fields that can be sorted
+
+**Form Configuration:**
+- `Fields` - Explicit field ordering
+- `Exclude` - Fields to exclude
+- `ReadOnlyFields` - Read-only fields
+- `PrepopulatedFields` - Auto-populated fields
+- `RawIDFields` - Raw ID input for foreign keys
+- `AutocompleteFields` - Autocomplete for foreign keys
+- `RadioFields` - Radio buttons for choices
+- `Fieldsets` - Form field grouping
+- `GetForm` - Custom form generator
+- `GetFields` - Dynamic field list
+- `GetFieldsets` - Dynamic fieldsets
+- `GetReadOnlyFields` - Dynamic read-only fields
+- `GetPrepopulatedFields` - Dynamic prepopulated fields
+
+**Related Models:**
+- `Inlines` - Related model editing
+
+**Actions:**
+- `Actions` - Bulk actions
+
+**Permissions:**
+- `PermissionChecker` - Permission checker
+- `HasAddPermission` - Add permission check
+- `HasChangePermission` - Change permission check
+- `HasDeletePermission` - Delete permission check
+- `HasViewPermission` - View permission check
+- `HasModulePermission` - Module permission check
+
+**View Customization:**
+- `GetQueryset` - Custom queryset hook
+- `SaveModel` - Custom save hook
+- `DeleteModel` - Custom delete hook
+
+**Advanced Features:**
+- `SaveAs` - Show "Save as new" button
+- `SaveAsContinue` - Continue editing after "save as new"
+- `SaveOnTop` - Show save buttons at top
+- `ViewOnSite` - Get URL for viewing object
+- `ShowChangeLink` - Show change link in inlines
+
+**Form Field Customization:**
+- `FormFieldOverrides` - Override widgets for fields
+- `FormFieldForForeignKey` - Custom foreign key field
+- `FormFieldForManyToMany` - Custom many-to-many field
+
+### 3. List View (`list_view.go`)
+
+Complete list view implementation:
+- Pagination
+- Filtering
+- Searching
+- Sorting
+- Bulk actions
+- Export
+
+### 4. Detail View (`detail_view.go`)
+
+Detail view for viewing/editing individual objects:
+- Form rendering
+- Field display
+- Inlines
+- Actions
+
+### 5. Form View (`form_view.go`)
+
+Form handling for create/update:
+- Form generation
+- Form validation
+- Form saving
+- Form errors
+
+### 6. Filters (`filters.go`, `filters_advanced.go`)
+
+Filter system:
+- Boolean filters
+- Choice filters
+- Date filters
+- Number filters
+- Text filters
+- Related filters
+- Custom filters
+
+### 7. Widgets (`widgets.go`, `widgets_advanced.go`)
+
+Form widgets:
+- Text input
+- Textarea
+- Select
+- Checkbox
+- Radio buttons
+- Date picker
+- Time picker
+- DateTime picker
+- File upload
+- Image upload
+- Rich text editor
+- Autocomplete
+- Raw ID
+
+### 8. Actions (`actions.go`)
+
+Bulk actions:
+- Type-safe action definition
+- Action execution
+- Action permissions
+- Action confirmation
+
+### 9. Export (`export.go`)
+
+Export functionality:
+- CSV export
+- JSON export
+- Custom export formats
+
+### 10. Inlines (`inlines.go`)
+
+Related model editing:
+- Tabular inline
+- Stacked inline
+- Inline permissions
+- Inline validation
+
+### 11. Fieldsets (`fieldsets.go`)
+
+Form field grouping:
+- Fieldset definition
+- Collapsible fieldsets
+- Fieldset permissions
+
+### 12. Permissions (`permissions.go`)
+
+Permission system:
+- Permission checking
+- Permission decorators
+- Custom permissions
+
+### 13. HTTP Handlers (`http/`)
+
+Complete HTTP handlers:
+- List handler
+- Detail handler
+- Create handler
+- Update handler
+- Delete handler
+- Action handler
+- Export handler
+
+### 14. Registry (`registry.go`)
+
+Admin model registry:
+- Model registration
+- Model lookup
+- Global registry
+
+## Features
+
+### ✅ Complete Features
+
+1. **Type-Safe Admin** - Full type safety with generics
+2. **List View** - Pagination, filtering, searching, sorting
+3. **Detail View** - View and edit individual objects
+4. **Form Handling** - Create and update forms
+5. **Filters** - Advanced filtering system
+6. **Search** - Full-text search
+7. **Widgets** - Rich form widgets
+8. **Actions** - Bulk actions
+9. **Export** - CSV and JSON export
+10. **Inlines** - Related model editing
+11. **Fieldsets** - Form field grouping
+12. **Permissions** - Permission system
+13. **HTTP Handlers** - Complete HTTP handlers
+14. **Registry** - Model registry
+
+## Usage Examples
+
+### Basic Admin Registration
 
 ```go
-func (User) AdminConfig() admin.Config {
-    return admin.Config{
-        ListDisplay: []string{"username", "email", "is_active", "created_at"},
-        ListFilter: []string{"is_active", "created_at"},
-        SearchFields: []string{"username", "email"},
-        ListPerPage: 25,
-        Ordering: []string{"-created_at"},
-    }
-}
-```
-
-## List Views
-
-The list view is where you'll spend most of your time. forge gives you:
-
-### Display Fields
-Control what columns show up:
-
-```go
-ListDisplay: []string{
-    "username",           // Simple field
-    "email",             // Simple field
-    "is_active",         // Boolean field (shows as checkbox)
-    "post_count",        // Custom method
-    "created_at",        // Date field
-}
-```
-
-### Custom List Methods
-Add computed columns:
-
-```go
-func (u *User) PostCount() int {
-    count, _ := Post.Objects.Filter(Post.Fields.UserID.Equals(u.ID)).Count(context.Background())
-    return count
-}
-```
-
-### Search and Filtering
-```go
-ListFilter: []string{
-    "is_active",         // Boolean filter
-    "created_at",        // Date range filter
-    "role",             // Choice filter
-}
-
-SearchFields: []string{
-    "username",         // Search in username
-    "email",           // Search in email
-}
-```
-
-### Pagination and Ordering
-```go
-ListPerPage: 50,                    // Items per page
-Ordering: []string{"-created_at"},  // Default ordering
-```
-
-## Form Views
-
-### Fieldsets
-Organize your form fields into logical groups:
-
-```go
-Fieldsets: []admin.Fieldset{
-    {
-        Title: "Basic Information",
-        Fields: []string{"username", "email", "is_active"},
-    },
-    {
-        Title: "Profile",
-        Fields: []string{"bio", "avatar"},
-        Classes: []string{"collapse"}, // Collapsed by default
-    },
-}
-```
-
-### Readonly Fields
-Make fields read-only in the admin:
-
-```go
-ReadonlyFields: []string{"id", "created_at", "updated_at"},
-```
-
-### Prepopulated Fields
-Auto-fill fields based on other fields:
-
-```go
-PrepopulatedFields: map[string][]string{
-    "slug": {"title"},  // Fill slug from title
-}
-```
-
-## Inlines
-
-Edit related models inline:
-
-```go
-Inlines: []admin.Inline{
-    {
-        Model: &Post{},
-        Extra: 3,           // Show 3 empty forms
-        MinNum: 1,          // Require at least 1
-        MaxNum: 10,         // Maximum 10
-    },
-}
-```
-
-Now when you edit a user, you'll see their posts right there on the same page.
-
-## Actions
-
-Add bulk actions to your list views:
-
-```go
-Actions: []admin.Action{
-    {
-        Name: "make_active",
-        Description: "Mark selected users as active",
-        Handler: func(queryset admin.QuerySet, form admin.FormData) error {
-            return queryset.Update(map[string]interface{}{
-                "is_active": true,
-            })
+userAdmin := admin.Register(
+    &models.User{},
+    models.User.Objects,
+    &admin.Config[*models.User]{
+        ListDisplay: []admin.FieldExpr[*models.User, any]{
+            admin.StringField("username", getter, setter),
+            admin.StringField("email", getter, setter),
+            admin.BoolField("is_active", getter, setter),
+        },
+        ListFilter: []admin.Filter[*models.User]{
+            admin.NewBooleanFilter(
+                admin.BoolField("is_active", getter, setter),
+            ),
+        },
+        SearchFields: []admin.FieldExpr[*models.User, any]{
+            admin.StringField("username", getter, setter),
+            admin.StringField("email", getter, setter),
         },
     },
-    {
-        Name: "send_welcome_email",
-        Description: "Send welcome email to selected users",
-        Handler: func(queryset admin.QuerySet, form admin.FormData) error {
-            users, _ := queryset.All()
-            for _, user := range users {
-                sendWelcomeEmail(user.(*User))
-            }
-            return nil
+)
+```
+
+### Admin with Inlines
+
+```go
+postAdmin := admin.Register(
+    &models.Post{},
+    models.Post.Objects,
+    &admin.Config[*models.Post]{
+        ListDisplay: []admin.FieldExpr[*models.Post, any]{
+            admin.StringField("title", getter, setter),
+            admin.StringField("author", getter, setter),
+        },
+        Inlines: []admin.Inline[*models.Post, any]{
+            admin.TabularInline(
+                &models.Comment{},
+                models.Comment.Objects,
+                parentField,
+                []admin.FieldExpr[*models.Comment, any]{
+                    admin.StringField("author", getter, setter),
+                    admin.StringField("content", getter, setter),
+                },
+            ),
         },
     },
-}
+)
 ```
 
-## Custom Filters
-
-Create your own filters:
+### Admin with Actions
 
 ```go
-type ActiveUsersFilter struct {
-    admin.BooleanFilter
-}
-
-func (f *ActiveUsersFilter) Filter(queryset admin.QuerySet, value interface{}) admin.QuerySet {
-    if value.(bool) {
-        return queryset.Filter(User.Fields.IsActive.Equals(true))
-    }
-    return queryset
-}
-
-func (User) AdminConfig() admin.Config {
-    return admin.Config{
-        ListFilter: []string{"is_active", "created_at"},
-        CustomFilters: map[string]admin.Filter{
-            "active_users": &ActiveUsersFilter{},
-        },
-    }
-}
-```
-
-## Widgets
-
-Control how fields are displayed in forms:
-
-```go
-FormWidgets: map[string]admin.Widget{
-    "bio": admin.TextareaWidget{
-        Rows: 10,
-        Cols: 80,
-    },
-    "birth_date": admin.DateWidget{
-        Format: "2006-01-02",
-    },
-    "avatar": admin.ImageField{
-        UploadTo: "avatars/",
-    },
-    "role": admin.SelectWidget{
-        Choices: []admin.Choice{
-            {Value: "admin", Label: "Administrator"},
-            {Value: "user", Label: "Regular User"},
-            {Value: "moderator", Label: "Moderator"},
+userAdmin := admin.Register(
+    &models.User{},
+    models.User.Objects,
+    &admin.Config[*models.User]{
+        Actions: []admin.Action[*models.User]{
+            admin.NewAction(
+                "activate",
+                "Activate selected users",
+                func(ctx context.Context, users []*models.User) error {
+                    for _, user := range users {
+                        user.IsActive = true
+                        if err := models.User.Objects.Update(ctx, user); err != nil {
+                            return err
+                        }
+                    }
+                    return nil
+                },
+            ),
         },
     },
-}
+)
 ```
 
-## Validation
-
-Add custom validation to your admin forms:
+### Admin with Fieldsets
 
 ```go
-func (User) AdminClean(form admin.FormData) error {
-    password := form.Get("password")
-    confirm := form.Get("password_confirm")
-    
-    if password != confirm {
-        return errors.New("Passwords don't match")
-    }
-    
-    if len(password) < 8 {
-        return errors.New("Password must be at least 8 characters")
-    }
-    
-    return nil
-}
-```
-
-## Permissions
-
-Control who can do what:
-
-```go
-func (User) AdminConfig() admin.Config {
-    return admin.Config{
-        Permissions: admin.Permissions{
-            Add:    "users.add_user",
-            Change: "users.change_user",
-            Delete: "users.delete_user",
-            View:   "users.view_user",
+userAdmin := admin.Register(
+    &models.User{},
+    models.User.Objects,
+    &admin.Config[*models.User]{
+        Fieldsets: []admin.Fieldset[*models.User]{
+            admin.NewFieldset(
+                "Account Information",
+                admin.StringField("username", getter, setter),
+                admin.StringField("email", getter, setter),
+            ),
+            admin.NewFieldset(
+                "Permissions",
+                admin.BoolField("is_active", getter, setter),
+                admin.BoolField("is_staff", getter, setter),
+            ),
         },
-    }
-}
+    },
+)
 ```
 
-## Custom Templates
+## Integration Points
 
-Override admin templates for full control:
+### ORM System
+- Uses ORM QuerySet for data access
+- Type-safe field expressions
+- Manager integration
 
-```go
-Templates: map[string]string{
-    "change_list.html":    "admin/user_change_list.html",
-    "change_form.html":    "admin/user_change_form.html",
-    "delete_confirmation.html": "admin/user_delete.html",
-}
-```
+### Filter System
+- Filter integration
+- Query parsing
+- Security validation
 
-## Export
+### HTTP Server
+- HTTP handlers
+- Routing integration
+- Middleware support
 
-Add export functionality:
+### Identity System
+- Permission integration
+- Authentication middleware
+- User management
 
-```go
-ExportFormats: []string{"csv", "json", "xlsx"},
-ExportFields: []string{"username", "email", "is_active", "created_at"},
-```
+## Extension Points
 
-Now users can export filtered data from the list view.
+### Custom Widgets
+- Define custom widgets
+- Custom widget rendering
+- Custom widget parsing
 
-## Advanced Features
+### Custom Filters
+- Define custom filters
+- Custom filter logic
+- Custom filter widgets
 
-### Custom QuerySets
-Override the default queryset:
+### Custom Actions
+- Define custom actions
+- Custom action logic
+- Custom action permissions
 
-```go
-func (User) AdminGetQueryset(request *http.Request) admin.QuerySet {
-    qs := User.Objects.All()
-    
-    // Only show active users to non-admins
-    if !isAdmin(request) {
-        qs = qs.Filter(User.Fields.IsActive.Equals(true))
-    }
-    
-    return qs
-}
-```
-
-### Custom Save Methods
-Control how objects are saved:
-
-```go
-func (User) AdminSaveModel(request *http.Request, obj interface{}, form admin.FormData, change bool) error {
-    user := obj.(*User)
-    
-    // Hash password if it's being set
-    if form.HasChanged("password") {
-        hashed, _ := bcrypt.GenerateFromPassword([]byte(form.Get("password")), bcrypt.DefaultCost)
-        user.PasswordHash = string(hashed)
-    }
-    
-    return User.Objects.Save(user)
-}
-```
-
-### Custom URLs
-Add custom admin URLs:
-
-```go
-func (User) AdminGetUrls() []admin.Url {
-    return []admin.Url{
-        {
-            Path:     "send-email/",
-            View:     sendEmailView,
-            Name:     "send_email",
-        },
-        {
-            Path:     "stats/",
-            View:     userStatsView,
-            Name:     "user_stats",
-        },
-    }
-}
-```
-
-## Security
-
-The admin system includes security features out of the box:
-
-- **CSRF Protection** - All forms are CSRF protected
-- **XSS Prevention** - Output is properly escaped
-- **Permission Checking** - Users must have appropriate permissions
-- **Audit Logging** - All admin actions are logged
-- **Secure Defaults** - Safe defaults for all configurations
-
-## Performance
-
-The admin is built to perform well:
-
-- **Efficient Queries** - Uses select_related and prefetch_related
-- **Pagination** - Only loads the data you need
-- **Caching** - Caches expensive operations
-- **Lazy Loading** - Loads data only when needed
+### Custom Forms
+- Custom form generation
+- Custom form validation
+- Custom form saving
 
 ## Best Practices
 
-1. **Keep it simple** - Don't over-customize your admin
-2. **Use permissions** - Properly secure your admin
-3. **Optimize queries** - Use select_related for foreign keys
-4. **Test your admin** - Write tests for custom actions and validation
-5. **Document custom features** - Help your users understand custom functionality
+1. **Type Safety** - Use type-safe field expressions
+2. **Permissions** - Always check permissions
+3. **Validation** - Validate all input
+4. **Performance** - Use select_related and prefetch_related
+5. **User Experience** - Provide helpful error messages
+6. **Security** - Sanitize all output
 
-## Next Steps
+## Future Enhancements
 
-- [REST API Framework](/docs/features/api-framework) - Build APIs for your models
-- [Filter System](/docs/features/filter-system) - Advanced filtering capabilities
-- [Examples](/docs/examples/blog) - See the admin in action
+- [ ] HTML template rendering
+- [ ] Rich text editor
+- [ ] File/image uploads
+- [ ] History/audit logging
+- [ ] Autocomplete UI improvements
+- [ ] Date/time picker improvements

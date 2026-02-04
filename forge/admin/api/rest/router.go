@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/forgego/forge/admin/core"
+	apicore "github.com/forgego/forge/api/core"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -43,6 +43,9 @@ func (r *Router) RegisterRoutes(router chi.Router) {
 			MaxAge:           300,
 		}))
 
+		// Configuration endpoint
+		sub.Get("/config", r.handleConfig)
+
 		// Metadata endpoints
 		sub.Get("/meta", r.handleMetaList)
 		sub.Get("/meta/{model}", r.handleMetaDetail)
@@ -52,6 +55,9 @@ func (r *Router) RegisterRoutes(router chi.Router) {
 
 		// Global search
 		sub.Get("/search", r.handleGlobalSearch)
+
+		// Plugin page endpoint
+		sub.Get("/plugins/{plugin}/pages/{page}", r.handlePluginPage)
 
 		// Model routes (registered dynamically)
 		r.registerModelRoutes(sub)
@@ -90,12 +96,43 @@ func (r *Router) registerModelRoutes(router chi.Router) {
 	}
 }
 
+// handleConfig returns the admin configuration
+func (r *Router) handleConfig(w http.ResponseWriter, req *http.Request) {
+	ctx := req.Context()
+	user, _ := apicore.UserFromContext(ctx)
+
+	// Gather plugin metadata
+	plugins := make([]map[string]interface{}, 0)
+	for _, p := range r.registry.GetAllPlugins() {
+		plugins = append(plugins, map[string]interface{}{
+			"id":          p.ID(),
+			"name":        p.Name(),
+			"menuEntries": p.GetMenuItems(),
+		})
+	}
+
+	config := map[string]interface{}{
+		"title":       "Forge Admin",
+		"version":     "1.0.0",
+		"user":        user,
+		"plugins":     plugins,
+		"environment": "development", // TODO: Get from global config
+		"dashboard":   core.GetDashboard(ctx),
+	}
+
+	respondJSON(w, http.StatusOK, config)
+}
+
 // handleMetaList returns list of all models
 func (r *Router) handleMetaList(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
-	user := getUserFromContext(ctx)
+	user, _ := apicore.UserFromContext(ctx)
 
 	allAdmins := r.registry.GetAll()
+	fmt.Printf("DEBUG: handleMetaList. Registered models: %d\n", len(allAdmins))
+	for k := range allAdmins {
+		fmt.Printf("DEBUG: Registered model: %s\n", k)
+	}
 	models := make([]core.ModelListMetadata, 0, len(allAdmins))
 
 	for name, admin := range allAdmins {
@@ -142,10 +179,13 @@ func (r *Router) handleLogin(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleMetaDetail(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	modelName := chi.URLParam(req, "model")
-	user := getUserFromContext(ctx)
+	user, _ := apicore.UserFromContext(ctx)
+
+	fmt.Printf("DEBUG: handleMetaDetail for %s. User: %v\n", modelName, user)
 
 	admin, err := r.registry.Get(modelName)
 	if err != nil {
+		fmt.Printf("DEBUG: Model not found: %s. Error: %v\n", modelName, err)
 		respondError(w, http.StatusNotFound, "model_not_found", err.Error(), nil)
 		return
 	}
@@ -169,10 +209,13 @@ func (r *Router) handleMetaDetail(w http.ResponseWriter, req *http.Request) {
 func (r *Router) handleList(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
+		fmt.Printf("DEBUG: handleList for %s. User: %v\n", admin.ModelName(), user)
 		// Check view permission
-		if !admin.HasViewPermission(ctx, user, nil) {
+		hasPerm := admin.HasViewPermission(ctx, user, nil)
+		fmt.Printf("DEBUG: HasViewPermission: %v\n", hasPerm)
+		if !hasPerm {
 			respondError(w, http.StatusForbidden, "permission_denied", "You don't have permission to view this model", nil)
 			return
 		}
@@ -195,7 +238,7 @@ func (r *Router) handleList(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleDetail(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 		idStr := chi.URLParam(req, "id")
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -225,7 +268,7 @@ func (r *Router) handleDetail(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleCreate(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
 		// Check add permission
 		if !admin.HasAddPermission(ctx, user) {
@@ -255,7 +298,7 @@ func (r *Router) handleCreate(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleUpdate(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 		idStr := chi.URLParam(req, "id")
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -292,7 +335,7 @@ func (r *Router) handleUpdate(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleReplace(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 		idStr := chi.URLParam(req, "id")
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -320,7 +363,7 @@ func (r *Router) handleReplace(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleDelete(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 		idStr := chi.URLParam(req, "id")
 
 		id, err := strconv.ParseInt(idStr, 10, 64)
@@ -350,7 +393,7 @@ func (r *Router) handleDelete(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleBulkCreate(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
 		// Check add permission
 		if !admin.HasAddPermission(ctx, user) {
@@ -371,7 +414,7 @@ func (r *Router) handleBulkCreate(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleBulkUpdate(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
 		// Check change permission
 		if !admin.HasChangePermission(ctx, user, nil) {
@@ -391,7 +434,7 @@ func (r *Router) handleBulkUpdate(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleBulkDelete(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
 		// Check delete permission
 		if !admin.HasDeletePermission(ctx, user, nil) {
@@ -409,7 +452,7 @@ func (r *Router) handleBulkDelete(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleAction(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 		actionName := chi.URLParam(req, "action")
 
 		// Check change permission (actions typically require change permission)
@@ -440,7 +483,7 @@ func (r *Router) handleAction(admin core.AdminInterface) http.HandlerFunc {
 func (r *Router) handleAutocomplete(admin core.AdminInterface) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
-		user := getUserFromContext(ctx)
+		user, _ := apicore.UserFromContext(ctx)
 
 		// Check view permission
 		if !admin.HasViewPermission(ctx, user, nil) {
@@ -513,6 +556,32 @@ func (r *Router) handleGlobalSearch(w http.ResponseWriter, req *http.Request) {
 	})
 }
 
+// handlePluginPage returns the SDUI layout for a plugin page
+func (r *Router) handlePluginPage(w http.ResponseWriter, req *http.Request) {
+	pluginID := chi.URLParam(req, "plugin")
+	pageID := chi.URLParam(req, "page")
+
+	plugin, err := r.registry.GetPlugin(pluginID)
+	if err != nil {
+		respondError(w, http.StatusNotFound, "plugin_not_found", "Plugin not found", nil)
+		return
+	}
+
+	pages := plugin.GetPages()
+	if pages == nil {
+		respondError(w, http.StatusNotFound, "page_not_found", "Page not found", nil)
+		return
+	}
+
+	page, ok := pages[pageID]
+	if !ok {
+		respondError(w, http.StatusNotFound, "page_not_found", "Page not found", nil)
+		return
+	}
+
+	respondJSON(w, http.StatusOK, page)
+}
+
 // Helper types and functions
 
 func parseListParams(req *http.Request) core.ListParams {
@@ -551,14 +620,6 @@ func parseListParams(req *http.Request) core.ListParams {
 	}
 
 	return params
-}
-
-type contextKey string
-
-const userContextKey contextKey = "user"
-
-func getUserFromContext(ctx context.Context) interface{} {
-	return ctx.Value(userContextKey)
 }
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {

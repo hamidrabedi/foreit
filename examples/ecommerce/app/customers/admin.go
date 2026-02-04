@@ -12,14 +12,14 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[CustomerGroup]{
 		Icon: "Users",
 		ListDisplay: []admin.Field{
-			CustomerGroupFields.Name,
-			CustomerGroupFields.Code,
-			CustomerGroupFields.DiscountPercentage,
-			CustomerGroupFields.IsActive,
-			CustomerGroupFields.CreatedAt,
+			CustomerGroupFieldsInstance.Name,
+			CustomerGroupFieldsInstance.Code,
+			CustomerGroupFieldsInstance.DiscountPercentage,
+			CustomerGroupFieldsInstance.IsActive,
+			CustomerGroupFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			CustomerGroupFields.IsActive,
+			CustomerGroupFieldsInstance.IsActive,
 		},
 	})
 
@@ -27,21 +27,21 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Customer]{
 		Icon: "User",
 		ListDisplay: []admin.Field{
-			CustomerFields.Email,
-			CustomerFields.FirstName,
-			CustomerFields.LastName,
-			CustomerFields.IsActive,
-			CustomerFields.IsVerified,
-			CustomerFields.CreatedAt,
+			CustomerFieldsInstance.Email,
+			CustomerFieldsInstance.FirstName,
+			CustomerFieldsInstance.LastName,
+			CustomerFieldsInstance.IsActive,
+			CustomerFieldsInstance.IsVerified,
+			CustomerFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			CustomerFields.IsActive,
-			CustomerFields.IsVerified,
+			CustomerFieldsInstance.IsActive,
+			CustomerFieldsInstance.IsVerified,
 		},
 		SearchFields: []admin.Field{
-			CustomerFields.Email,
-			CustomerFields.FirstName,
-			CustomerFields.LastName,
+			CustomerFieldsInstance.Email,
+			CustomerFieldsInstance.FirstName,
+			CustomerFieldsInstance.LastName,
 		},
 	})
 
@@ -49,15 +49,15 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Address]{
 		Icon: "MapPin",
 		ListDisplay: []admin.Field{
-			AddressFields.CustomerID,
-			AddressFields.AddressType,
-			AddressFields.City,
-			AddressFields.StateProvince,
-			AddressFields.CountryCode,
+			AddressFieldsInstance.CustomerId,
+			AddressFieldsInstance.AddressType,
+			AddressFieldsInstance.City,
+			AddressFieldsInstance.StateProvince,
+			AddressFieldsInstance.CountryCode,
 		},
 		ListFilter: []admin.Field{
-			AddressFields.AddressType,
-			AddressFields.CountryCode,
+			AddressFieldsInstance.AddressType,
+			AddressFieldsInstance.CountryCode,
 		},
 	})
 
@@ -65,11 +65,11 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[WishList]{
 		Icon: "Heart",
 		ListDisplay: []admin.Field{
-			WishListFields.CustomerID,
-			WishListFields.Name,
-			WishListFields.IsPublic,
-			WishListFields.IsDefault,
-			WishListFields.CreatedAt,
+			WishListFieldsInstance.CustomerId,
+			WishListFieldsInstance.Name,
+			WishListFieldsInstance.IsPublic,
+			WishListFieldsInstance.IsDefault,
+			WishListFieldsInstance.CreatedAt,
 		},
 	})
 }

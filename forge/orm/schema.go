@@ -28,6 +28,7 @@ type FieldInfo struct {
 	PrimaryKey bool
 	Unique     bool
 	ForeignKey *RelationInfo
+	StructFieldName string
 }
 
 // RelationInfo contains relation metadata
@@ -40,6 +41,7 @@ type RelationInfo struct {
 	OnUpdate    string
 	RelatedName string
 	FieldName   string // The field name on this model
+	Through     string // Through table for ManyToMany
 }
 
 // RelationType represents the type of relation
@@ -100,6 +102,27 @@ func BuildModelSchema(schemaInstance schema.Schema) (*ModelSchema, error) {
 		ms.TableName = meta.TableName
 	}
 
+	// Build map of DBColumn -> StructFieldName
+	structFieldMap := make(map[string]string)
+	if ms.ModelType.Kind() == reflect.Struct {
+		for i := 0; i < ms.ModelType.NumField(); i++ {
+			field := ms.ModelType.Field(i)
+			// Skip unexported
+			if field.PkgPath != "" {
+				continue
+			}
+
+			// Check db tag
+			dbTag := field.Tag.Get("db")
+			if dbTag != "" {
+				structFieldMap[dbTag] = field.Name
+			}
+
+			// Also map lower case name
+			structFieldMap[strings.ToLower(field.Name)] = field.Name
+		}
+	}
+
 	// Build fields from schema
 	fields := schemaInstance.Fields()
 	for _, field := range fields {
@@ -114,6 +137,13 @@ func BuildModelSchema(schemaInstance schema.Schema) (*ModelSchema, error) {
 
 		if field.DBColumn == "" {
 			fieldInfo.DBColumn = field.Name
+		}
+
+		// Resolve StructFieldName
+		if name, ok := structFieldMap[fieldInfo.DBColumn]; ok {
+			fieldInfo.StructFieldName = name
+		} else if name, ok := structFieldMap[strings.ToLower(field.Name)]; ok {
+			fieldInfo.StructFieldName = name
 		}
 
 		if field.PrimaryKey {
@@ -133,6 +163,7 @@ func BuildModelSchema(schemaInstance schema.Schema) (*ModelSchema, error) {
 			OnDelete:    string(rel.OnDelete),
 			OnUpdate:    string(rel.OnUpdate),
 			RelatedName: rel.RelatedName,
+			Through:     rel.Through,
 		}
 
 		// Determine relation type
@@ -224,6 +255,9 @@ func GetModelSchema[T any]() (*ModelSchema, error) {
 	schemaMu.Lock()
 	schemaCache[typ] = schema
 	schemaMu.Unlock()
+
+	// Register type name for relation resolution
+	RegisterModelType(typ.Name(), typ)
 
 	return schema, nil
 }

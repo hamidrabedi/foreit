@@ -40,6 +40,26 @@ func NewBaseViewSet(serializer func() Serializer, queryset, model interface{}) *
 	}
 }
 
+// getManager gets the manager for operations
+func (vs *BaseViewSet) getManager() reflect.Value {
+	// If Queryset is set and looks like a manager (has Create method), use it
+	if vs.Queryset != nil {
+		qsValue := reflect.ValueOf(vs.Queryset)
+		if qsValue.MethodByName("Create").IsValid() {
+			return qsValue
+		}
+	}
+	
+	// Fallback to finding manager from model instance
+	// This creates a new instance of the model type to search for manager
+	modelType := reflect.TypeOf(vs.Model)
+	if modelType.Kind() == reflect.Ptr {
+		modelType = modelType.Elem()
+	}
+	instance := reflect.New(modelType).Interface()
+	return getManagerFromModel(instance)
+}
+
 // List handles GET /resource/
 func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -143,13 +163,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serializer := vs.Serializer()
-	baseSerializer, ok := serializer.(*BaseSerializer)
-	if !ok {
-		// nolint:errcheck // HTTP response errors can't be handled meaningfully
-		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Invalid serializer type")
-		return
-	}
-	baseSerializer.data = data
+	serializer.SetData(data)
 
 	if err := serializer.Validate(); err != nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
@@ -167,7 +181,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	populateFromMap(instance, data)
 
 	// Get manager and call Create
-	manager := getManagerFromModel(instance)
+	manager := vs.getManager()
 	if !manager.IsValid() {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Manager not found")
@@ -220,10 +234,7 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get manager and call Get
-	modelValue := reflect.New(reflect.TypeOf(vs.Model).Elem())
-	instance := modelValue.Interface()
-
-	manager := getManagerFromModel(instance)
+	manager := vs.getManager()
 	if !manager.IsValid() {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Manager not found")
@@ -256,7 +267,7 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	instance = results[0].Interface()
+	instance := results[0].Interface()
 	serialized := SerializeModel(instance)
 	// nolint:errcheck // HTTP response errors can't be handled meaningfully
 	_ = forgehttp.SendJSON(w, http.StatusOK, serialized)
@@ -288,13 +299,7 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	serializer := vs.Serializer()
-	baseSerializer, ok := serializer.(*BaseSerializer)
-	if !ok {
-		// nolint:errcheck // HTTP response errors can't be handled meaningfully
-		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Invalid serializer type")
-		return
-	}
-	baseSerializer.data = data
+	serializer.SetData(data)
 
 	if err := serializer.Validate(); err != nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
@@ -305,10 +310,7 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get existing instance
-	modelValue := reflect.New(reflect.TypeOf(vs.Model).Elem())
-	instance := modelValue.Interface()
-
-	manager := getManagerFromModel(instance)
+	manager := vs.getManager()
 	if !manager.IsValid() {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Manager not found")
@@ -335,7 +337,7 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	instance = getResults[0].Interface()
+	instance := getResults[0].Interface()
 
 	// Populate from data
 	populateFromMap(instance, data)
@@ -390,10 +392,7 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get instance first
-	modelValue := reflect.New(reflect.TypeOf(vs.Model).Elem())
-	instance := modelValue.Interface()
-
-	manager := getManagerFromModel(instance)
+	manager := vs.getManager()
 	if !manager.IsValid() {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Manager not found")
@@ -420,7 +419,7 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	instance = getResults[0].Interface()
+	instance := getResults[0].Interface()
 
 	// Delete
 	deleteMethod := manager.MethodByName("Delete")

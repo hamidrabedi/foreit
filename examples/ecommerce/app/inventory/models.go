@@ -9,50 +9,50 @@ import (
 
 // Warehouse represents a physical warehouse or storage location
 type Warehouse struct {
-	schema.BaseSchema
+	WarehouseGenerated
 }
 
 func (Warehouse) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
 		
 		// Identification
-		schema.String("name").Required().MaxLength(200).Unique().Build(),
-		schema.String("code").Required().MaxLength(50).Unique().
-			HelpText("Warehouse code for reference").Build(),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200), schema.Unique()),
+		schema.StringField("code", schema.Required(), schema.MaxLength(50), schema.Unique(),
+			schema.HelpText("Warehouse code for reference")),
 		
 		// Contact
-		schema.String("contact_name").MaxLength(200).Optional().Build(),
-		schema.String("contact_email").MaxLength(255).Optional().Build(),
-		schema.String("contact_phone").MaxLength(20).Optional().Build(),
+		schema.StringField("contact_name", schema.MaxLength(200), schema.Optional()),
+		schema.StringField("contact_email", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("contact_phone", schema.MaxLength(20), schema.Optional()),
 		
 		// Address
-		schema.String("address_line1").Required().MaxLength(255).Build(),
-		schema.String("address_line2").MaxLength(255).Optional().Build(),
-		schema.String("city").Required().MaxLength(100).Build(),
-		schema.String("state").MaxLength(100).Optional().Build(),
-		schema.String("postal_code").Required().MaxLength(20).Build(),
-		schema.String("country_code").Required().MaxLength(2).Build(),
-		schema.String("country_name").Required().MaxLength(100).Build(),
+		schema.StringField("address_line1", schema.Required(), schema.MaxLength(255)),
+		schema.StringField("address_line2", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("city", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("state", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("postal_code", schema.Required(), schema.MaxLength(20)),
+		schema.StringField("country_code", schema.Required(), schema.MaxLength(2)),
+		schema.StringField("country_name", schema.Required(), schema.MaxLength(100)),
 		
 		// Geolocation
-		schema.Float64("latitude").Optional().Build(),
-		schema.Float64("longitude").Optional().Build(),
+		schema.Float64Field("latitude", schema.Optional()),
+		schema.Float64Field("longitude", schema.Optional()),
 		
 		// Settings
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("is_primary").Default(false).
-			HelpText("Primary warehouse for fulfillment").Build(),
-		schema.Int32("priority").Default(0).
-			HelpText("Fulfillment priority (higher = preferred)").Build(),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.BoolField("is_primary", schema.Default(false),
+			schema.HelpText("Primary warehouse for fulfillment")),
+		schema.Int32Field("priority", schema.Default(0),
+			schema.HelpText("Fulfillment priority (higher = preferred)")),
 		
 		// Capacity
-		schema.Int32("total_capacity").Optional().
-			HelpText("Total storage capacity (units)").Build(),
+		schema.Int32Field("total_capacity", schema.Optional(),
+			schema.HelpText("Total storage capacity (units)")),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -63,9 +63,9 @@ func (Warehouse) Meta() schema.Meta {
 		VerboseNamePlural: "Warehouses",
 		OrderBy:          []string{"-is_primary", "-priority", "name"},
 		Indexes: []schema.Index{
-			{Name: "idx_warehouse_code", Fields: []string{"code"}, Unique: true},
-			{Name: "idx_warehouse_active", Fields: []string{"is_active"}},
-			{Name: "idx_warehouse_primary", Fields: []string{"is_primary"}},
+			schema.UniqueIndexOn("idx_warehouse_code", "code"),
+			schema.IndexOn("idx_warehouse_active", "is_active"),
+			schema.IndexOn("idx_warehouse_primary", "is_primary"),
 		},
 	}
 }
@@ -85,42 +85,42 @@ func (Warehouse) Hooks() *schema.ModelHooks {
 
 // Stock represents inventory levels for product variants
 type Stock struct {
-	schema.BaseSchema
+	StockGenerated
 }
 
 func (Stock) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("product_variant_id").Required().Build(),
-		schema.Int64("warehouse_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("product_variant_id", schema.Required()),
+		schema.Int64Field("warehouse_id", schema.Required()),
 		
 		// Quantities
-		schema.Int32("quantity").Required().Default(0).
-			HelpText("Available quantity").Build(),
-		schema.Int32("reserved_quantity").Default(0).
-			HelpText("Quantity reserved in pending orders").Build(),
-		schema.Int32("available_quantity").Default(0).
-			HelpText("quantity - reserved_quantity").Build(),
+		schema.Int32Field("quantity", schema.Required(), schema.Default(0),
+			schema.HelpText("Available quantity")),
+		schema.Int32Field("reserved_quantity", schema.Default(0),
+			schema.HelpText("Quantity reserved in pending orders")),
+		schema.Int32Field("available_quantity", schema.Default(0),
+			schema.HelpText("quantity - reserved_quantity")),
 		
 		// Reordering
-		schema.Int32("reorder_point").Default(10).
-			HelpText("Minimum quantity before reorder").Build(),
-		schema.Int32("reorder_quantity").Default(50).
-			HelpText("Quantity to reorder").Build(),
+		schema.Int32Field("reorder_point", schema.Default(10),
+			schema.HelpText("Minimum quantity before reorder")),
+		schema.Int32Field("reorder_quantity", schema.Default(50),
+			schema.HelpText("Quantity to reorder")),
 		
 		// Location
-		schema.String("bin_location").MaxLength(100).Optional().
-			HelpText("Physical location in warehouse (e.g., A-12-3)").Build(),
+		schema.StringField("bin_location", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Physical location in warehouse (e.g., A-12-3)")),
 		
 		// Status
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("allow_backorder").Default(false).Build(),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.BoolField("allow_backorder", schema.Default(false)),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("last_counted_at").Optional().
-			HelpText("Last physical count").Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("last_counted_at", schema.Optional(),
+			schema.HelpText("Last physical count")),
 	}
 }
 
@@ -131,9 +131,9 @@ func (Stock) Meta() schema.Meta {
 		VerboseNamePlural: "Stock",
 		OrderBy:          []string{"warehouse_id", "product_variant_id"},
 		Indexes: []schema.Index{
-			{Name: "idx_stock_variant", Fields: []string{"product_variant_id"}},
-			{Name: "idx_stock_warehouse", Fields: []string{"warehouse_id"}},
-			{Name: "idx_stock_quantity", Fields: []string{"quantity"}},
+			schema.IndexOn("idx_stock_variant", "product_variant_id"),
+			schema.IndexOn("idx_stock_warehouse", "warehouse_id"),
+			schema.IndexOn("idx_stock_quantity", "quantity"),
 		},
 		UniqueTogether: [][]string{
 			{"product_variant_id", "warehouse_id"},
@@ -143,14 +143,12 @@ func (Stock) Meta() schema.Meta {
 
 func (Stock) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_variant_id", "ProductVariant").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_records").Build(),
-		schema.ForeignKey("warehouse_id", "Warehouse").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_records").Build(),
+		schema.ForeignKeyField("product_variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_records")),
+		schema.ForeignKeyField("warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_records")),
 	}
 }
 
@@ -171,60 +169,60 @@ func (Stock) Hooks() *schema.ModelHooks {
 
 // StockMovement represents inventory transactions
 type StockMovement struct {
-	schema.BaseSchema
+	StockMovementGenerated
 }
 
 func (StockMovement) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("stock_id").Required().Build(),
-		schema.Int64("product_variant_id").Required().Build(),
-		schema.Int64("warehouse_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("stock_id", schema.Required()),
+		schema.Int64Field("product_variant_id", schema.Required()),
+		schema.Int64Field("warehouse_id", schema.Required()),
 		
 		// Movement details
-		schema.String("type").Required().MaxLength(50).
-			HelpText("Type: purchase, sale, return, adjustment, transfer, damage, loss, count").Build(),
-		schema.Int32("quantity").Required().
-			HelpText("Quantity change (positive or negative)").Build(),
-		schema.Int32("quantity_before").Required().
-			HelpText("Quantity before movement").Build(),
-		schema.Int32("quantity_after").Required().
-			HelpText("Quantity after movement").Build(),
+		schema.StringField("type", schema.Required(), schema.MaxLength(50),
+			schema.HelpText("Type: purchase, sale, return, adjustment, transfer, damage, loss, count")),
+		schema.Int32Field("quantity", schema.Required(),
+			schema.HelpText("Quantity change (positive or negative)")),
+		schema.Int32Field("quantity_before", schema.Required(),
+			schema.HelpText("Quantity before movement")),
+		schema.Int32Field("quantity_after", schema.Required(),
+			schema.HelpText("Quantity after movement")),
 		
 		// Reference
-		schema.String("reference_type").MaxLength(50).Optional().
-			HelpText("Reference type: order, return, transfer, etc.").Build(),
-		schema.Int64("reference_id").Optional().
-			HelpText("ID of related record (order_id, transfer_id, etc.)").Build(),
-		schema.String("reference_number").MaxLength(100).Optional().
-			HelpText("Human-readable reference number").Build(),
+		schema.StringField("reference_type", schema.MaxLength(50), schema.Optional(),
+			schema.HelpText("Reference type: order, return, transfer, etc.")),
+		schema.Int64Field("reference_id", schema.Optional(),
+			schema.HelpText("ID of related record (order_id, transfer_id, etc.)")),
+		schema.StringField("reference_number", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Human-readable reference number")),
 		
 		// Transfer (if applicable)
-		schema.Int64("from_warehouse_id").Optional().
-			HelpText("Source warehouse for transfers").Build(),
-		schema.Int64("to_warehouse_id").Optional().
-			HelpText("Destination warehouse for transfers").Build(),
+		schema.Int64Field("from_warehouse_id", schema.Optional(),
+			schema.HelpText("Source warehouse for transfers")),
+		schema.Int64Field("to_warehouse_id", schema.Optional(),
+			schema.HelpText("Destination warehouse for transfers")),
 		
 		// Additional information
-		schema.String("reason").MaxLength(255).Optional().
-			HelpText("Reason for movement").Build(),
-		schema.Text("notes").Optional().Build(),
+		schema.StringField("reason", schema.MaxLength(255), schema.Optional(),
+			schema.HelpText("Reason for movement")),
+		schema.TextField("notes", schema.Optional()),
 		
 		// User tracking
-		schema.Int64("user_id").Optional().
-			HelpText("User who performed the movement").Build(),
-		schema.String("user_name").MaxLength(200).Optional().Build(),
+		schema.Int64Field("user_id", schema.Optional(),
+			schema.HelpText("User who performed the movement")),
+		schema.StringField("user_name", schema.MaxLength(200), schema.Optional()),
 		
 		// Cost (for accounting)
-		schema.Float64("unit_cost").Optional().
-			HelpText("Cost per unit at time of movement").Build(),
-		schema.Float64("total_cost").Optional().
-			HelpText("Total cost of movement").Build(),
+		schema.Float64Field("unit_cost", schema.Optional(),
+			schema.HelpText("Cost per unit at time of movement")),
+		schema.Float64Field("total_cost", schema.Optional(),
+			schema.HelpText("Total cost of movement")),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("movement_date").Required().
-			HelpText("Date of movement (can be backdated)").Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("movement_date", schema.Required(),
+			schema.HelpText("Date of movement (can be backdated)")),
 	}
 }
 
@@ -235,38 +233,33 @@ func (StockMovement) Meta() schema.Meta {
 		VerboseNamePlural: "Stock Movements",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_movement_stock", Fields: []string{"stock_id"}},
-			{Name: "idx_movement_variant", Fields: []string{"product_variant_id"}},
-			{Name: "idx_movement_warehouse", Fields: []string{"warehouse_id"}},
-			{Name: "idx_movement_type", Fields: []string{"type"}},
-			{Name: "idx_movement_reference", Fields: []string{"reference_type", "reference_id"}},
-			{Name: "idx_movement_date", Fields: []string{"movement_date"}},
+			schema.IndexOn("idx_movement_stock", "stock_id"),
+			schema.IndexOn("idx_movement_variant", "product_variant_id"),
+			schema.IndexOn("idx_movement_warehouse", "warehouse_id"),
+			schema.IndexOn("idx_movement_type", "type"),
+			schema.IndexOn("idx_movement_reference", "reference_type", "reference_id"),
+			schema.IndexOn("idx_movement_date", "movement_date"),
 		},
 	}
 }
 
 func (StockMovement) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("stock_id", "Stock").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("movements").Build(),
-		schema.ForeignKey("product_variant_id", "ProductVariant").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_movements").Build(),
-		schema.ForeignKey("warehouse_id", "Warehouse").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_movements").Build(),
-		schema.ForeignKey("from_warehouse_id", "Warehouse").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("outbound_transfers").Build(),
-		schema.ForeignKey("to_warehouse_id", "Warehouse").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("inbound_transfers").Build(),
+		schema.ForeignKeyField("stock_id", "Stock",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("movements")),
+		schema.ForeignKeyField("product_variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_movements")),
+		schema.ForeignKeyField("warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_movements")),
+		schema.ForeignKeyField("from_warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("outbound_transfers")),
+		schema.ForeignKeyField("to_warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("inbound_transfers")),
 	}
 }
 
@@ -288,41 +281,41 @@ func (StockMovement) Hooks() *schema.ModelHooks {
 
 // StockAlert represents low stock alerts
 type StockAlert struct {
-	schema.BaseSchema
+	StockAlertGenerated
 }
 
 func (StockAlert) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("stock_id").Required().Build(),
-		schema.Int64("product_variant_id").Required().Build(),
-		schema.Int64("warehouse_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("stock_id", schema.Required()),
+		schema.Int64Field("product_variant_id", schema.Required()),
+		schema.Int64Field("warehouse_id", schema.Required()),
 		
 		// Alert details
-		schema.String("alert_type").Required().MaxLength(50).
-			HelpText("Type: low_stock, out_of_stock, overstock").Build(),
-		schema.Int32("current_quantity").Required().Build(),
-		schema.Int32("threshold").Required().
-			HelpText("Threshold that triggered alert").Build(),
+		schema.StringField("alert_type", schema.Required(), schema.MaxLength(50),
+			schema.HelpText("Type: low_stock, out_of_stock, overstock")),
+		schema.Int32Field("current_quantity", schema.Required()),
+		schema.Int32Field("threshold", schema.Required(),
+			schema.HelpText("Threshold that triggered alert")),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("active").
-			HelpText("Status: active, acknowledged, resolved, dismissed").Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("active"),
+			schema.HelpText("Status: active, acknowledged, resolved, dismissed")),
 		
 		// Resolution
-		schema.Int64("resolved_by_user_id").Optional().Build(),
-		schema.String("resolved_by_user_name").MaxLength(200).Optional().Build(),
-		schema.Text("resolution_notes").Optional().Build(),
+		schema.Int64Field("resolved_by_user_id", schema.Optional()),
+		schema.StringField("resolved_by_user_name", schema.MaxLength(200), schema.Optional()),
+		schema.TextField("resolution_notes", schema.Optional()),
 		
 		// Notification
-		schema.Bool("notification_sent").Default(false).Build(),
-		schema.Time("notification_sent_at").Optional().Build(),
+		schema.BoolField("notification_sent", schema.Default(false)),
+		schema.TimeField("notification_sent_at", schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("acknowledged_at").Optional().Build(),
-		schema.Time("resolved_at").Optional().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("acknowledged_at", schema.Optional()),
+		schema.TimeField("resolved_at", schema.Optional()),
 	}
 }
 
@@ -333,29 +326,26 @@ func (StockAlert) Meta() schema.Meta {
 		VerboseNamePlural: "Stock Alerts",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_alert_stock", Fields: []string{"stock_id"}},
-			{Name: "idx_alert_variant", Fields: []string{"product_variant_id"}},
-			{Name: "idx_alert_warehouse", Fields: []string{"warehouse_id"}},
-			{Name: "idx_alert_status", Fields: []string{"status"}},
-			{Name: "idx_alert_type", Fields: []string{"alert_type"}},
+			schema.IndexOn("idx_alert_stock", "stock_id"),
+			schema.IndexOn("idx_alert_variant", "product_variant_id"),
+			schema.IndexOn("idx_alert_warehouse", "warehouse_id"),
+			schema.IndexOn("idx_alert_status", "status"),
+			schema.IndexOn("idx_alert_type", "alert_type"),
 		},
 	}
 }
 
 func (StockAlert) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("stock_id", "Stock").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("alerts").Build(),
-		schema.ForeignKey("product_variant_id", "ProductVariant").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_alerts").Build(),
-		schema.ForeignKey("warehouse_id", "Warehouse").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("stock_alerts").Build(),
+		schema.ForeignKeyField("stock_id", "Stock",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("alerts")),
+		schema.ForeignKeyField("product_variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_alerts")),
+		schema.ForeignKeyField("warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("stock_alerts")),
 	}
 }
 
@@ -370,48 +360,48 @@ func (StockAlert) Hooks() *schema.ModelHooks {
 
 // StockTransfer represents transfers between warehouses
 type StockTransfer struct {
-	schema.BaseSchema
+	StockTransferGenerated
 }
 
 func (StockTransfer) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
 		
 		// Transfer identification
-		schema.String("transfer_number").Required().MaxLength(50).Unique().Build(),
+		schema.StringField("transfer_number", schema.Required(), schema.MaxLength(50), schema.Unique()),
 		
 		// Warehouses
-		schema.Int64("from_warehouse_id").Required().Build(),
-		schema.Int64("to_warehouse_id").Required().Build(),
+		schema.Int64Field("from_warehouse_id", schema.Required()),
+		schema.Int64Field("to_warehouse_id", schema.Required()),
 		
 		// Product
-		schema.Int64("product_variant_id").Required().Build(),
-		schema.Int32("quantity").Required().Build(),
+		schema.Int64Field("product_variant_id", schema.Required()),
+		schema.Int32Field("quantity", schema.Required()),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("pending").
-			HelpText("Status: pending, in_transit, completed, cancelled").Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("pending"),
+			schema.HelpText("Status: pending, in_transit, completed, cancelled")),
 		
 		// Tracking
-		schema.String("tracking_number").MaxLength(255).Optional().Build(),
-		schema.String("carrier").MaxLength(100).Optional().Build(),
+		schema.StringField("tracking_number", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("carrier", schema.MaxLength(100), schema.Optional()),
 		
 		// Notes
-		schema.Text("notes").Optional().Build(),
-		schema.Text("reason").Optional().Build(),
+		schema.TextField("notes", schema.Optional()),
+		schema.TextField("reason", schema.Optional()),
 		
 		// User tracking
-		schema.Int64("requested_by_user_id").Optional().Build(),
-		schema.String("requested_by_user_name").MaxLength(200).Optional().Build(),
-		schema.Int64("approved_by_user_id").Optional().Build(),
-		schema.String("approved_by_user_name").MaxLength(200).Optional().Build(),
+		schema.Int64Field("requested_by_user_id", schema.Optional()),
+		schema.StringField("requested_by_user_name", schema.MaxLength(200), schema.Optional()),
+		schema.Int64Field("approved_by_user_id", schema.Optional()),
+		schema.StringField("approved_by_user_name", schema.MaxLength(200), schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("shipped_at").Optional().Build(),
-		schema.Time("completed_at").Optional().Build(),
-		schema.Time("cancelled_at").Optional().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("shipped_at", schema.Optional()),
+		schema.TimeField("completed_at", schema.Optional()),
+		schema.TimeField("cancelled_at", schema.Optional()),
 	}
 }
 
@@ -422,29 +412,26 @@ func (StockTransfer) Meta() schema.Meta {
 		VerboseNamePlural: "Stock Transfers",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_transfer_number", Fields: []string{"transfer_number"}, Unique: true},
-			{Name: "idx_transfer_from", Fields: []string{"from_warehouse_id"}},
-			{Name: "idx_transfer_to", Fields: []string{"to_warehouse_id"}},
-			{Name: "idx_transfer_variant", Fields: []string{"product_variant_id"}},
-			{Name: "idx_transfer_status", Fields: []string{"status"}},
+			schema.UniqueIndexOn("idx_transfer_number", "transfer_number"),
+			schema.IndexOn("idx_transfer_from", "from_warehouse_id"),
+			schema.IndexOn("idx_transfer_to", "to_warehouse_id"),
+			schema.IndexOn("idx_transfer_variant", "product_variant_id"),
+			schema.IndexOn("idx_transfer_status", "status"),
 		},
 	}
 }
 
 func (StockTransfer) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("from_warehouse_id", "Warehouse").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("outbound_stock_transfers").Build(),
-		schema.ForeignKey("to_warehouse_id", "Warehouse").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("inbound_stock_transfers").Build(),
-		schema.ForeignKey("product_variant_id", "ProductVariant").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("transfers").Build(),
+		schema.ForeignKeyField("from_warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("outbound_stock_transfers")),
+		schema.ForeignKeyField("to_warehouse_id", "Warehouse",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("inbound_stock_transfers")),
+		schema.ForeignKeyField("product_variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("transfers")),
 	}
 }
 

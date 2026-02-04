@@ -9,44 +9,44 @@ import (
 
 // Cart represents a shopping cart
 type Cart struct {
-	schema.BaseSchema
+	CartGenerated
 }
 
 func (Cart) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("customer_id").Optional().
-			HelpText("Customer (null for guest carts)").Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("customer_id", schema.Optional(),
+			schema.HelpText("Customer (null for guest carts)")),
 		
 		// Guest cart identification
-		schema.String("session_id").MaxLength(255).Optional().
-			HelpText("Session ID for guest carts").Build(),
-		schema.String("guest_email").MaxLength(255).Optional().Build(),
+		schema.StringField("session_id", schema.MaxLength(255), schema.Optional(),
+			schema.HelpText("Session ID for guest carts")),
+		schema.StringField("guest_email", schema.MaxLength(255), schema.Optional()),
 		
 		// Pricing
-		schema.Float64("subtotal").Default(0.0).
-			HelpText("Cart subtotal before discounts").Build(),
-		schema.Float64("discount_amount").Default(0.0).Build(),
-		schema.Float64("tax_amount").Default(0.0).Build(),
-		schema.Float64("shipping_amount").Default(0.0).Build(),
-		schema.Float64("total").Default(0.0).
-			HelpText("Cart total").Build(),
+		schema.Float64Field("subtotal", schema.Default(0.0),
+			schema.HelpText("Cart subtotal before discounts")),
+		schema.Float64Field("discount_amount", schema.Default(0.0)),
+		schema.Float64Field("tax_amount", schema.Default(0.0)),
+		schema.Float64Field("shipping_amount", schema.Default(0.0)),
+		schema.Float64Field("total", schema.Default(0.0),
+			schema.HelpText("Cart total")),
 		
 		// Coupon
-		schema.Int64("coupon_id").Optional().Build(),
-		schema.String("coupon_code").MaxLength(50).Optional().Build(),
+		schema.Int64Field("coupon_id", schema.Optional()),
+		schema.StringField("coupon_code", schema.MaxLength(50), schema.Optional()),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("active").
-			HelpText("Status: active, abandoned, converted").Build(),
-		schema.Bool("is_abandoned").Default(false).Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("active"),
+			schema.HelpText("Status: active, abandoned, converted")),
+		schema.BoolField("is_abandoned", schema.Default(false)),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("last_activity_at").Optional().Build(),
-		schema.Time("converted_at").Optional().
-			HelpText("When cart was converted to order").Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("last_activity_at", schema.Optional()),
+		schema.TimeField("converted_at", schema.Optional(),
+			schema.HelpText("When cart was converted to order")),
 	}
 }
 
@@ -57,24 +57,22 @@ func (Cart) Meta() schema.Meta {
 		VerboseNamePlural: "Shopping Carts",
 		OrderBy:          []string{"-updated_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_cart_customer", Fields: []string{"customer_id"}},
-			{Name: "idx_cart_session", Fields: []string{"session_id"}},
-			{Name: "idx_cart_status", Fields: []string{"status"}},
-			{Name: "idx_cart_abandoned", Fields: []string{"is_abandoned"}},
+			schema.IndexOn("idx_cart_customer", "customer_id"),
+			schema.IndexOn("idx_cart_session", "session_id"),
+			schema.IndexOn("idx_cart_status", "status"),
+			schema.IndexOn("idx_cart_abandoned", "is_abandoned"),
 		},
 	}
 }
 
 func (Cart) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer").
-			OnDelete(schema.CascadeCASCADE).
-			Optional().
-			RelatedName("carts").Build(),
-		schema.ForeignKey("coupon_id", "Coupon").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("carts").Build(),
+		schema.ForeignKeyField("customer_id", "Customer",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("carts")),
+		schema.ForeignKeyField("coupon_id", "Coupon",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("carts")),
 	}
 }
 
@@ -90,33 +88,33 @@ func (Cart) Hooks() *schema.ModelHooks {
 
 // CartItem represents items in a shopping cart
 type CartItem struct {
-	schema.BaseSchema
+	CartItemGenerated
 }
 
 func (CartItem) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("cart_id").Required().Build(),
-		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Optional().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("cart_id", schema.Required()),
+		schema.Int64Field("product_id", schema.Required()),
+		schema.Int64Field("variant_id", schema.Optional()),
 		
 		// Quantity and pricing
-		schema.Int32("quantity").Required().Default(1).Build(),
-		schema.Float64("unit_price").Required().
-			HelpText("Price per unit at time of adding").Build(),
-		schema.Float64("discount_amount").Default(0.0).Build(),
-		schema.Float64("tax_amount").Default(0.0).Build(),
-		schema.Float64("total").Required().
-			HelpText("Line total (quantity * unit_price - discount + tax)").Build(),
+		schema.Int32Field("quantity", schema.Required(), schema.Default(1)),
+		schema.Float64Field("unit_price", schema.Required(),
+			schema.HelpText("Price per unit at time of adding")),
+		schema.Float64Field("discount_amount", schema.Default(0.0)),
+		schema.Float64Field("tax_amount", schema.Default(0.0)),
+		schema.Float64Field("total", schema.Required(),
+			schema.HelpText("Line total (quantity * unit_price - discount + tax)")),
 		
 		// Product snapshot (for price changes)
-		schema.String("product_name").MaxLength(255).Optional().Build(),
-		schema.String("variant_name").MaxLength(255).Optional().Build(),
-		schema.String("image_url").MaxLength(500).Optional().Build(),
+		schema.StringField("product_name", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("variant_name", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("image_url", schema.MaxLength(500), schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -127,9 +125,9 @@ func (CartItem) Meta() schema.Meta {
 		VerboseNamePlural: "Cart Items",
 		OrderBy:          []string{"created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_cart_item_cart", Fields: []string{"cart_id"}},
-			{Name: "idx_cart_item_product", Fields: []string{"product_id"}},
-			{Name: "idx_cart_item_variant", Fields: []string{"variant_id"}},
+			schema.IndexOn("idx_cart_item_cart", "cart_id"),
+			schema.IndexOn("idx_cart_item_product", "product_id"),
+			schema.IndexOn("idx_cart_item_variant", "variant_id"),
 		},
 		UniqueTogether: [][]string{
 			{"cart_id", "product_id", "variant_id"},
@@ -139,18 +137,15 @@ func (CartItem) Meta() schema.Meta {
 
 func (CartItem) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("cart_id", "Cart").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("items").Build(),
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("cart_items").Build(),
-		schema.ForeignKey("variant_id", "ProductVariant").
-			OnDelete(schema.CascadeCASCADE).
-			Optional().
-			RelatedName("cart_items").Build(),
+		schema.ForeignKeyField("cart_id", "Cart",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("items")),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("cart_items")),
+		schema.ForeignKeyField("variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("cart_items")),
 	}
 }
 
@@ -170,104 +165,104 @@ func (CartItem) Hooks() *schema.ModelHooks {
 
 // Order represents a customer order
 type Order struct {
-	schema.BaseSchema
+	OrderGenerated
 }
 
 func (Order) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
 		
 		// Order identification
-		schema.String("order_number").Required().MaxLength(50).Unique().
-			HelpText("Human-readable order number").Build(),
+		schema.StringField("order_number", schema.Required(), schema.MaxLength(50), schema.Unique(),
+			schema.HelpText("Human-readable order number")),
 		
 		// Customer
-		schema.Int64("customer_id").Required().Build(),
-		schema.String("customer_email").Required().MaxLength(255).Build(),
-		schema.String("customer_first_name").Required().MaxLength(100).Build(),
-		schema.String("customer_last_name").Required().MaxLength(100).Build(),
-		schema.String("customer_phone").MaxLength(20).Optional().Build(),
+		schema.Int64Field("customer_id", schema.Required()),
+		schema.StringField("customer_email", schema.Required(), schema.MaxLength(255)),
+		schema.StringField("customer_first_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("customer_last_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("customer_phone", schema.MaxLength(20), schema.Optional()),
 		
 		// Pricing
-		schema.Float64("subtotal").Required().
-			HelpText("Order subtotal before discounts").Build(),
-		schema.Float64("discount_amount").Default(0.0).Build(),
-		schema.Float64("tax_amount").Required().Build(),
-		schema.Float64("shipping_amount").Required().Build(),
-		schema.Float64("total").Required().
-			HelpText("Order total").Build(),
+		schema.Float64Field("subtotal", schema.Required(),
+			schema.HelpText("Order subtotal before discounts")),
+		schema.Float64Field("discount_amount", schema.Default(0.0)),
+		schema.Float64Field("tax_amount", schema.Required()),
+		schema.Float64Field("shipping_amount", schema.Required()),
+		schema.Float64Field("total", schema.Required(),
+			schema.HelpText("Order total")),
 		
 		// Coupon
-		schema.Int64("coupon_id").Optional().Build(),
-		schema.String("coupon_code").MaxLength(50).Optional().Build(),
-		schema.Float64("coupon_discount").Default(0.0).Build(),
+		schema.Int64Field("coupon_id", schema.Optional()),
+		schema.StringField("coupon_code", schema.MaxLength(50), schema.Optional()),
+		schema.Float64Field("coupon_discount", schema.Default(0.0)),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("pending").
-			HelpText("Status: pending, processing, shipped, delivered, cancelled, refunded").Build(),
-		schema.String("payment_status").Required().MaxLength(20).Default("pending").
-			HelpText("Payment status: pending, paid, failed, refunded").Build(),
-		schema.String("fulfillment_status").Required().MaxLength(20).Default("unfulfilled").
-			HelpText("Fulfillment: unfulfilled, partial, fulfilled").Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("pending"),
+			schema.HelpText("Status: pending, processing, shipped, delivered, cancelled, refunded")),
+		schema.StringField("payment_status", schema.Required(), schema.MaxLength(20), schema.Default("pending"),
+			schema.HelpText("Payment status: pending, paid, failed, refunded")),
+		schema.StringField("fulfillment_status", schema.Required(), schema.MaxLength(20), schema.Default("unfulfilled"),
+			schema.HelpText("Fulfillment: unfulfilled, partial, fulfilled")),
 		
 		// Addresses
-		schema.Int64("shipping_address_id").Optional().Build(),
-		schema.Int64("billing_address_id").Optional().Build(),
+		schema.Int64Field("shipping_address_id", schema.Optional()),
+		schema.Int64Field("billing_address_id", schema.Optional()),
 		
 		// Shipping address snapshot
-		schema.String("shipping_first_name").MaxLength(100).Optional().Build(),
-		schema.String("shipping_last_name").MaxLength(100).Optional().Build(),
-		schema.String("shipping_company").MaxLength(200).Optional().Build(),
-		schema.String("shipping_address_line1").MaxLength(255).Optional().Build(),
-		schema.String("shipping_address_line2").MaxLength(255).Optional().Build(),
-		schema.String("shipping_city").MaxLength(100).Optional().Build(),
-		schema.String("shipping_state").MaxLength(100).Optional().Build(),
-		schema.String("shipping_postal_code").MaxLength(20).Optional().Build(),
-		schema.String("shipping_country_code").MaxLength(2).Optional().Build(),
-		schema.String("shipping_country_name").MaxLength(100).Optional().Build(),
-		schema.String("shipping_phone").MaxLength(20).Optional().Build(),
+		schema.StringField("shipping_first_name", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("shipping_last_name", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("shipping_company", schema.MaxLength(200), schema.Optional()),
+		schema.StringField("shipping_address_line1", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("shipping_address_line2", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("shipping_city", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("shipping_state", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("shipping_postal_code", schema.MaxLength(20), schema.Optional()),
+		schema.StringField("shipping_country_code", schema.MaxLength(2), schema.Optional()),
+		schema.StringField("shipping_country_name", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("shipping_phone", schema.MaxLength(20), schema.Optional()),
 		
 		// Billing address snapshot
-		schema.String("billing_first_name").MaxLength(100).Optional().Build(),
-		schema.String("billing_last_name").MaxLength(100).Optional().Build(),
-		schema.String("billing_company").MaxLength(200).Optional().Build(),
-		schema.String("billing_address_line1").MaxLength(255).Optional().Build(),
-		schema.String("billing_address_line2").MaxLength(255).Optional().Build(),
-		schema.String("billing_city").MaxLength(100).Optional().Build(),
-		schema.String("billing_state").MaxLength(100).Optional().Build(),
-		schema.String("billing_postal_code").MaxLength(20).Optional().Build(),
-		schema.String("billing_country_code").MaxLength(2).Optional().Build(),
-		schema.String("billing_country_name").MaxLength(100).Optional().Build(),
+		schema.StringField("billing_first_name", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("billing_last_name", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("billing_company", schema.MaxLength(200), schema.Optional()),
+		schema.StringField("billing_address_line1", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("billing_address_line2", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("billing_city", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("billing_state", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("billing_postal_code", schema.MaxLength(20), schema.Optional()),
+		schema.StringField("billing_country_code", schema.MaxLength(2), schema.Optional()),
+		schema.StringField("billing_country_name", schema.MaxLength(100), schema.Optional()),
 		
 		// Payment
-		schema.String("payment_method").MaxLength(50).Optional().
-			HelpText("Payment method: credit_card, paypal, stripe, etc.").Build(),
-		schema.String("payment_transaction_id").MaxLength(255).Optional().Build(),
+		schema.StringField("payment_method", schema.MaxLength(50), schema.Optional(),
+			schema.HelpText("Payment method: credit_card, paypal, stripe, etc.")),
+		schema.StringField("payment_transaction_id", schema.MaxLength(255), schema.Optional()),
 		
 		// Shipping
-		schema.String("shipping_method").MaxLength(100).Optional().Build(),
-		schema.String("tracking_number").MaxLength(255).Optional().Build(),
-		schema.String("carrier").MaxLength(100).Optional().Build(),
+		schema.StringField("shipping_method", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("tracking_number", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("carrier", schema.MaxLength(100), schema.Optional()),
 		
 		// Additional information
-		schema.Text("customer_notes").Optional().
-			HelpText("Notes from customer").Build(),
-		schema.Text("admin_notes").Optional().
-			HelpText("Internal notes").Build(),
+		schema.TextField("customer_notes", schema.Optional(),
+			schema.HelpText("Notes from customer")),
+		schema.TextField("admin_notes", schema.Optional(),
+			schema.HelpText("Internal notes")),
 		
 		// IP and user agent (for fraud detection)
-		schema.String("ip_address").MaxLength(45).Optional().Build(),
-		schema.String("user_agent").MaxLength(500).Optional().Build(),
+		schema.StringField("ip_address", schema.MaxLength(45), schema.Optional()),
+		schema.StringField("user_agent", schema.MaxLength(500), schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("paid_at").Optional().Build(),
-		schema.Time("shipped_at").Optional().Build(),
-		schema.Time("delivered_at").Optional().Build(),
-		schema.Time("cancelled_at").Optional().Build(),
-		schema.Time("expires_at").Optional().
-			HelpText("Order expiry for pending orders").Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("paid_at", schema.Optional()),
+		schema.TimeField("shipped_at", schema.Optional()),
+		schema.TimeField("delivered_at", schema.Optional()),
+		schema.TimeField("cancelled_at", schema.Optional()),
+		schema.TimeField("expires_at", schema.Optional(),
+			schema.HelpText("Order expiry for pending orders")),
 	}
 }
 
@@ -278,34 +273,30 @@ func (Order) Meta() schema.Meta {
 		VerboseNamePlural: "Orders",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_order_number", Fields: []string{"order_number"}, Unique: true},
-			{Name: "idx_order_customer", Fields: []string{"customer_id"}},
-			{Name: "idx_order_status", Fields: []string{"status"}},
-			{Name: "idx_order_payment_status", Fields: []string{"payment_status"}},
-			{Name: "idx_order_created", Fields: []string{"created_at"}},
-			{Name: "idx_order_email", Fields: []string{"customer_email"}},
+			schema.UniqueIndexOn("idx_order_number", "order_number"),
+			schema.IndexOn("idx_order_customer", "customer_id"),
+			schema.IndexOn("idx_order_status", "status"),
+			schema.IndexOn("idx_order_payment_status", "payment_status"),
+			schema.IndexOn("idx_order_created", "created_at"),
+			schema.IndexOn("idx_order_email", "customer_email"),
 		},
 	}
 }
 
 func (Order) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("orders").Build(),
-		schema.ForeignKey("coupon_id", "Coupon").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("orders").Build(),
-		schema.ForeignKey("shipping_address_id", "Address").
-			OnDelete(schema.CascadePROTECT).
-			Optional().
-			RelatedName("shipping_orders").Build(),
-		schema.ForeignKey("billing_address_id", "Address").
-			OnDelete(schema.CascadePROTECT).
-			Optional().
-			RelatedName("billing_orders").Build(),
+		schema.ForeignKeyField("customer_id", "Customer",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("orders")),
+		schema.ForeignKeyField("coupon_id", "Coupon",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("orders")),
+		schema.ForeignKeyField("shipping_address_id", "Address",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("shipping_orders")),
+		schema.ForeignKeyField("billing_address_id", "Address",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("billing_orders")),
 	}
 }
 
@@ -335,44 +326,44 @@ func (Order) Hooks() *schema.ModelHooks {
 
 // OrderItem represents line items in an order
 type OrderItem struct {
-	schema.BaseSchema
+	OrderItemGenerated
 }
 
 func (OrderItem) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("order_id").Required().Build(),
-		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Optional().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("order_id", schema.Required()),
+		schema.Int64Field("product_id", schema.Required()),
+		schema.Int64Field("variant_id", schema.Optional()),
 		
 		// Product snapshot (prices can change)
-		schema.String("product_name").Required().MaxLength(255).Build(),
-		schema.String("product_sku").Required().MaxLength(100).Build(),
-		schema.String("variant_name").MaxLength(255).Optional().Build(),
-		schema.String("variant_sku").MaxLength(100).Optional().Build(),
-		schema.String("image_url").MaxLength(500).Optional().Build(),
+		schema.StringField("product_name", schema.Required(), schema.MaxLength(255)),
+		schema.StringField("product_sku", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("variant_name", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("variant_sku", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("image_url", schema.MaxLength(500), schema.Optional()),
 		
 		// Quantity and pricing
-		schema.Int32("quantity").Required().Default(1).Build(),
-		schema.Float64("unit_price").Required().
-			HelpText("Price per unit at time of order").Build(),
-		schema.Float64("discount_amount").Default(0.0).Build(),
-		schema.Float64("tax_amount").Default(0.0).Build(),
-		schema.Float64("total").Required().
-			HelpText("Line total").Build(),
+		schema.Int32Field("quantity", schema.Required(), schema.Default(1)),
+		schema.Float64Field("unit_price", schema.Required(),
+			schema.HelpText("Price per unit at time of order")),
+		schema.Float64Field("discount_amount", schema.Default(0.0)),
+		schema.Float64Field("tax_amount", schema.Default(0.0)),
+		schema.Float64Field("total", schema.Required(),
+			schema.HelpText("Line total")),
 		
 		// Fulfillment
-		schema.Int32("quantity_fulfilled").Default(0).Build(),
-		schema.Int32("quantity_refunded").Default(0).Build(),
-		schema.String("fulfillment_status").Required().MaxLength(20).Default("unfulfilled").
-			HelpText("Status: unfulfilled, fulfilled, refunded").Build(),
+		schema.Int32Field("quantity_fulfilled", schema.Default(0)),
+		schema.Int32Field("quantity_refunded", schema.Default(0)),
+		schema.StringField("fulfillment_status", schema.Required(), schema.MaxLength(20), schema.Default("unfulfilled"),
+			schema.HelpText("Status: unfulfilled, fulfilled, refunded")),
 		
 		// Physical attributes (for shipping calculations)
-		schema.Float64("weight").Optional().Build(),
+		schema.Float64Field("weight", schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -383,27 +374,24 @@ func (OrderItem) Meta() schema.Meta {
 		VerboseNamePlural: "Order Items",
 		OrderBy:          []string{"created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_order_item_order", Fields: []string{"order_id"}},
-			{Name: "idx_order_item_product", Fields: []string{"product_id"}},
-			{Name: "idx_order_item_variant", Fields: []string{"variant_id"}},
+			schema.IndexOn("idx_order_item_order", "order_id"),
+			schema.IndexOn("idx_order_item_product", "product_id"),
+			schema.IndexOn("idx_order_item_variant", "variant_id"),
 		},
 	}
 }
 
 func (OrderItem) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("items").Build(),
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("order_items").Build(),
-		schema.ForeignKey("variant_id", "ProductVariant").
-			OnDelete(schema.CascadePROTECT).
-			Optional().
-			RelatedName("order_items").Build(),
+		schema.ForeignKeyField("order_id", "Order",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("items")),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("order_items")),
+		schema.ForeignKeyField("variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("order_items")),
 	}
 }
 
@@ -411,6 +399,7 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 	return &schema.ModelHooks{
 		BeforeSave: func(ctx context.Context, instance interface{}) error {
 			// Calculate line total
+			// Capture product snapshot
 			return nil
 		},
 		AfterSave: func(ctx context.Context, instance interface{}) error {
@@ -423,48 +412,48 @@ func (OrderItem) Hooks() *schema.ModelHooks {
 
 // Payment represents payment transactions
 type Payment struct {
-	schema.BaseSchema
+	PaymentGenerated
 }
 
 func (Payment) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("order_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("order_id", schema.Required()),
 		
 		// Payment identification
-		schema.String("transaction_id").MaxLength(255).Optional().
-			HelpText("External payment gateway transaction ID").Build(),
+		schema.StringField("transaction_id", schema.MaxLength(255), schema.Optional(),
+			schema.HelpText("External payment gateway transaction ID")),
 		
 		// Amount
-		schema.Float64("amount").Required().
-			HelpText("Payment amount").Build(),
-		schema.String("currency").Required().MaxLength(3).Default("USD").Build(),
+		schema.Float64Field("amount", schema.Required(),
+			schema.HelpText("Payment amount")),
+		schema.StringField("currency", schema.Required(), schema.MaxLength(3), schema.Default("USD")),
 		
 		// Payment method
-		schema.String("payment_method").Required().MaxLength(50).
-			HelpText("Method: credit_card, paypal, stripe, bank_transfer, etc.").Build(),
-		schema.String("payment_gateway").MaxLength(50).Optional().
-			HelpText("Gateway used: stripe, paypal, square, etc.").Build(),
+		schema.StringField("payment_method", schema.Required(), schema.MaxLength(50),
+			schema.HelpText("Method: credit_card, paypal, stripe, bank_transfer, etc.")),
+		schema.StringField("payment_gateway", schema.MaxLength(50), schema.Optional(),
+			schema.HelpText("Gateway used: stripe, paypal, square, etc.")),
 		
 		// Card details (last 4 digits only for security)
-		schema.String("card_last4").MaxLength(4).Optional().Build(),
-		schema.String("card_brand").MaxLength(50).Optional().Build(),
+		schema.StringField("card_last4", schema.MaxLength(4), schema.Optional()),
+		schema.StringField("card_brand", schema.MaxLength(50), schema.Optional()),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("pending").
-			HelpText("Status: pending, completed, failed, refunded, cancelled").Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("pending"),
+			schema.HelpText("Status: pending, completed, failed, refunded, cancelled")),
 		
 		// Additional information
-		schema.Text("gateway_response").Optional().
-			HelpText("Full gateway response (JSON)").Build(),
-		schema.String("failure_reason").MaxLength(500).Optional().Build(),
+		schema.TextField("gateway_response", schema.Optional(),
+			schema.HelpText("Full gateway response (JSON)")),
+		schema.StringField("failure_reason", schema.MaxLength(500), schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("completed_at").Optional().Build(),
-		schema.Time("failed_at").Optional().Build(),
-		schema.Time("refunded_at").Optional().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("completed_at", schema.Optional()),
+		schema.TimeField("failed_at", schema.Optional()),
+		schema.TimeField("refunded_at", schema.Optional()),
 	}
 }
 
@@ -475,19 +464,18 @@ func (Payment) Meta() schema.Meta {
 		VerboseNamePlural: "Payments",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_payment_order", Fields: []string{"order_id"}},
-			{Name: "idx_payment_transaction", Fields: []string{"transaction_id"}},
-			{Name: "idx_payment_status", Fields: []string{"status"}},
+			schema.IndexOn("idx_payment_order", "order_id"),
+			schema.IndexOn("idx_payment_transaction", "transaction_id"),
+			schema.IndexOn("idx_payment_status", "status"),
 		},
 	}
 }
 
 func (Payment) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("payments").Build(),
+		schema.ForeignKeyField("order_id", "Order",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("payments")),
 	}
 }
 
@@ -503,54 +491,54 @@ func (Payment) Hooks() *schema.ModelHooks {
 
 // Shipment represents order shipments
 type Shipment struct {
-	schema.BaseSchema
+	ShipmentGenerated
 }
 
 func (Shipment) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("order_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("order_id", schema.Required()),
 		
 		// Tracking
-		schema.String("tracking_number").Required().MaxLength(255).Build(),
-		schema.String("carrier").Required().MaxLength(100).
-			HelpText("Carrier: USPS, UPS, FedEx, DHL, etc.").Build(),
-		schema.String("service_level").MaxLength(100).Optional().
-			HelpText("Service: Standard, Express, Overnight, etc.").Build(),
+		schema.StringField("tracking_number", schema.Required(), schema.MaxLength(255)),
+		schema.StringField("carrier", schema.Required(), schema.MaxLength(100),
+			schema.HelpText("Carrier: USPS, UPS, FedEx, DHL, etc.")),
+		schema.StringField("service_level", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Service: Standard, Express, Overnight, etc.")),
 		
 		// Shipping address (snapshot)
-		schema.String("recipient_name").Required().MaxLength(200).Build(),
-		schema.String("address_line1").Required().MaxLength(255).Build(),
-		schema.String("address_line2").MaxLength(255).Optional().Build(),
-		schema.String("city").Required().MaxLength(100).Build(),
-		schema.String("state").MaxLength(100).Optional().Build(),
-		schema.String("postal_code").Required().MaxLength(20).Build(),
-		schema.String("country_code").Required().MaxLength(2).Build(),
-		schema.String("country_name").Required().MaxLength(100).Build(),
-		schema.String("phone").MaxLength(20).Optional().Build(),
+		schema.StringField("recipient_name", schema.Required(), schema.MaxLength(200)),
+		schema.StringField("address_line1", schema.Required(), schema.MaxLength(255)),
+		schema.StringField("address_line2", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("city", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("state", schema.MaxLength(100), schema.Optional()),
+		schema.StringField("postal_code", schema.Required(), schema.MaxLength(20)),
+		schema.StringField("country_code", schema.Required(), schema.MaxLength(2)),
+		schema.StringField("country_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("phone", schema.MaxLength(20), schema.Optional()),
 		
 		// Shipping details
-		schema.Float64("weight").Optional().
-			HelpText("Total weight in kg").Build(),
-		schema.Float64("shipping_cost").Required().Build(),
+		schema.Float64Field("weight", schema.Optional(),
+			schema.HelpText("Total weight in kg")),
+		schema.Float64Field("shipping_cost", schema.Required()),
 		
 		// Status
-		schema.String("status").Required().MaxLength(20).Default("pending").
-			HelpText("Status: pending, in_transit, delivered, failed, returned").Build(),
+		schema.StringField("status", schema.Required(), schema.MaxLength(20), schema.Default("pending"),
+			schema.HelpText("Status: pending, in_transit, delivered, failed, returned")),
 		
 		// Tracking events
-		schema.Text("tracking_events").Optional().
-			HelpText("JSON array of tracking events").Build(),
+		schema.TextField("tracking_events", schema.Optional(),
+			schema.HelpText("JSON array of tracking events")),
 		
 		// Notes
-		schema.Text("notes").Optional().Build(),
+		schema.TextField("notes", schema.Optional()),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("shipped_at").Optional().Build(),
-		schema.Time("estimated_delivery_at").Optional().Build(),
-		schema.Time("delivered_at").Optional().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("shipped_at", schema.Optional()),
+		schema.TimeField("estimated_delivery_at", schema.Optional()),
+		schema.TimeField("delivered_at", schema.Optional()),
 	}
 }
 
@@ -561,19 +549,18 @@ func (Shipment) Meta() schema.Meta {
 		VerboseNamePlural: "Shipments",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_shipment_order", Fields: []string{"order_id"}},
-			{Name: "idx_shipment_tracking", Fields: []string{"tracking_number"}},
-			{Name: "idx_shipment_status", Fields: []string{"status"}},
+			schema.IndexOn("idx_shipment_order", "order_id"),
+			schema.IndexOn("idx_shipment_tracking", "tracking_number"),
+			schema.IndexOn("idx_shipment_status", "status"),
 		},
 	}
 }
 
 func (Shipment) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("order_id", "Order").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("shipments").Build(),
+		schema.ForeignKeyField("order_id", "Order",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("shipments")),
 	}
 }
 

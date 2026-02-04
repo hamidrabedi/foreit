@@ -12,17 +12,17 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Cart]{
 		Icon: "ShoppingCart",
 		ListDisplay: []admin.Field{
-			CartFields.ID,
-			CartFields.GuestEmail,
-			CartFields.Total,
-			CartFields.Status,
-			CartFields.IsAbandoned,
-			CartFields.LastActivityAt,
-			CartFields.CreatedAt,
+			CartFieldsInstance.Id,
+			CartFieldsInstance.GuestEmail,
+			CartFieldsInstance.Total,
+			CartFieldsInstance.Status,
+			CartFieldsInstance.IsAbandoned,
+			CartFieldsInstance.LastActivityAt,
+			CartFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			CartFields.Status,
-			CartFields.IsAbandoned,
+			CartFieldsInstance.Status,
+			CartFieldsInstance.IsAbandoned,
 		},
 	})
 
@@ -30,15 +30,15 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[CartItem]{
 		Icon: "ShoppingBag",
 		ListDisplay: []admin.Field{
-			CartItemFields.CartID,
-			CartItemFields.ProductName,
-			CartItemFields.VariantName,
-			CartItemFields.Quantity,
-			CartItemFields.UnitPrice,
-			CartItemFields.Total,
+			CartItemFieldsInstance.CartId,
+			CartItemFieldsInstance.ProductName,
+			CartItemFieldsInstance.VariantName,
+			CartItemFieldsInstance.Quantity,
+			CartItemFieldsInstance.UnitPrice,
+			CartItemFieldsInstance.Total,
 		},
 		ListFilter: []admin.Field{
-			CartItemFields.CartID,
+			CartItemFieldsInstance.CartId,
 		},
 	})
 
@@ -46,22 +46,22 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Order]{
 		Icon: "ClipboardList",
 		ListDisplay: []admin.Field{
-			OrderFields.OrderNumber,
-			OrderFields.CustomerEmail,
-			OrderFields.Total,
-			OrderFields.Status,
-			OrderFields.PaymentStatus,
-			OrderFields.FulfillmentStatus,
-			OrderFields.CreatedAt,
+			OrderFieldsInstance.OrderNumber,
+			OrderFieldsInstance.CustomerEmail,
+			OrderFieldsInstance.Total,
+			OrderFieldsInstance.Status,
+			OrderFieldsInstance.PaymentStatus,
+			OrderFieldsInstance.FulfillmentStatus,
+			OrderFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			OrderFields.Status,
-			OrderFields.PaymentStatus,
-			OrderFields.FulfillmentStatus,
+			OrderFieldsInstance.Status,
+			OrderFieldsInstance.PaymentStatus,
+			OrderFieldsInstance.FulfillmentStatus,
 		},
 		SearchFields: []admin.Field{
-			OrderFields.OrderNumber,
-			OrderFields.CustomerEmail,
+			OrderFieldsInstance.OrderNumber,
+			OrderFieldsInstance.CustomerEmail,
 		},
 	})
 
@@ -69,12 +69,12 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[OrderItem]{
 		Icon: "Package",
 		ListDisplay: []admin.Field{
-			OrderItemFields.OrderID,
-			OrderItemFields.ProductName,
-			OrderItemFields.Quantity,
-			OrderItemFields.UnitPrice,
-			OrderItemFields.Total,
-			OrderItemFields.FulfillmentStatus,
+			OrderItemFieldsInstance.OrderId,
+			OrderItemFieldsInstance.ProductName,
+			OrderItemFieldsInstance.Quantity,
+			OrderItemFieldsInstance.UnitPrice,
+			OrderItemFieldsInstance.Total,
+			OrderItemFieldsInstance.FulfillmentStatus,
 		},
 	})
 
@@ -82,16 +82,16 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Payment]{
 		Icon: "CreditCard",
 		ListDisplay: []admin.Field{
-			PaymentFields.OrderID,
-			PaymentFields.Amount,
-			PaymentFields.Currency,
-			PaymentFields.PaymentMethod,
-			PaymentFields.Status,
-			PaymentFields.TransactionID,
+			PaymentFieldsInstance.OrderId,
+			PaymentFieldsInstance.Amount,
+			PaymentFieldsInstance.Currency,
+			PaymentFieldsInstance.PaymentMethod,
+			PaymentFieldsInstance.Status,
+			PaymentFieldsInstance.TransactionId,
 		},
 		ListFilter: []admin.Field{
-			PaymentFields.Status,
-			PaymentFields.PaymentMethod,
+			PaymentFieldsInstance.Status,
+			PaymentFieldsInstance.PaymentMethod,
 		},
 	})
 
@@ -99,15 +99,15 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Shipment]{
 		Icon: "Truck",
 		ListDisplay: []admin.Field{
-			ShipmentFields.OrderID,
-			ShipmentFields.TrackingNumber,
-			ShipmentFields.Carrier,
-			ShipmentFields.Status,
-			ShipmentFields.ShippedAt,
+			ShipmentFieldsInstance.OrderId,
+			ShipmentFieldsInstance.TrackingNumber,
+			ShipmentFieldsInstance.Carrier,
+			ShipmentFieldsInstance.Status,
+			ShipmentFieldsInstance.ShippedAt,
 		},
 		ListFilter: []admin.Field{
-			ShipmentFields.Status,
-			ShipmentFields.Carrier,
+			ShipmentFieldsInstance.Status,
+			ShipmentFieldsInstance.Carrier,
 		},
 	})
 }

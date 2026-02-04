@@ -12,16 +12,16 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Coupon]{
 		Icon: "Ticket",
 		ListDisplay: []admin.Field{
-			CouponFields.Code,
-			CouponFields.Name,
-			CouponFields.DiscountType,
-			CouponFields.DiscountValue,
-			CouponFields.IsActive,
-			CouponFields.ValidUntil,
+			CouponFieldsInstance.Code,
+			CouponFieldsInstance.Name,
+			CouponFieldsInstance.DiscountType,
+			CouponFieldsInstance.DiscountValue,
+			CouponFieldsInstance.IsActive,
+			CouponFieldsInstance.ValidUntil,
 		},
 		ListFilter: []admin.Field{
-			CouponFields.DiscountType,
-			CouponFields.IsActive,
+			CouponFieldsInstance.DiscountType,
+			CouponFieldsInstance.IsActive,
 		},
 	})
 
@@ -29,11 +29,11 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[CouponUsage]{
 		Icon: "BarChart3",
 		ListDisplay: []admin.Field{
-			CouponUsageFields.CouponID,
-			CouponUsageFields.OrderID,
-			CouponUsageFields.CustomerID,
-			CouponUsageFields.DiscountAmount,
-			CouponUsageFields.CreatedAt,
+			CouponUsageFieldsInstance.CouponId,
+			CouponUsageFieldsInstance.OrderId,
+			CouponUsageFieldsInstance.CustomerId,
+			CouponUsageFieldsInstance.DiscountAmount,
+			CouponUsageFieldsInstance.CreatedAt,
 		},
 	})
 
@@ -41,17 +41,17 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[Review]{
 		Icon: "Star",
 		ListDisplay: []admin.Field{
-			ReviewFields.ProductID,
-			ReviewFields.CustomerID,
-			ReviewFields.Rating,
-			ReviewFields.Status,
-			ReviewFields.IsFeatured,
-			ReviewFields.CreatedAt,
+			ReviewFieldsInstance.ProductId,
+			ReviewFieldsInstance.CustomerId,
+			ReviewFieldsInstance.Rating,
+			ReviewFieldsInstance.Status,
+			ReviewFieldsInstance.IsFeatured,
+			ReviewFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			ReviewFields.Status,
-			ReviewFields.Rating,
-			ReviewFields.IsFeatured,
+			ReviewFieldsInstance.Status,
+			ReviewFieldsInstance.Rating,
+			ReviewFieldsInstance.IsFeatured,
 		},
 	})
 
@@ -59,9 +59,9 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[ReviewImage]{
 		Icon: "Image",
 		ListDisplay: []admin.Field{
-			ReviewImageFields.ReviewID,
-			ReviewImageFields.AltText,
-			ReviewImageFields.SortOrder,
+			ReviewImageFieldsInstance.ReviewId,
+			ReviewImageFieldsInstance.AltText,
+			ReviewImageFieldsInstance.SortOrder,
 		},
 	})
 
@@ -69,9 +69,9 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[ReviewHelpfulness]{
 		Icon: "ThumbsUp",
 		ListDisplay: []admin.Field{
-			ReviewHelpfulnessFields.ReviewID,
-			ReviewHelpfulnessFields.CustomerID,
-			ReviewHelpfulnessFields.IsHelpful,
+			ReviewHelpfulnessFieldsInstance.ReviewId,
+			ReviewHelpfulnessFieldsInstance.CustomerId,
+			ReviewHelpfulnessFieldsInstance.IsHelpful,
 		},
 	})
 
@@ -79,15 +79,15 @@ func RegisterAdmin(ctx context.Context) {
 	admin.Register(&admin.Config[ProductQuestion]{
 		Icon: "HelpCircle",
 		ListDisplay: []admin.Field{
-			ProductQuestionFields.ProductID,
-			ProductQuestionFields.CustomerID,
-			ProductQuestionFields.Status,
-			ProductQuestionFields.IsPublic,
-			ProductQuestionFields.CreatedAt,
+			ProductQuestionFieldsInstance.ProductId,
+			ProductQuestionFieldsInstance.CustomerId,
+			ProductQuestionFieldsInstance.Status,
+			ProductQuestionFieldsInstance.IsPublic,
+			ProductQuestionFieldsInstance.CreatedAt,
 		},
 		ListFilter: []admin.Field{
-			ProductQuestionFields.Status,
-			ProductQuestionFields.IsPublic,
+			ProductQuestionFieldsInstance.Status,
+			ProductQuestionFieldsInstance.IsPublic,
 		},
 	})
 }

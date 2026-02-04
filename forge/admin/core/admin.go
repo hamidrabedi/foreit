@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-
+	"strings"
 	"time"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 	"github.com/go-viper/mapstructure/v2"
@@ -69,6 +70,13 @@ func NewAdmin[T any](
 	}
 
 	return admin, nil
+}
+
+// SetDB sets the database connection for the admin manager
+func (a *Admin[T]) SetDB(database *db.DB) {
+	if a.manager != nil {
+		a.manager.SetDB(database)
+	}
 }
 
 // ModelName returns the name of the model
@@ -214,8 +222,79 @@ func (a *Admin[T]) ListObjects(ctx context.Context, params ListParams) (*Paginat
 			}
 		}
 		if !applied {
-			// Default filter behavior (exact match)
-			qs = qs.Filter(orm.F(key).Eq(value))
+			// Parse lookup (e.g. price__gt, name__contains)
+			field, lookup := parseLookup(key)
+			
+			// Create expression based on lookup
+			var expr orm.Expression
+			f := orm.F(field)
+
+			switch lookup {
+			case "exact":
+				expr = f.Eq(value)
+			case "ne":
+				expr = f.Ne(value)
+			case "gt":
+				expr = f.Gt(value)
+			case "gte":
+				expr = f.Gte(value)
+			case "lt":
+				expr = f.Lt(value)
+			case "lte":
+				expr = f.Lte(value)
+			case "contains":
+				if s, ok := value.(string); ok {
+					expr = f.Contains(s)
+				} else {
+					expr = f.Eq(value) // Fallback
+				}
+			case "icontains":
+				if s, ok := value.(string); ok {
+					expr = f.IContains(s)
+				} else {
+					expr = f.Eq(value) // Fallback
+				}
+			case "startswith":
+				if s, ok := value.(string); ok {
+					expr = f.StartsWith(s)
+				} else {
+					expr = f.Eq(value)
+				}
+			case "endswith":
+				if s, ok := value.(string); ok {
+					expr = f.EndsWith(s)
+				} else {
+					expr = f.Eq(value)
+				}
+			case "in":
+				// value should be slice or comma-separated string
+				// For now assume value is single string from query param
+				if s, ok := value.(string); ok {
+					parts := strings.Split(s, ",")
+					if len(parts) > 0 {
+						// We need to convert parts to interface{}
+						args := make([]interface{}, len(parts))
+						for i, v := range parts {
+							args[i] = v
+						}
+						expr = f.In(args...)
+					} else {
+						expr = f.Eq(value)
+					}
+				} else {
+					expr = f.Eq(value)
+				}
+			case "isnull":
+				if s, ok := value.(string); ok && (s == "true" || s == "1") {
+					expr = f.IsNull()
+				} else {
+					expr = f.IsNotNull()
+				}
+			default:
+				expr = f.Eq(value)
+			}
+			
+			qs = qs.Filter(expr)
 		}
 	}
 
@@ -468,10 +547,15 @@ func (a *Admin[T]) HasAddPermission(ctx context.Context, user interface{}) bool 
 }
 
 func (a *Admin[T]) HasChangePermission(ctx context.Context, user interface{}, obj interface{}) bool {
-	typedObj, ok := obj.(*T)
-	if !ok {
-		return false
+	var typedObj *T
+	if obj != nil {
+		var ok bool
+		typedObj, ok = obj.(*T)
+		if !ok {
+			return false
+		}
 	}
+
 	if a.config.HasChangePermission != nil {
 		return a.config.HasChangePermission(ctx, a, user, typedObj)
 	}
@@ -482,10 +566,15 @@ func (a *Admin[T]) HasChangePermission(ctx context.Context, user interface{}, ob
 }
 
 func (a *Admin[T]) HasDeletePermission(ctx context.Context, user interface{}, obj interface{}) bool {
-	typedObj, ok := obj.(*T)
-	if !ok {
-		return false
+	var typedObj *T
+	if obj != nil {
+		var ok bool
+		typedObj, ok = obj.(*T)
+		if !ok {
+			return false
+		}
 	}
+
 	if a.config.HasDeletePermission != nil {
 		return a.config.HasDeletePermission(ctx, a, user, typedObj)
 	}
@@ -496,10 +585,15 @@ func (a *Admin[T]) HasDeletePermission(ctx context.Context, user interface{}, ob
 }
 
 func (a *Admin[T]) HasViewPermission(ctx context.Context, user interface{}, obj interface{}) bool {
-	typedObj, ok := obj.(*T)
-	if !ok {
-		return false
+	var typedObj *T
+	if obj != nil {
+		var ok bool
+		typedObj, ok = obj.(*T)
+		if !ok {
+			return false
+		}
 	}
+
 	if a.config.HasViewPermission != nil {
 		return a.config.HasViewPermission(ctx, a, user, typedObj)
 	}
@@ -715,4 +809,18 @@ func toInt64(v interface{}) (int64, error) {
 	}
 
 	return 0, fmt.Errorf("cannot convert %T to int64", v)
+}
+
+// parseLookup splits key into field path and lookup (e.g. "price__gt" -> "price", "gt")
+func parseLookup(key string) (string, string) {
+	parts := strings.Split(key, "__")
+	if len(parts) > 1 {
+		last := parts[len(parts)-1]
+		// Check if last part is a known lookup
+		switch last {
+		case "exact", "ne", "gt", "gte", "lt", "lte", "contains", "icontains", "startswith", "endswith", "in", "isnull":
+			return strings.Join(parts[:len(parts)-1], "__"), last
+		}
+	}
+	return key, "exact"
 }

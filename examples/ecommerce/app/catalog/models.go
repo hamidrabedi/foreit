@@ -10,29 +10,40 @@ import (
 // Category represents a product category with hierarchical support
 type Category struct {
 	schema.BaseSchema
+	Id          int64   `json:"id" db:"id"`
+	Name        string  `json:"name" db:"name"`
+	Slug        string  `json:"slug" db:"slug"`
+	Description string  `json:"description" db:"description"`
+	ParentID    int64   `json:"parent_id" db:"parent_id"`
+	ImageURL    string  `json:"image_url" db:"image_url"`
+	SortOrder   int32   `json:"sort_order" db:"sort_order"`
+	IsActive    bool    `json:"is_active" db:"is_active"`
+	Level       int32   `json:"level" db:"level"`
+	CreatedAt   string  `json:"created_at" db:"created_at"`
+	UpdatedAt   string  `json:"updated_at" db:"updated_at"`
 }
 
 func (Category) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(200).Unique().
-			HelpText("Category name").Build(),
-		schema.String("slug").Required().MaxLength(200).Unique().
-			HelpText("URL-friendly identifier").Build(),
-		schema.Text("description").Optional().
-			HelpText("Category description").Build(),
-		schema.Int64("parent_id").Optional().
-			HelpText("Parent category for hierarchy").Build(),
-		schema.String("image_url").MaxLength(500).Optional().
-			HelpText("Category image").Build(),
-		schema.Int32("sort_order").Default(0).
-			HelpText("Display order").Build(),
-		schema.Bool("is_active").Default(true).
-			HelpText("Is category active").Build(),
-		schema.Int32("level").Default(0).
-			HelpText("Hierarchy level (0=root)").Build(),
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200), schema.Unique(),
+			schema.HelpText("Category name")),
+		schema.StringField("slug", schema.Required(), schema.MaxLength(200), schema.Unique(),
+			schema.HelpText("URL-friendly identifier")),
+		schema.TextField("description", schema.Optional(),
+			schema.HelpText("Category description")),
+		schema.Int64Field("parent_id", schema.Optional(),
+			schema.HelpText("Parent category for hierarchy")),
+		schema.StringField("image_url", schema.MaxLength(500), schema.Optional(),
+			schema.HelpText("Category image")),
+		schema.Int32Field("sort_order", schema.Default(0),
+			schema.HelpText("Display order")),
+		schema.BoolField("is_active", schema.Default(true),
+			schema.HelpText("Is category active")),
+		schema.Int32Field("level", schema.Default(0),
+			schema.HelpText("Hierarchy level (0=root)")),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -43,19 +54,18 @@ func (Category) Meta() schema.Meta {
 		VerboseNamePlural: "Categories",
 		OrderBy:           []string{"sort_order", "name"},
 		Indexes: []schema.Index{
-			{Name: "idx_category_slug", Fields: []string{"slug"}, Unique: true},
-			{Name: "idx_category_parent", Fields: []string{"parent_id"}},
-			{Name: "idx_category_active", Fields: []string{"is_active"}},
+			schema.UniqueIndexOn("idx_category_slug", "slug"),
+			schema.IndexOn("idx_category_parent", "parent_id"),
+			schema.IndexOn("idx_category_active", "is_active"),
 		},
 	}
 }
 
 func (Category) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("parent_id", "Category").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("children").Build(),
+		schema.ForeignKeyField("parent_id", "Category",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("children")),
 	}
 }
 
@@ -71,20 +81,20 @@ func (Category) Hooks() *schema.ModelHooks {
 
 // Brand represents a product brand
 type Brand struct {
-	schema.BaseSchema
+	BrandGenerated
 }
 
 func (Brand) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(200).Unique().Build(),
-		schema.String("slug").Required().MaxLength(200).Unique().Build(),
-		schema.Text("description").Optional().Build(),
-		schema.String("logo_url").MaxLength(500).Optional().Build(),
-		schema.String("website_url").MaxLength(500).Optional().Build(),
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200), schema.Unique()),
+		schema.StringField("slug", schema.Required(), schema.MaxLength(200), schema.Unique()),
+		schema.TextField("description", schema.Optional()),
+		schema.StringField("logo_url", schema.MaxLength(500), schema.Optional()),
+		schema.StringField("website_url", schema.MaxLength(500), schema.Optional()),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -95,7 +105,7 @@ func (Brand) Meta() schema.Meta {
 		VerboseNamePlural: "Brands",
 		OrderBy:           []string{"name"},
 		Indexes: []schema.Index{
-			{Name: "idx_brand_slug", Fields: []string{"slug"}, Unique: true},
+			schema.UniqueIndexOn("idx_brand_slug", "slug"),
 		},
 	}
 }
@@ -110,77 +120,76 @@ func (Brand) Hooks() *schema.ModelHooks {
 
 // Product represents a product in the catalog
 type Product struct {
-	schema.BaseSchema
-	IsActive bool `json:"is_active" db:"is_active"`
+	ProductGenerated
 }
 
 func (Product) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(255).
-			HelpText("Product name").Build(),
-		schema.String("slug").Required().MaxLength(255).Unique().
-			HelpText("URL-friendly identifier").Build(),
-		schema.String("sku").Required().MaxLength(100).Unique().
-			HelpText("Stock Keeping Unit").Build(),
-		schema.Text("description").Required().
-			HelpText("Full product description").Build(),
-		schema.Text("short_description").Optional().
-			HelpText("Brief description for listings").Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required(), schema.MaxLength(255),
+			schema.HelpText("Product name")),
+		schema.StringField("slug", schema.Required(), schema.MaxLength(255), schema.Unique(),
+			schema.HelpText("URL-friendly identifier")),
+		schema.StringField("sku", schema.Required(), schema.MaxLength(100), schema.Unique(),
+			schema.HelpText("Stock Keeping Unit")),
+		schema.TextField("description", schema.Required(),
+			schema.HelpText("Full product description")),
+		schema.TextField("short_description", schema.Optional(),
+			schema.HelpText("Brief description for listings")),
 
 		// Relationships
-		schema.Int64("category_id").Required().
-			HelpText("Product category").Build(),
-		schema.Int64("brand_id").Optional().
-			HelpText("Product brand").Build(),
+		schema.Int64Field("category_id", schema.Required(),
+			schema.HelpText("Product category")),
+		schema.Int64Field("brand_id", schema.Optional(),
+			schema.HelpText("Product brand")),
 
 		// Pricing
-		schema.Float64("price").Required().
-			HelpText("Base price").Build(),
-		schema.Float64("cost_price").Optional().
-			HelpText("Cost to seller").Build(),
-		schema.Float64("compare_at_price").Optional().
-			HelpText("Original price for discounts").Build(),
+		schema.Float64Field("price", schema.Required(),
+			schema.HelpText("Base price")),
+		schema.Float64Field("cost_price", schema.Optional(),
+			schema.HelpText("Cost to seller")),
+		schema.Float64Field("compare_at_price", schema.Optional(),
+			schema.HelpText("Original price for discounts")),
 
 		// Inventory (base level)
-		schema.Int32("stock_quantity").Default(0).
-			HelpText("Total stock across all warehouses").Build(),
-		schema.Bool("track_inventory").Default(true).
-			HelpText("Whether to track inventory").Build(),
-		schema.Bool("allow_backorder").Default(false).
-			HelpText("Allow orders when out of stock").Build(),
+		schema.Int32Field("stock_quantity", schema.Default(0),
+			schema.HelpText("Total stock across all warehouses")),
+		schema.BoolField("track_inventory", schema.Default(true),
+			schema.HelpText("Whether to track inventory")),
+		schema.BoolField("allow_backorder", schema.Default(false),
+			schema.HelpText("Allow orders when out of stock")),
 
 		// Physical attributes
-		schema.Float64("weight").Optional().
-			HelpText("Weight in kg").Build(),
-		schema.Float64("length").Optional().
-			HelpText("Length in cm").Build(),
-		schema.Float64("width").Optional().
-			HelpText("Width in cm").Build(),
-		schema.Float64("height").Optional().
-			HelpText("Height in cm").Build(),
+		schema.Float64Field("weight", schema.Optional(),
+			schema.HelpText("Weight in kg")),
+		schema.Float64Field("length", schema.Optional(),
+			schema.HelpText("Length in cm")),
+		schema.Float64Field("width", schema.Optional(),
+			schema.HelpText("Width in cm")),
+		schema.Float64Field("height", schema.Optional(),
+			schema.HelpText("Height in cm")),
 
 		// Status
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("is_featured").Default(false).Build(),
-		schema.Bool("is_digital").Default(false).
-			HelpText("Digital product (no shipping)").Build(),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.BoolField("is_featured", schema.Default(false)),
+		schema.BoolField("is_digital", schema.Default(false),
+			schema.HelpText("Digital product (no shipping)")),
 
 		// SEO
-		schema.String("meta_title").MaxLength(255).Optional().Build(),
-		schema.Text("meta_description").Optional().Build(),
-		schema.String("meta_keywords").MaxLength(500).Optional().Build(),
+		schema.StringField("meta_title", schema.MaxLength(255), schema.Optional()),
+		schema.TextField("meta_description", schema.Optional()),
+		schema.StringField("meta_keywords", schema.MaxLength(500), schema.Optional()),
 
 		// Stats
-		schema.Int32("view_count").Default(0).Build(),
-		schema.Int32("order_count").Default(0).Build(),
-		schema.Float64("rating_average").Default(0.0).Build(),
-		schema.Int32("rating_count").Default(0).Build(),
+		schema.Int32Field("view_count", schema.Default(0)),
+		schema.Int32Field("order_count", schema.Default(0)),
+		schema.Float64Field("rating_average", schema.Default(0.0)),
+		schema.Int32Field("rating_count", schema.Default(0)),
 
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
-		schema.Time("published_at").Optional().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
+		schema.TimeField("published_at", schema.Optional()),
 	}
 }
 
@@ -191,27 +200,25 @@ func (Product) Meta() schema.Meta {
 		VerboseNamePlural: "Products",
 		OrderBy:           []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_product_slug", Fields: []string{"slug"}, Unique: true},
-			{Name: "idx_product_sku", Fields: []string{"sku"}, Unique: true},
-			{Name: "idx_product_category", Fields: []string{"category_id"}},
-			{Name: "idx_product_brand", Fields: []string{"brand_id"}},
-			{Name: "idx_product_active", Fields: []string{"is_active"}},
-			{Name: "idx_product_featured", Fields: []string{"is_featured"}},
-			{Name: "idx_product_price", Fields: []string{"price"}},
+			schema.UniqueIndexOn("idx_product_slug", "slug"),
+			schema.UniqueIndexOn("idx_product_sku", "sku"),
+			schema.IndexOn("idx_product_category", "category_id"),
+			schema.IndexOn("idx_product_brand", "brand_id"),
+			schema.IndexOn("idx_product_active", "is_active"),
+			schema.IndexOn("idx_product_featured", "is_featured"),
+			schema.IndexOn("idx_product_price", "price"),
 		},
 	}
 }
 
 func (Product) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("category_id", "Category").
-			OnDelete(schema.CascadePROTECT).
-			Required().
-			RelatedName("products").Build(),
-		schema.ForeignKey("brand_id", "Brand").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("products").Build(),
+		schema.ForeignKeyField("category_id", "Category",
+			schema.OnDelete(schema.CascadePROTECT),
+			schema.RelatedName("products")),
+		schema.ForeignKeyField("brand_id", "Brand",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("products")),
 	}
 }
 
@@ -233,64 +240,64 @@ func (Product) Hooks() *schema.ModelHooks {
 
 // ProductVariant represents a product variant (size, color, etc.)
 type ProductVariant struct {
-	schema.BaseSchema
+	ProductVariantGenerated
 }
 
 func (ProductVariant) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("product_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("product_id", schema.Required()),
 
 		// Variant identification
-		schema.String("sku").Required().MaxLength(100).Unique().
-			HelpText("Unique SKU for this variant").Build(),
-		schema.String("name").Required().MaxLength(255).
-			HelpText("Variant name (e.g., 'Large Red')").Build(),
+		schema.StringField("sku", schema.Required(), schema.MaxLength(100), schema.Unique(),
+			schema.HelpText("Unique SKU for this variant")),
+		schema.StringField("name", schema.Required(), schema.MaxLength(255),
+			schema.HelpText("Variant name (e.g., 'Large Red')")),
 
 		// Variant options
-		schema.String("option1_name").MaxLength(100).Optional().
-			HelpText("First option name (e.g., 'Size')").Build(),
-		schema.String("option1_value").MaxLength(100).Optional().
-			HelpText("First option value (e.g., 'Large')").Build(),
-		schema.String("option2_name").MaxLength(100).Optional().
-			HelpText("Second option name (e.g., 'Color')").Build(),
-		schema.String("option2_value").MaxLength(100).Optional().
-			HelpText("Second option value (e.g., 'Red')").Build(),
-		schema.String("option3_name").MaxLength(100).Optional().
-			HelpText("Third option name").Build(),
-		schema.String("option3_value").MaxLength(100).Optional().
-			HelpText("Third option value").Build(),
+		schema.StringField("option1_name", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("First option name (e.g., 'Size')")),
+		schema.StringField("option1_value", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("First option value (e.g., 'Large')")),
+		schema.StringField("option2_name", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Second option name (e.g., 'Color')")),
+		schema.StringField("option2_value", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Second option value (e.g., 'Red')")),
+		schema.StringField("option3_name", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Third option name")),
+		schema.StringField("option3_value", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Third option value")),
 
 		// Pricing (can override product price)
-		schema.Float64("price").Optional().
-			HelpText("Override price (uses product price if null)").Build(),
-		schema.Float64("compare_at_price").Optional().Build(),
-		schema.Float64("cost_price").Optional().Build(),
+		schema.Float64Field("price", schema.Optional(),
+			schema.HelpText("Override price (uses product price if null)")),
+		schema.Float64Field("compare_at_price", schema.Optional()),
+		schema.Float64Field("cost_price", schema.Optional()),
 
 		// Inventory
-		schema.Int32("stock_quantity").Default(0).Build(),
-		schema.Int32("reserved_quantity").Default(0).
-			HelpText("Quantity in pending orders").Build(),
-		schema.Bool("track_inventory").Default(true).Build(),
+		schema.Int32Field("stock_quantity", schema.Default(0)),
+		schema.Int32Field("reserved_quantity", schema.Default(0),
+			schema.HelpText("Quantity in pending orders")),
+		schema.BoolField("track_inventory", schema.Default(true)),
 
 		// Physical attributes (can override product)
-		schema.Float64("weight").Optional().Build(),
-		schema.Float64("length").Optional().Build(),
-		schema.Float64("width").Optional().Build(),
-		schema.Float64("height").Optional().Build(),
+		schema.Float64Field("weight", schema.Optional()),
+		schema.Float64Field("length", schema.Optional()),
+		schema.Float64Field("width", schema.Optional()),
+		schema.Float64Field("height", schema.Optional()),
 
 		// Status
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("is_default").Default(false).
-			HelpText("Default variant for product").Build(),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.BoolField("is_default", schema.Default(false),
+			schema.HelpText("Default variant for product")),
 
 		// Display
-		schema.String("image_url").MaxLength(500).Optional().Build(),
-		schema.Int32("sort_order").Default(0).Build(),
+		schema.StringField("image_url", schema.MaxLength(500), schema.Optional()),
+		schema.Int32Field("sort_order", schema.Default(0)),
 
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -301,9 +308,9 @@ func (ProductVariant) Meta() schema.Meta {
 		VerboseNamePlural: "Product Variants",
 		OrderBy:           []string{"product_id", "sort_order"},
 		Indexes: []schema.Index{
-			{Name: "idx_variant_sku", Fields: []string{"sku"}, Unique: true},
-			{Name: "idx_variant_product", Fields: []string{"product_id"}},
-			{Name: "idx_variant_active", Fields: []string{"is_active"}},
+			schema.UniqueIndexOn("idx_variant_sku", "sku"),
+			schema.IndexOn("idx_variant_product", "product_id"),
+			schema.IndexOn("idx_variant_active", "is_active"),
 		},
 		UniqueTogether: [][]string{
 			{"product_id", "option1_value", "option2_value", "option3_value"},
@@ -313,10 +320,9 @@ func (ProductVariant) Meta() schema.Meta {
 
 func (ProductVariant) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("variants").Build(),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("variants")),
 	}
 }
 
@@ -336,27 +342,27 @@ func (ProductVariant) Hooks() *schema.ModelHooks {
 
 // ProductImage represents product images
 type ProductImage struct {
-	schema.BaseSchema
+	ProductImageGenerated
 }
 
 func (ProductImage) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Optional().
-			HelpText("Optional: Associate image with specific variant").Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("product_id", schema.Required()),
+		schema.Int64Field("variant_id", schema.Optional(),
+			schema.HelpText("Optional: Associate image with specific variant")),
 
-		schema.String("image_url").Required().MaxLength(500).Build(),
-		schema.String("thumbnail_url").MaxLength(500).Optional().Build(),
-		schema.String("alt_text").MaxLength(255).Optional().
-			HelpText("Alternative text for accessibility").Build(),
+		schema.StringField("image_url", schema.Required(), schema.MaxLength(500)),
+		schema.StringField("thumbnail_url", schema.MaxLength(500), schema.Optional()),
+		schema.StringField("alt_text", schema.MaxLength(255), schema.Optional(),
+			schema.HelpText("Alternative text for accessibility")),
 
-		schema.Int32("sort_order").Default(0).Build(),
-		schema.Bool("is_primary").Default(false).
-			HelpText("Primary product image").Build(),
+		schema.Int32Field("sort_order", schema.Default(0)),
+		schema.BoolField("is_primary", schema.Default(false),
+			schema.HelpText("Primary product image")),
 
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -367,22 +373,20 @@ func (ProductImage) Meta() schema.Meta {
 		VerboseNamePlural: "Product Images",
 		OrderBy:           []string{"product_id", "sort_order"},
 		Indexes: []schema.Index{
-			{Name: "idx_image_product", Fields: []string{"product_id"}},
-			{Name: "idx_image_variant", Fields: []string{"variant_id"}},
+			schema.IndexOn("idx_image_product", "product_id"),
+			schema.IndexOn("idx_image_variant", "variant_id"),
 		},
 	}
 }
 
 func (ProductImage) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("images").Build(),
-		schema.ForeignKey("product_image_id", "ProductImage").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("images").Build(),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("images")),
+		schema.ForeignKeyField("product_image_id", "ProductImage",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("images")),
 	}
 }
 
@@ -397,24 +401,24 @@ func (ProductImage) Hooks() *schema.ModelHooks {
 
 // ProductAttribute represents dynamic product attributes
 type ProductAttribute struct {
-	schema.BaseSchema
+	ProductAttributeGenerated
 }
 
 func (ProductAttribute) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(200).Unique().
-			HelpText("Attribute name (e.g., 'Color', 'Size')").Build(),
-		schema.String("code").Required().MaxLength(100).Unique().
-			HelpText("Code for programmatic access").Build(),
-		schema.String("type").Required().MaxLength(50).
-			HelpText("Type: text, number, select, multiselect").Build(),
-		schema.Bool("is_filterable").Default(true).
-			HelpText("Show in filters").Build(),
-		schema.Bool("is_visible").Default(true).
-			HelpText("Show on product page").Build(),
-		schema.Int32("sort_order").Default(0).Build(),
-		schema.Time("created_at").AutoNowAdd().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200), schema.Unique(),
+			schema.HelpText("Attribute name (e.g., 'Color', 'Size')")),
+		schema.StringField("code", schema.Required(), schema.MaxLength(100), schema.Unique(),
+			schema.HelpText("Code for programmatic access")),
+		schema.StringField("type", schema.Required(), schema.MaxLength(50),
+			schema.HelpText("Type: text, number, select, multiselect")),
+		schema.BoolField("is_filterable", schema.Default(true),
+			schema.HelpText("Show in filters")),
+		schema.BoolField("is_visible", schema.Default(true),
+			schema.HelpText("Show on product page")),
+		schema.Int32Field("sort_order", schema.Default(0)),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
 	}
 }
 
@@ -437,16 +441,16 @@ func (ProductAttribute) Hooks() *schema.ModelHooks {
 
 // ProductAttributeValue represents attribute values for products
 type ProductAttributeValue struct {
-	schema.BaseSchema
+	ProductAttributeValueGenerated
 }
 
 func (ProductAttributeValue) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("product_id").Required().Build(),
-		schema.Int64("attribute_id").Required().Build(),
-		schema.String("value").Required().MaxLength(500).Build(),
-		schema.Time("created_at").AutoNowAdd().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("product_id", schema.Required()),
+		schema.Int64Field("attribute_id", schema.Required()),
+		schema.StringField("value", schema.Required(), schema.MaxLength(500)),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
 	}
 }
 
@@ -456,8 +460,8 @@ func (ProductAttributeValue) Meta() schema.Meta {
 		VerboseName:       "Product Attribute Value",
 		VerboseNamePlural: "Product Attribute Values",
 		Indexes: []schema.Index{
-			{Name: "idx_attr_value_product", Fields: []string{"product_id"}},
-			{Name: "idx_attr_value_attribute", Fields: []string{"attribute_id"}},
+			schema.IndexOn("idx_attr_value_product", "product_id"),
+			schema.IndexOn("idx_attr_value_attribute", "attribute_id"),
 		},
 		UniqueTogether: [][]string{
 			{"product_id", "attribute_id"},
@@ -467,14 +471,12 @@ func (ProductAttributeValue) Meta() schema.Meta {
 
 func (ProductAttributeValue) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("attribute_values").Build(),
-		schema.ForeignKey("attribute_id", "ProductAttribute").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("values").Build(),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("attribute_values")),
+		schema.ForeignKeyField("attribute_id", "ProductAttribute",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("values")),
 	}
 }
 

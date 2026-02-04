@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/forgego/forge/db"
-	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/db/migrate"
 	"github.com/forgego/forge/tests/testhelpers"
 )
 
@@ -29,7 +29,7 @@ func TestMigrationApplyPostgres(t *testing.T) {
 
 	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
-		Host:      "localhost",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",

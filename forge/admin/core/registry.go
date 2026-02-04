@@ -109,23 +109,23 @@ func (r *Registry) RegisterPlugin(p Plugin) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	name := p.Name()
-	if _, exists := r.plugins[name]; exists {
-		return fmt.Errorf("plugin %q already registered", name)
+	id := p.ID()
+	if _, exists := r.plugins[id]; exists {
+		return fmt.Errorf("plugin %q already registered", id)
 	}
 
-	r.plugins[name] = p
+	r.plugins[id] = p
 	return nil
 }
 
-// GetPlugin retrieves a plugin by name
-func (r *Registry) GetPlugin(name string) (Plugin, error) {
+// GetPlugin retrieves a plugin by ID
+func (r *Registry) GetPlugin(id string) (Plugin, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	p, ok := r.plugins[name]
+	p, ok := r.plugins[id]
 	if !ok {
-		return nil, fmt.Errorf("plugin %q not found", name)
+		return nil, fmt.Errorf("plugin %q not found", id)
 	}
 
 	return p, nil

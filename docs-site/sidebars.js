@@ -73,6 +73,21 @@ const sidebars = {
     },
     {
       type: 'category',
+      label: 'System Features',
+      items: [
+        'features/admin-system',
+        'features/api-framework',
+        'features/code-generation',
+        'features/database-layer',
+        'features/filter-system',
+        'features/identity-system',
+        'features/migration-system',
+        'features/orm-system',
+        'features/schema-system',
+      ],
+    },
+    {
+      type: 'category',
       label: 'API Reference',
       items: [
         'api-reference/schema',
@@ -121,6 +136,7 @@ const sidebars = {
         'contributing/implementations',
         'contributing/changelog',
         'contributing/roadmap',
+        'contributing/todos',
       ],
     },
   ],

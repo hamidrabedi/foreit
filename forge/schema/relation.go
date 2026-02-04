@@ -9,6 +9,19 @@ const (
 	RelationManyToMany
 )
 
+func (t RelationType) String() string {
+	switch t {
+	case RelationForeignKey:
+		return "ForeignKey"
+	case RelationOneToOne:
+		return "OneToOne"
+	case RelationManyToMany:
+		return "ManyToMany"
+	default:
+		return "Unknown"
+	}
+}
+
 // CascadeType represents cascade behavior
 type CascadeType string
 
@@ -55,198 +68,4 @@ type CustomRelation interface {
 	GetName() string
 	GetType() RelationType
 	GetTarget() string
-}
-
-// ForeignKey creates a new ForeignKey relation builder
-func ForeignKey(name, to string) *ForeignKeyBuilder {
-	b := &ForeignKeyBuilder{
-		relation: Relation{
-			Name: name,
-			Type: RelationForeignKey,
-			To:   to,
-		},
-	}
-	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *ForeignKeyBuilder { return b })
-	return b
-}
-
-// ForeignKeyBuilder is a builder for ForeignKey relations
-type ForeignKeyBuilder struct {
-	CommonRelationMethods[*ForeignKeyBuilder]
-	relation Relation
-}
-
-func (b *ForeignKeyBuilder) chain() *ForeignKeyBuilder {
-	return b
-}
-
-func (b *ForeignKeyBuilder) Required() *ForeignKeyBuilder {
-	// ForeignKey is always required unless explicitly set to optional
-	return b
-}
-
-func (b *ForeignKeyBuilder) Optional() *ForeignKeyBuilder {
-	// This would be used in field definitions, but for relations
-	// we use OnDelete(SET_NULL) to make it optional
-	return b
-}
-
-func (b *ForeignKeyBuilder) VerboseName(name string) *ForeignKeyBuilder {
-	// Store verbose name in relation (could be used in admin)
-	return b
-}
-
-// CascadeOnDelete is a convenience method (inherited from CommonRelationMethods)
-
-func (b *ForeignKeyBuilder) DBConstraint(enabled bool) *ForeignKeyBuilder {
-	b.relation.DBConstraint = enabled
-	return b
-}
-
-func (b *ForeignKeyBuilder) ConstraintName(name string) *ForeignKeyBuilder {
-	b.relation.ConstraintName = name
-	return b
-}
-
-func (b *ForeignKeyBuilder) Deferrable(deferrable DeferrableType) *ForeignKeyBuilder {
-	b.relation.Deferrable = deferrable
-	return b
-}
-
-func (b *ForeignKeyBuilder) Match(matchType FKMatchType) *ForeignKeyBuilder {
-	b.relation.Match = matchType
-	return b
-}
-
-func (b *ForeignKeyBuilder) Swappable(swappable string) *ForeignKeyBuilder {
-	b.relation.Swappable = swappable
-	return b
-}
-
-func (b *ForeignKeyBuilder) Build() Relation {
-	// Set default DBConstraint to true if not explicitly set
-	if !b.relation.DBConstraint && b.relation.ConstraintName == "" {
-		b.relation.DBConstraint = true
-	}
-	return b.relation
-}
-
-// RelatedName sets the related name (inherited from CommonRelationMethods)
-// RelatedQueryName sets the related query name (inherited from CommonRelationMethods)
-// OnDelete sets cascade on delete (inherited from CommonRelationMethods)
-// OnUpdate sets cascade on update (inherited from CommonRelationMethods)
-// LimitChoicesTo limits choices (inherited from CommonRelationMethods)
-// ParentLink marks as parent link (inherited from CommonRelationMethods)
-
-// ManyToOne is a helper that creates a ForeignKey relation
-// This is for convenience - it's the same as ForeignKey
-func ManyToOne(name, to, fkColumn string) *ForeignKeyBuilder {
-	return ForeignKey(fkColumn, to).RelatedName(name)
-}
-
-// OneToMany creates a reverse relation (used on the "one" side)
-// This is typically defined on the "many" side as ForeignKey
-// but this helper makes it clearer when defining relations
-func OneToMany(name, to, fkColumn string) *OneToManyBuilder {
-	return &OneToManyBuilder{
-		relation: Relation{
-			Name: name,
-			Type: RelationForeignKey, // OneToMany is really a reverse ForeignKey
-			To:   to,
-		},
-		fkColumn: fkColumn,
-	}
-}
-
-// OneToManyBuilder represents a reverse ForeignKey relation
-type OneToManyBuilder struct {
-	relation Relation
-	fkColumn string
-}
-
-func (b *OneToManyBuilder) CascadeOnDelete() *OneToManyBuilder {
-	b.relation.OnDelete = CascadeCASCADE
-	return b
-}
-
-func (b *OneToManyBuilder) Build() Relation {
-	return b.relation
-}
-
-// OneToOne creates a new OneToOne relation builder
-func OneToOne(name, to string) *OneToOneBuilder {
-	b := &OneToOneBuilder{
-		relation: Relation{
-			Name: name,
-			Type: RelationOneToOne,
-			To:   to,
-		},
-	}
-	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *OneToOneBuilder { return b })
-	return b
-}
-
-// OneToOneBuilder is a builder for OneToOne relations
-type OneToOneBuilder struct {
-	CommonRelationMethods[*OneToOneBuilder]
-	relation Relation
-}
-
-func (b *OneToOneBuilder) chain() *OneToOneBuilder {
-	return b
-}
-
-func (b *OneToOneBuilder) Build() Relation {
-	return b.relation
-}
-
-// ManyToMany creates a new ManyToMany relation builder
-func ManyToMany(name, to string) *ManyToManyBuilder {
-	b := &ManyToManyBuilder{
-		relation: Relation{
-			Name: name,
-			Type: RelationManyToMany,
-			To:   to,
-		},
-	}
-	initCommonRelationMethods(&b.CommonRelationMethods, &b.relation, func() *ManyToManyBuilder { return b })
-	return b
-}
-
-// ManyToManyBuilder is a builder for ManyToMany relations
-type ManyToManyBuilder struct {
-	CommonRelationMethods[*ManyToManyBuilder]
-	relation Relation
-}
-
-func (b *ManyToManyBuilder) chain() *ManyToManyBuilder {
-	return b
-}
-
-func (b *ManyToManyBuilder) Through(throughTable, localColumn, remoteColumn string) *ManyToManyBuilder {
-	b.relation.Through = throughTable
-	// Store column names for the through table
-	// This would be used when generating SQL
-	return b
-}
-
-func (b *ManyToManyBuilder) ThroughTable(tableName string) *ManyToManyBuilder {
-	b.relation.Through = tableName
-	return b
-}
-
-func (b *ManyToManyBuilder) Symmetrical() *ManyToManyBuilder {
-	b.relation.Symmetrical = true
-	return b
-}
-
-// RelatedName, RelatedQueryName, LimitChoicesTo are inherited from CommonRelationMethods
-
-func (b *ManyToManyBuilder) Build() Relation {
-	return b.relation
-}
-
-// RegisterRelationType registers a custom relation type
-func RegisterRelationType(name string, relationType RelationType, builder func(string, string) interface{}) {
-	// TODO: Implement relation type registry
 }

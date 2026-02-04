@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/forgego/forge/db"
-	"github.com/forgego/forge/migrate"
+	"github.com/forgego/forge/db/migrate"
 	"github.com/forgego/forge/tests/helpers"
 	"github.com/forgego/forge/tests/testhelpers"
 )
@@ -25,7 +25,7 @@ func TestSchemaBuilders_MigrationIntegration(t *testing.T) {
 
 	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",
@@ -182,7 +182,7 @@ func TestSchemaBuilders_ComplexModel(t *testing.T) {
 
 	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",
@@ -306,7 +306,7 @@ func TestSchemaBuilders_FieldOptionsIntegration(t *testing.T) {
 
 	opts := testhelpers.PostgresOpts{
 		UseDirect: true,
-		Host:      "192.168.132.50",
+		Host:      "127.0.0.1",
 		Port:      "5432",
 		User:      "postgres",
 		Password:  "123",

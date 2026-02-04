@@ -39,21 +39,12 @@ func (m *Manager[T]) SetDB(database *db.DB) {
 }
 
 // FieldAccessor returns a field accessor for type-safe field operations.
-// The field accessor provides a way to reference model fields in a type-safe manner
-// for building queries and expressions.
 func (m *Manager[T]) FieldAccessor() (*FieldAccessor[T], error) {
 	return NewFieldAccessor[T]()
 }
 
 // GetFieldAccessor returns a field accessor for this model.
-//
-// Deprecated: Use FieldAccessor() instead (Go convention: getters don't have Get prefix).
-// GetFieldAccessor will be removed in v3.0.
-// Migration:
-//   // Old
-//   fa, err := manager.GetFieldAccessor()
-//   // New
-//   fa, err := manager.FieldAccessor()
+// Deprecated: Use FieldAccessor() instead.
 func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
 	return m.FieldAccessor()
 }
@@ -73,13 +64,6 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 }
 
 // Get retrieves a single model instance by its primary key ID.
-// Returns an error if the instance is not found.
-//
-// This is different from QuerySet.Get() which retrieves from a filtered queryset.
-// Use Manager.Get() when you know the primary key, use QuerySet.Get() when filtering.
-//
-// Example:
-//   user, err := userManager.Get(ctx, 42)  // Get user with ID 42
 func (m *Manager[T]) Get(ctx context.Context, id int64) (*T, error) {
 	if m.db == nil {
 		return nil, errors.NewNotImplementedError("Manager.Get() - database connection not set")
@@ -124,25 +108,14 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 		return errors.NewNotImplementedError("Manager.Create() - database connection not set")
 	}
 
-	// Run BeforeCreate hooks
-	if hookable, ok := any(instance).(interface{ BeforeCreate(context.Context) error }); ok {
-		if err := hookable.BeforeCreate(ctx); err != nil {
-			return fmt.Errorf("BeforeCreate hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "BeforeCreate"); err != nil {
+		return err
 	}
-
-	// Run BeforeSave hook
-	if hookable, ok := any(instance).(interface{ BeforeSave(context.Context) error }); ok {
-		if err := hookable.BeforeSave(ctx); err != nil {
-			return fmt.Errorf("BeforeSave hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
+		return err
 	}
-
-	// Validate instance
-	if validatable, ok := any(instance).(interface{ Clean() error }); ok {
-		if err := validatable.Clean(); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
-		}
+	if err := m.validate(instance); err != nil {
+		return err
 	}
 
 	// Build and execute INSERT
@@ -151,42 +124,17 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 		return fmt.Errorf("failed to build insert SQL: %w", err)
 	}
 
-	// Execute INSERT and get generated ID
 	id, err := ExecuteInsert(ctx, m.db, sql, args)
 	if err != nil {
 		return err
 	}
 
-	// Set the ID on the instance type-safely
-	if modelWithID, ok := any(instance).(ModelWithID); ok {
-		modelWithID.SetID(id)
-	} else {
-		// Fallback to reflection
-		instanceValue := reflect.ValueOf(instance).Elem()
-		idField := instanceValue.FieldByName("ID")
-		if !idField.IsValid() {
-			idField = instanceValue.FieldByName("id")
-		}
-		if idField.IsValid() && idField.CanSet() {
-			idField.SetInt(id)
-		}
-	}
+	m.setID(instance, id)
 
-	// Run AfterCreate hooks
-	if hookable, ok := any(instance).(interface{ AfterCreate(context.Context) error }); ok {
-		if err := hookable.AfterCreate(ctx); err != nil {
-			return fmt.Errorf("AfterCreate hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "AfterCreate"); err != nil {
+		return err
 	}
-
-	// Run AfterSave hook
-	if hookable, ok := any(instance).(interface{ AfterSave(context.Context) error }); ok {
-		if err := hookable.AfterSave(ctx); err != nil {
-			return fmt.Errorf("AfterSave hook failed: %w", err)
-		}
-	}
-
-	return nil
+	return m.runHooks(ctx, instance, "AfterSave")
 }
 
 // BulkCreate creates multiple model instances efficiently using a single INSERT statement
@@ -199,79 +147,50 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 		return nil
 	}
 
-	// Run BeforeCreate hooks for all instances
+	// Pre-process all instances
 	for _, instance := range instances {
-		if hookable, ok := any(instance).(interface{ BeforeCreate(context.Context) error }); ok {
-			if err := hookable.BeforeCreate(ctx); err != nil {
-				return fmt.Errorf("BeforeCreate hook failed: %w", err)
-			}
+		if err := m.runHooks(ctx, instance, "BeforeCreate"); err != nil {
+			return err
 		}
-
-		// Run BeforeSave hook
-		if hookable, ok := any(instance).(interface{ BeforeSave(context.Context) error }); ok {
-			if err := hookable.BeforeSave(ctx); err != nil {
-				return fmt.Errorf("BeforeSave hook failed: %w", err)
-			}
+		if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
+			return err
 		}
-
-		// Validate instance
-		if validatable, ok := any(instance).(interface{ Clean() error }); ok {
-			if err := validatable.Clean(); err != nil {
-				return fmt.Errorf("validation failed: %w", err)
-			}
+		if err := m.validate(instance); err != nil {
+			return err
 		}
 	}
 
-	// Convert []*T to []interface{} for BuildBulkInsertSQL
+	// Convert []*T to []interface{}
 	instancesInterface := make([]interface{}, len(instances))
 	for i, instance := range instances {
 		instancesInterface[i] = instance
 	}
 
-	// Build bulk INSERT SQL
+	// Build and execute bulk INSERT
 	sql, args, _, err := BuildBulkInsertSQL(instancesInterface, m.tableName)
 	if err != nil {
 		return fmt.Errorf("failed to build bulk insert SQL: %w", err)
 	}
 
-	// Execute bulk INSERT and get generated IDs
 	ids, err := ExecuteBulkInsert(ctx, m.db, sql, args)
 	if err != nil {
 		return err
 	}
 
-	// Set IDs on instances
+	// Set IDs
 	for i, instance := range instances {
 		if i < len(ids) {
-			if modelWithID, ok := any(instance).(ModelWithID); ok {
-				modelWithID.SetID(ids[i])
-			} else {
-				// Fallback to reflection
-				instanceValue := reflect.ValueOf(instance).Elem()
-				idField := instanceValue.FieldByName("ID")
-				if !idField.IsValid() {
-					idField = instanceValue.FieldByName("id")
-				}
-				if idField.IsValid() && idField.CanSet() {
-					idField.SetInt(ids[i])
-				}
-			}
+			m.setID(instance, ids[i])
 		}
 	}
 
-	// Run AfterCreate hooks for all instances
+	// Post-process all instances
 	for _, instance := range instances {
-		if hookable, ok := any(instance).(interface{ AfterCreate(context.Context) error }); ok {
-			if err := hookable.AfterCreate(ctx); err != nil {
-				return fmt.Errorf("AfterCreate hook failed: %w", err)
-			}
+		if err := m.runHooks(ctx, instance, "AfterCreate"); err != nil {
+			return err
 		}
-
-		// Run AfterSave hook
-		if hookable, ok := any(instance).(interface{ AfterSave(context.Context) error }); ok {
-			if err := hookable.AfterSave(ctx); err != nil {
-				return fmt.Errorf("AfterSave hook failed: %w", err)
-			}
+		if err := m.runHooks(ctx, instance, "AfterSave"); err != nil {
+			return err
 		}
 	}
 
@@ -284,55 +203,29 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 		return errors.NewNotImplementedError("Manager.Update() - database connection not set")
 	}
 
-	// Get ID value type-safely
-	var id int64
-	if modelWithID, ok := any(instance).(ModelWithID); ok {
-		id = modelWithID.GetID()
-	} else {
-		// Fallback to reflection
-		idValue, err := GetIDValue(instance, "id")
-		if err != nil {
-			return fmt.Errorf("failed to get ID: %w", err)
-		}
-		var ok bool
-		id, ok = idValue.(int64)
-		if !ok {
-			return fmt.Errorf("ID must be int64, got %T", idValue)
-		}
+	id, err := m.getID(instance)
+	if err != nil {
+		return err
 	}
-
 	if id == 0 {
 		return errors.NewInvalidInputError("id", "ID must be non-zero for update")
 	}
 
-	// Run BeforeUpdate hooks
-	if hookable, ok := any(instance).(interface{ BeforeUpdate(context.Context) error }); ok {
-		if err := hookable.BeforeUpdate(ctx); err != nil {
-			return fmt.Errorf("BeforeUpdate hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "BeforeUpdate"); err != nil {
+		return err
+	}
+	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
+		return err
+	}
+	if err := m.validate(instance); err != nil {
+		return err
 	}
 
-	// Run BeforeSave hook
-	if hookable, ok := any(instance).(interface{ BeforeSave(context.Context) error }); ok {
-		if err := hookable.BeforeSave(ctx); err != nil {
-			return fmt.Errorf("BeforeSave hook failed: %w", err)
-		}
-	}
-
-	// Validate instance
-	if validatable, ok := any(instance).(interface{ Clean() error }); ok {
-		if err := validatable.Clean(); err != nil {
-			return fmt.Errorf("validation failed: %w", err)
-		}
-	}
-
-	// Build and execute UPDATE
 	sql, args, err := BuildUpdateSQL(instance, m.tableName, "id")
 	if err != nil {
 		return fmt.Errorf("failed to build update SQL: %w", err)
 	}
 
-	// Execute UPDATE
 	rowsAffected, err := ExecuteUpdate(ctx, m.db, sql, args)
 	if err != nil {
 		return err
@@ -342,39 +235,17 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 		return errors.NewNotFoundError("model", id)
 	}
 
-	// Run AfterUpdate hooks
-	if hookable, ok := any(instance).(interface{ AfterUpdate(context.Context) error }); ok {
-		if err := hookable.AfterUpdate(ctx); err != nil {
-			return fmt.Errorf("AfterUpdate hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "AfterUpdate"); err != nil {
+		return err
 	}
-
-	// Run AfterSave hook
-	if hookable, ok := any(instance).(interface{ AfterSave(context.Context) error }); ok {
-		if err := hookable.AfterSave(ctx); err != nil {
-			return fmt.Errorf("AfterSave hook failed: %w", err)
-		}
-	}
-
-	return nil
+	return m.runHooks(ctx, instance, "AfterSave")
 }
 
 // Save saves a model (create or update)
 func (m *Manager[T]) Save(ctx context.Context, instance *T) error {
-	// Use type assertion if available
-	if modelWithID, ok := any(instance).(ModelWithID); ok {
-		if modelWithID.GetID() != 0 {
-			return m.Update(ctx, instance)
-		}
-		return m.Create(ctx, instance)
-	}
-
-	// Fallback to reflection
-	idValue, err := GetIDValue(instance, "id")
-	if err == nil {
-		if id, ok := idValue.(int64); ok && id != 0 {
-			return m.Update(ctx, instance)
-		}
+	id, _ := m.getID(instance)
+	if id != 0 {
+		return m.Update(ctx, instance)
 	}
 	return m.Create(ctx, instance)
 }
@@ -385,38 +256,20 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 		return errors.NewNotImplementedError("Manager.Delete() - database connection not set")
 	}
 
-	// Get ID value type-safely
-	var id int64
-	if modelWithID, ok := any(instance).(ModelWithID); ok {
-		id = modelWithID.GetID()
-	} else {
-		// Fallback to reflection
-		idValue, err := GetIDValue(instance, "id")
-		if err != nil {
-			return fmt.Errorf("failed to get ID: %w", err)
-		}
-		var ok bool
-		id, ok = idValue.(int64)
-		if !ok {
-			return fmt.Errorf("ID must be int64, got %T", idValue)
-		}
+	id, err := m.getID(instance)
+	if err != nil {
+		return err
 	}
-
 	if id == 0 {
 		return errors.NewInvalidInputError("id", "ID must be non-zero for delete")
 	}
 
-	// Run BeforeDelete hooks
-	if hookable, ok := any(instance).(interface{ BeforeDelete(context.Context) error }); ok {
-		if err := hookable.BeforeDelete(ctx); err != nil {
-			return fmt.Errorf("BeforeDelete hook failed: %w", err)
-		}
+	if err := m.runHooks(ctx, instance, "BeforeDelete"); err != nil {
+		return err
 	}
 
-	// Build and execute DELETE
 	sql, args := BuildDeleteSQL(m.tableName, "id", id)
 
-	// Execute DELETE
 	rowsAffected, err := ExecuteDelete(ctx, m.db, sql, args)
 	if err != nil {
 		return err
@@ -426,14 +279,7 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 		return errors.NewNotFoundError("model", id)
 	}
 
-	// Run AfterDelete hooks
-	if hookable, ok := any(instance).(interface{ AfterDelete(context.Context) error }); ok {
-		if err := hookable.AfterDelete(ctx); err != nil {
-			return fmt.Errorf("AfterDelete hook failed: %w", err)
-		}
-	}
-
-	return nil
+	return m.runHooks(ctx, instance, "AfterDelete")
 }
 
 // UpdateFields updates specific fields type-safely
@@ -446,7 +292,6 @@ func (m *Manager[T]) UpdateFields(ctx context.Context, id int64, updates UpdateM
 		}
 	}
 
-	// Get QuerySet and use UpdateBuilder
 	fa, err := m.FieldAccessor()
 	if err != nil {
 		return err
@@ -467,12 +312,97 @@ func (m *Manager[T]) UpdateFields(ctx context.Context, id int64, updates UpdateM
 		return err
 	}
 
-	// Apply updates
 	for fieldName, value := range updates {
-		// Type checking happens in Set
 		ub.updates[fieldName] = value
 	}
 
 	_, err = ub.Execute(ctx)
 	return err
+}
+
+// Helper methods
+
+func (m *Manager[T]) getID(instance *T) (int64, error) {
+	if modelWithID, ok := any(instance).(ModelWithID); ok {
+		return modelWithID.GetID(), nil
+	}
+	
+	idValue, err := GetIDValue(instance, "id")
+	if err != nil {
+		return 0, fmt.Errorf("failed to get ID: %w", err)
+	}
+	
+	if id, ok := idValue.(int64); ok {
+		return id, nil
+	}
+	return 0, fmt.Errorf("ID must be int64, got %T", idValue)
+}
+
+func (m *Manager[T]) setID(instance *T, id int64) {
+	if modelWithID, ok := any(instance).(ModelWithID); ok {
+		modelWithID.SetID(id)
+		return
+	}
+
+	// Fallback to reflection
+	instanceValue := reflect.ValueOf(instance).Elem()
+	idField := instanceValue.FieldByName("ID")
+	if !idField.IsValid() {
+		idField = instanceValue.FieldByName("id")
+	}
+	if idField.IsValid() && idField.CanSet() {
+		idField.SetInt(id)
+	}
+}
+
+func (m *Manager[T]) validate(instance *T) error {
+	if validatable, ok := any(instance).(interface{ Clean() error }); ok {
+		if err := validatable.Clean(); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func (m *Manager[T]) runHooks(ctx context.Context, instance *T, hookType string) error {
+	var err error
+	switch hookType {
+	case "BeforeCreate":
+		if h, ok := any(instance).(interface{ BeforeCreate(context.Context) error }); ok {
+			err = h.BeforeCreate(ctx)
+		}
+	case "AfterCreate":
+		if h, ok := any(instance).(interface{ AfterCreate(context.Context) error }); ok {
+			err = h.AfterCreate(ctx)
+		}
+	case "BeforeUpdate":
+		if h, ok := any(instance).(interface{ BeforeUpdate(context.Context) error }); ok {
+			err = h.BeforeUpdate(ctx)
+		}
+	case "AfterUpdate":
+		if h, ok := any(instance).(interface{ AfterUpdate(context.Context) error }); ok {
+			err = h.AfterUpdate(ctx)
+		}
+	case "BeforeSave":
+		if h, ok := any(instance).(interface{ BeforeSave(context.Context) error }); ok {
+			err = h.BeforeSave(ctx)
+		}
+	case "AfterSave":
+		if h, ok := any(instance).(interface{ AfterSave(context.Context) error }); ok {
+			err = h.AfterSave(ctx)
+		}
+	case "BeforeDelete":
+		if h, ok := any(instance).(interface{ BeforeDelete(context.Context) error }); ok {
+			err = h.BeforeDelete(ctx)
+		}
+	case "AfterDelete":
+		if h, ok := any(instance).(interface{ AfterDelete(context.Context) error }); ok {
+			err = h.AfterDelete(ctx)
+		}
+	}
+	
+	if err != nil {
+		return fmt.Errorf("%s hook failed: %w", hookType, err)
+	}
+	return nil
 }

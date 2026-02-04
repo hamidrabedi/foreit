@@ -72,7 +72,7 @@ func buildFieldsMetadata(s schema.Schema) ([]FieldMetadata, error) {
 	for _, field := range fields {
 		fieldMeta := FieldMetadata{
 			Name:         field.Name,
-			Type:         string(field.Type),
+			Type:         field.Type.String(),
 			Label:        getOrDefault(field.VerboseName, "", field.Name),
 			HelpText:     field.HelpText,
 			Required:     field.Required,
@@ -126,7 +126,7 @@ func buildRelationsMetadata(s schema.Schema) []RelationMetadata {
 	for _, rel := range relations {
 		relMeta := RelationMetadata{
 			Name:         rel.Name,
-			Type:         string(rel.Type),
+			Type:         rel.Type.String(),
 			RelatedModel: rel.To,
 			RelatedField: rel.RelatedName,
 			Label:        getOrDefault("", "", rel.Name), // Relation struct has no VerboseName

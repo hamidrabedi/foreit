@@ -2,28 +2,31 @@ package core
 
 import (
 	"time"
+
+	"github.com/forgego/forge/admin/components"
 )
 
 // Metadata represents the complete metadata for an admin model
 // This is what gets serialized to JSON for the frontend
 type Metadata struct {
-	Name              string              `json:"name"`
-	VerboseName       string              `json:"verbose_name"`
-	VerboseNamePlural string              `json:"verbose_name_plural"`
-	Description       string              `json:"description,omitempty"`
-	Icon              string              `json:"icon,omitempty"`
-	Fields            []FieldMetadata     `json:"fields"`
-	Relations         []RelationMetadata  `json:"relations,omitempty"`
-	Permissions       PermissionMetadata  `json:"permissions"`
-	Actions           []ActionMetadata    `json:"actions"`
-	Filters           []FilterMetadata    `json:"filters"`
-	ListDisplay       []string            `json:"list_display"`
-	ListFilter        []string            `json:"list_filter,omitempty"`
-	SearchFields      []string            `json:"search_fields,omitempty"`
-	Ordering          []string            `json:"ordering,omitempty"`
-	Pagination        PaginationConfig    `json:"pagination"`
-	PageType          string              `json:"page_type,omitempty"` // "list", "form", "list-form", "detail"
-	UIOverrides       map[string]string   `json:"ui_overrides,omitempty"`
+	Name              string                `json:"name"`
+	VerboseName       string                `json:"verbose_name"`
+	VerboseNamePlural string                `json:"verbose_name_plural"`
+	Description       string                `json:"description,omitempty"`
+	Icon              string                `json:"icon,omitempty"`
+	Fields            []FieldMetadata       `json:"fields"`
+	Relations         []RelationMetadata    `json:"relations,omitempty"`
+	Permissions       PermissionMetadata    `json:"permissions"`
+	Actions           []ActionMetadata      `json:"actions"`
+	Filters           []FilterMetadata      `json:"filters"`
+	ListDisplay       []string              `json:"list_display"`
+	ListFilter        []string              `json:"list_filter,omitempty"`
+	SearchFields      []string              `json:"search_fields,omitempty"`
+	Ordering          []string              `json:"ordering,omitempty"`
+	Pagination        PaginationConfig      `json:"pagination"`
+	PageType          string                `json:"page_type,omitempty"` // "list", "form", "list-form", "detail"
+	UIOverrides       map[string]string     `json:"ui_overrides,omitempty"`
+	Layout            *components.Component `json:"layout,omitempty"` // Server-Driven UI Layout
 }
 
 // FieldMetadata represents metadata for a single field

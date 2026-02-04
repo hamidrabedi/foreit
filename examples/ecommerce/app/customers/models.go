@@ -9,27 +9,27 @@ import (
 
 // CustomerGroup represents customer segmentation for pricing/promotions
 type CustomerGroup struct {
-	schema.BaseSchema
+	CustomerGroupGenerated
 }
 
 func (CustomerGroup) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("name").Required().MaxLength(200).Unique().
-			HelpText("Group name (e.g., 'VIP', 'Wholesale')").Build(),
-		schema.String("code").Required().MaxLength(50).Unique().Build(),
-		schema.Text("description").Optional().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200), schema.Unique(),
+			schema.HelpText("Group name (e.g., 'VIP', 'Wholesale')")),
+		schema.StringField("code", schema.Required(), schema.MaxLength(50), schema.Unique()),
+		schema.TextField("description", schema.Optional()),
 		
 		// Pricing
-		schema.Float64("discount_percentage").Default(0.0).
-			HelpText("Default discount percentage for this group").Build(),
+		schema.Float64Field("discount_percentage", schema.Default(0.0),
+			schema.HelpText("Default discount percentage for this group")),
 		
 		// Status
-		schema.Bool("is_active").Default(true).Build(),
+		schema.BoolField("is_active", schema.Default(true)),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -52,68 +52,68 @@ func (CustomerGroup) Hooks() *schema.ModelHooks {
 
 // Customer represents a customer account
 type Customer struct {
-	schema.BaseSchema
+	CustomerGenerated
 }
 
 func (Customer) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
 		
 		// Authentication (if using built-in auth)
-		schema.String("email").Required().MaxLength(255).Unique().
-			HelpText("Customer email address").Build(),
-		schema.String("password_hash").Required().MaxLength(255).
-			HelpText("Hashed password").Build(),
+		schema.StringField("email", schema.Required(), schema.MaxLength(255), schema.Unique(),
+			schema.HelpText("Customer email address")),
+		schema.StringField("password_hash", schema.Required(), schema.MaxLength(255),
+			schema.HelpText("Hashed password")),
 		
 		// Personal information
-		schema.String("first_name").Required().MaxLength(100).Build(),
-		schema.String("last_name").Required().MaxLength(100).Build(),
-		schema.String("phone").MaxLength(20).Optional().Build(),
-		schema.Date("date_of_birth").Optional().Build(),
-		schema.String("gender").MaxLength(20).Optional().
-			HelpText("Gender: male, female, other, prefer_not_to_say").Build(),
+		schema.StringField("first_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("last_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("phone", schema.MaxLength(20), schema.Optional()),
+		schema.DateField("date_of_birth", schema.Optional()),
+		schema.StringField("gender", schema.MaxLength(20), schema.Optional(),
+			schema.HelpText("Gender: male, female, other, prefer_not_to_say")),
 		
 		// Business (for B2B)
-		schema.String("company_name").MaxLength(200).Optional().Build(),
-		schema.String("tax_id").MaxLength(50).Optional().
-			HelpText("Tax ID / VAT number").Build(),
+		schema.StringField("company_name", schema.MaxLength(200), schema.Optional()),
+		schema.StringField("tax_id", schema.MaxLength(50), schema.Optional(),
+			schema.HelpText("Tax ID / VAT number")),
 		
 		// Customer group
-		schema.Int64("customer_group_id").Optional().Build(),
+		schema.Int64Field("customer_group_id", schema.Optional()),
 		
 		// Status
-		schema.Bool("is_active").Default(true).
-			HelpText("Is account active").Build(),
-		schema.Bool("is_verified").Default(false).
-			HelpText("Is email verified").Build(),
-		schema.Bool("accepts_marketing").Default(false).
-			HelpText("Accepts marketing emails").Build(),
+		schema.BoolField("is_active", schema.Default(true),
+			schema.HelpText("Is account active")),
+		schema.BoolField("is_verified", schema.Default(false),
+			schema.HelpText("Is email verified")),
+		schema.BoolField("accepts_marketing", schema.Default(false),
+			schema.HelpText("Accepts marketing emails")),
 		
 		// Account security
-		schema.String("verification_token").MaxLength(255).Optional().Build(),
-		schema.String("reset_password_token").MaxLength(255).Optional().Build(),
-		schema.Time("reset_password_expires_at").Optional().Build(),
-		schema.Time("last_login_at").Optional().Build(),
-		schema.String("last_login_ip").MaxLength(45).Optional().Build(),
+		schema.StringField("verification_token", schema.MaxLength(255), schema.Optional()),
+		schema.StringField("reset_password_token", schema.MaxLength(255), schema.Optional()),
+		schema.TimeField("reset_password_expires_at", schema.Optional()),
+		schema.TimeField("last_login_at", schema.Optional()),
+		schema.StringField("last_login_ip", schema.MaxLength(45), schema.Optional()),
 		
 		// Statistics
-		schema.Int32("total_orders").Default(0).
-			HelpText("Total number of orders").Build(),
-		schema.Float64("total_spent").Default(0.0).
-			HelpText("Total amount spent").Build(),
-		schema.Float64("average_order_value").Default(0.0).Build(),
+		schema.Int32Field("total_orders", schema.Default(0),
+			schema.HelpText("Total number of orders")),
+		schema.Float64Field("total_spent", schema.Default(0.0),
+			schema.HelpText("Total amount spent")),
+		schema.Float64Field("average_order_value", schema.Default(0.0)),
 		
 		// Preferences
-		schema.String("preferred_language").MaxLength(10).Default("en").Build(),
-		schema.String("preferred_currency").MaxLength(3).Default("USD").Build(),
+		schema.StringField("preferred_language", schema.MaxLength(10), schema.Default("en")),
+		schema.StringField("preferred_currency", schema.MaxLength(3), schema.Default("USD")),
 		
 		// Notes
-		schema.Text("notes").Optional().
-			HelpText("Admin notes about customer").Build(),
+		schema.TextField("notes", schema.Optional(),
+			schema.HelpText("Admin notes about customer")),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -124,20 +124,19 @@ func (Customer) Meta() schema.Meta {
 		VerboseNamePlural: "Customers",
 		OrderBy:          []string{"-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_customer_email", Fields: []string{"email"}, Unique: true},
-			{Name: "idx_customer_group", Fields: []string{"customer_group_id"}},
-			{Name: "idx_customer_active", Fields: []string{"is_active"}},
-			{Name: "idx_customer_verified", Fields: []string{"is_verified"}},
+			schema.UniqueIndexOn("idx_customer_email", "email"),
+			schema.IndexOn("idx_customer_group", "customer_group_id"),
+			schema.IndexOn("idx_customer_active", "is_active"),
+			schema.IndexOn("idx_customer_verified", "is_verified"),
 		},
 	}
 }
 
 func (Customer) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_group_id", "CustomerGroup").
-			OnDelete(schema.CascadeSET_NULL).
-			Optional().
-			RelatedName("customers").Build(),
+		schema.ForeignKeyField("customer_group_id", "CustomerGroup",
+			schema.OnDelete(schema.CascadeSET_NULL),
+			schema.RelatedName("customers")),
 	}
 }
 
@@ -158,52 +157,52 @@ func (Customer) Hooks() *schema.ModelHooks {
 
 // Address represents shipping/billing addresses
 type Address struct {
-	schema.BaseSchema
+	AddressGenerated
 }
 
 func (Address) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("customer_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("customer_id", schema.Required()),
 		
 		// Address type
-		schema.String("address_type").Required().MaxLength(20).
-			HelpText("Type: shipping, billing, both").Build(),
+		schema.StringField("address_type", schema.Required(), schema.MaxLength(20),
+			schema.HelpText("Type: shipping, billing, both")),
 		
 		// Contact
-		schema.String("first_name").Required().MaxLength(100).Build(),
-		schema.String("last_name").Required().MaxLength(100).Build(),
-		schema.String("company_name").MaxLength(200).Optional().Build(),
-		schema.String("phone").MaxLength(20).Optional().Build(),
+		schema.StringField("first_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("last_name", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("company_name", schema.MaxLength(200), schema.Optional()),
+		schema.StringField("phone", schema.MaxLength(20), schema.Optional()),
 		
 		// Address
-		schema.String("address_line1").Required().MaxLength(255).
-			HelpText("Street address, P.O. box").Build(),
-		schema.String("address_line2").MaxLength(255).Optional().
-			HelpText("Apartment, suite, unit, building, floor, etc.").Build(),
-		schema.String("city").Required().MaxLength(100).Build(),
-		schema.String("state_province").MaxLength(100).Optional().
-			HelpText("State, province, region").Build(),
-		schema.String("postal_code").Required().MaxLength(20).Build(),
-		schema.String("country_code").Required().MaxLength(2).
-			HelpText("ISO 3166-1 alpha-2 country code").Build(),
-		schema.String("country_name").Required().MaxLength(100).Build(),
+		schema.StringField("address_line1", schema.Required(), schema.MaxLength(255),
+			schema.HelpText("Street address, P.O. box")),
+		schema.StringField("address_line2", schema.MaxLength(255), schema.Optional(),
+			schema.HelpText("Apartment, suite, unit, building, floor, etc.")),
+		schema.StringField("city", schema.Required(), schema.MaxLength(100)),
+		schema.StringField("state_province", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("State, province, region")),
+		schema.StringField("postal_code", schema.Required(), schema.MaxLength(20)),
+		schema.StringField("country_code", schema.Required(), schema.MaxLength(2),
+			schema.HelpText("ISO 3166-1 alpha-2 country code")),
+		schema.StringField("country_name", schema.Required(), schema.MaxLength(100)),
 		
 		// Geolocation (optional)
-		schema.Float64("latitude").Optional().Build(),
-		schema.Float64("longitude").Optional().Build(),
+		schema.Float64Field("latitude", schema.Optional()),
+		schema.Float64Field("longitude", schema.Optional()),
 		
 		// Preferences
-		schema.Bool("is_default_shipping").Default(false).Build(),
-		schema.Bool("is_default_billing").Default(false).Build(),
+		schema.BoolField("is_default_shipping", schema.Default(false)),
+		schema.BoolField("is_default_billing", schema.Default(false)),
 		
 		// Special instructions
-		schema.Text("delivery_instructions").Optional().
-			HelpText("Delivery notes, gate codes, etc.").Build(),
+		schema.TextField("delivery_instructions", schema.Optional(),
+			schema.HelpText("Delivery notes, gate codes, etc.")),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -214,19 +213,18 @@ func (Address) Meta() schema.Meta {
 		VerboseNamePlural: "Addresses",
 		OrderBy:          []string{"-is_default_shipping", "-is_default_billing", "-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_address_customer", Fields: []string{"customer_id"}},
-			{Name: "idx_address_type", Fields: []string{"address_type"}},
-			{Name: "idx_address_country", Fields: []string{"country_code"}},
+			schema.IndexOn("idx_address_customer", "customer_id"),
+			schema.IndexOn("idx_address_type", "address_type"),
+			schema.IndexOn("idx_address_country", "country_code"),
 		},
 	}
 }
 
 func (Address) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("addresses").Build(),
+		schema.ForeignKeyField("customer_id", "Customer",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("addresses")),
 	}
 }
 
@@ -244,30 +242,30 @@ func (Address) Hooks() *schema.ModelHooks {
 
 // WishList represents customer wish lists
 type WishList struct {
-	schema.BaseSchema
+	WishListGenerated
 }
 
 func (WishList) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("customer_id").Required().Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("customer_id", schema.Required()),
 		
-		schema.String("name").Required().MaxLength(200).
-			HelpText("Wish list name (e.g., 'Birthday Gifts')").Build(),
-		schema.Text("description").Optional().Build(),
+		schema.StringField("name", schema.Required(), schema.MaxLength(200),
+			schema.HelpText("Wish list name (e.g., 'Birthday Gifts')")),
+		schema.TextField("description", schema.Optional()),
 		
 		// Visibility
-		schema.Bool("is_public").Default(false).
-			HelpText("Share with others").Build(),
-		schema.String("share_token").MaxLength(100).Optional().
-			HelpText("Token for sharing wish list").Build(),
+		schema.BoolField("is_public", schema.Default(false),
+			schema.HelpText("Share with others")),
+		schema.StringField("share_token", schema.MaxLength(100), schema.Optional(),
+			schema.HelpText("Token for sharing wish list")),
 		
 		// Status
-		schema.Bool("is_default").Default(false).Build(),
+		schema.BoolField("is_default", schema.Default(false)),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -278,18 +276,17 @@ func (WishList) Meta() schema.Meta {
 		VerboseNamePlural: "Wish Lists",
 		OrderBy:          []string{"-is_default", "-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_wishlist_customer", Fields: []string{"customer_id"}},
-			{Name: "idx_wishlist_token", Fields: []string{"share_token"}},
+			schema.IndexOn("idx_wishlist_customer", "customer_id"),
+			schema.IndexOn("idx_wishlist_token", "share_token"),
 		},
 	}
 }
 
 func (WishList) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("customer_id", "Customer").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("wish_lists").Build(),
+		schema.ForeignKeyField("customer_id", "Customer",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("wish_lists")),
 	}
 }
 
@@ -308,29 +305,29 @@ func (WishList) Hooks() *schema.ModelHooks {
 
 // WishListItem represents items in a wish list
 type WishListItem struct {
-	schema.BaseSchema
+	WishListItemGenerated
 }
 
 func (WishListItem) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.Int64("wish_list_id").Required().Build(),
-		schema.Int64("product_id").Required().Build(),
-		schema.Int64("variant_id").Optional().
-			HelpText("Specific product variant").Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.Int64Field("wish_list_id", schema.Required()),
+		schema.Int64Field("product_id", schema.Required()),
+		schema.Int64Field("variant_id", schema.Optional(),
+			schema.HelpText("Specific product variant")),
 		
-		schema.Int32("desired_quantity").Default(1).Build(),
-		schema.Float64("price_when_added").Optional().
-			HelpText("Price when added to wish list").Build(),
+		schema.Int32Field("desired_quantity", schema.Default(1)),
+		schema.Float64Field("price_when_added", schema.Optional(),
+			schema.HelpText("Price when added to wish list")),
 		
-		schema.Text("notes").Optional().
-			HelpText("Personal notes about the item").Build(),
-		schema.Int32("priority").Default(0).
-			HelpText("Priority: 0=normal, 1=high, etc.").Build(),
+		schema.TextField("notes", schema.Optional(),
+			schema.HelpText("Personal notes about the item")),
+		schema.Int32Field("priority", schema.Default(0),
+			schema.HelpText("Priority: 0=normal, 1=high, etc.")),
 		
 		// Timestamps
-		schema.Time("created_at").AutoNowAdd().Build(),
-		schema.Time("updated_at").AutoNow().Build(),
+		schema.TimeField("created_at", schema.AutoNowAdd()),
+		schema.TimeField("updated_at", schema.AutoNow()),
 	}
 }
 
@@ -341,9 +338,9 @@ func (WishListItem) Meta() schema.Meta {
 		VerboseNamePlural: "Wish List Items",
 		OrderBy:          []string{"-priority", "-created_at"},
 		Indexes: []schema.Index{
-			{Name: "idx_wishlist_item_list", Fields: []string{"wish_list_id"}},
-			{Name: "idx_wishlist_item_product", Fields: []string{"product_id"}},
-			{Name: "idx_wishlist_item_variant", Fields: []string{"variant_id"}},
+			schema.IndexOn("idx_wishlist_item_list", "wish_list_id"),
+			schema.IndexOn("idx_wishlist_item_product", "product_id"),
+			schema.IndexOn("idx_wishlist_item_variant", "variant_id"),
 		},
 		UniqueTogether: [][]string{
 			{"wish_list_id", "product_id", "variant_id"},
@@ -353,18 +350,15 @@ func (WishListItem) Meta() schema.Meta {
 
 func (WishListItem) Relations() []schema.Relation {
 	return []schema.Relation{
-		schema.ForeignKey("wish_list_id", "WishList").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("items").Build(),
-		schema.ForeignKey("product_id", "Product").
-			OnDelete(schema.CascadeCASCADE).
-			Required().
-			RelatedName("wish_list_items").Build(),
-		schema.ForeignKey("variant_id", "ProductVariant").
-			OnDelete(schema.CascadeCASCADE).
-			Optional().
-			RelatedName("wish_list_items").Build(),
+		schema.ForeignKeyField("wish_list_id", "WishList",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("items")),
+		schema.ForeignKeyField("product_id", "Product",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("wish_list_items")),
+		schema.ForeignKeyField("variant_id", "ProductVariant",
+			schema.OnDelete(schema.CascadeCASCADE),
+			schema.RelatedName("wish_list_items")),
 	}
 }
 

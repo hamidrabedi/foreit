@@ -1,103 +1,49 @@
 ---
-sidebar_position: 3
+id: roadmap
+title: Roadmap
+sidebar_label: Roadmap
 ---
 
-# Roadmap
+# forge Framework - Roadmap
 
-This document outlines the development roadmap for forge framework.
+## Vision
+
+forge aims to be the **Django of Go** - a full-featured, type-safe web framework that combines the best of Django's developer experience with Go's performance and type safety.
 
 ## Current Status: MVP Complete ✅
 
 The framework has achieved MVP status with all core features working.
 
-## Completed Features
-
-### Core Framework ✅
-- Schema definition system
-- Code generation infrastructure
-- Type-safe ORM API
-- Manager CRUD operations
-- SQL builder with proper escaping
-- Migration system
-- Database layer
-
-### Admin System ✅
-- Type-safe admin interface
-- Complete HTTP handlers
-- Rich form widgets
-- Filters, search, pagination
-- Bulk actions
-- Export functionality
-
-### REST API Framework ✅
-- Complete API framework
-- Serializers
-- ViewSets
-- Authentication (Token, JWT, Basic, Session, API Key)
-- Permissions
-- Throttling
-- Content negotiation
-- Pagination
-- Filtering
-
-### User System ✅
-- User management
-- Authentication
-- Session management
-- Password management
-- Permission system
-- Email verification
-
-### Infrastructure ✅
-- HTTP & Routing
-- Security features
-- Validation
-- Logging
-- Configuration
-- CLI Tools
-
 ## Roadmap by Priority
 
-### P0 - Critical (In Progress / Next)
+### P0 - Critical (Next 3 Months)
 
 #### 1. Advanced ORM Features
 **Status:** 🚧 Structure Ready
 
-- [ ] SelectRelated/PrefetchRelated - JOIN queries and separate queries
-- [ ] Aggregates - Count, Sum, Avg, Min, Max
-- [ ] Annotations - Computed fields and expressions
-- [ ] F() Expressions - Database functions in queries
-- [ ] Subqueries - Nested query support
-- [ ] Values/ValuesList - Return dictionaries instead of model instances
-- [ ] Bulk Operations - BulkUpdate, BulkCreate
+- [ ] **SelectRelated/PrefetchRelated** - JOIN queries and separate queries for relations
+- [ ] **Aggregates** - Count, Sum, Avg, Min, Max, etc.
+- [ ] **Annotations** - Computed fields and expressions
+- [ ] **F() Expressions** - Database functions in queries
+- [ ] **Subqueries** - Nested query support
+- [ ] **Values/ValuesList** - Return dictionaries instead of model instances
+- [ ] **Bulk Operations** - BulkUpdate, BulkCreate for performance
 
 **Impact:** Enables complex queries and better performance
 
-#### 2. AST Parser Enhancements
-**Status:** 🚧 Partial
-
-- [ ] Extract all field options
-- [ ] Extract relation options completely
-- [ ] Extract meta options
-- [ ] Extract hooks
-- [ ] Generate validation tags from schema
-- [ ] Generate database constraints from schema
-
-**Impact:** More complete code generation
-
-#### 3. Admin Interface Enhancements
+#### 2. Admin Interface Enhancements
 **Status:** ✅ Core Complete, 🚧 Enhancements Needed
 
-- [ ] Template rendering - HTML templates for admin views
-- [ ] Rich text editor - WYSIWYG editor
-- [ ] File/Image uploads - File handling
-- [ ] History/Audit logging - Track changes
-- [ ] Autocomplete UI - Better autocomplete
-- [ ] Date/Time pickers - Enhanced widgets
+- [ ] **Template Rendering** - HTML templates for admin views
+- [ ] **Rich Text Editor** - WYSIWYG editor for text fields
+- [ ] **File/Image Uploads** - File handling in admin
+- [ ] **History/Audit Logging** - Track changes to models
+- [ ] **Autocomplete UI** - Better autocomplete interface
+- [ ] **Date/Time Pickers** - Enhanced date/time widgets
 
 **Impact:** Better admin user experience
 
-#### 4. Testing Infrastructure
+#### 3. Testing Infrastructure
 **Status:** 🚧 Partial
 
 - [ ] Comprehensive test suite
@@ -109,9 +55,9 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Code quality and reliability
 
-### P1 - High Priority
+### P1 - High Priority (Next 6 Months)
 
-#### 5. REST API Auto-Generation
+#### 4. REST API Auto-Generation
 **Status:** ✅ Framework Complete, 🚧 Auto-Generation Needed
 
 - [ ] Auto-generate ViewSets from models
@@ -123,18 +69,18 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Faster API development
 
-#### 6. Advanced Query Features
+#### 5. Advanced Query Features
 **Status:** 🚧 Structure Ready
 
-- [ ] Window functions - ROW_NUMBER, RANK, etc.
-- [ ] Full-text search - PostgreSQL full-text search
-- [ ] Raw SQL support - Execute raw SQL when needed
-- [ ] Database functions - Custom database functions
-- [ ] Query optimization - Query plan analysis
+- [ ] **Window Functions** - ROW_NUMBER, RANK, etc.
+- [ ] **Full-Text Search** - PostgreSQL full-text search
+- [ ] **Raw SQL Support** - Execute raw SQL when needed
+- [ ] **Database Functions** - Custom database functions
+- [ ] **Query Optimization** - Query plan analysis
 
 **Impact:** More powerful querying capabilities
 
-#### 7. Caching Layer
+#### 6. Caching Layer
 **Status:** 📋 Planned
 
 - [ ] Query result caching
@@ -146,7 +92,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Performance improvements
 
-#### 8. CLI Enhancements
+#### 7. CLI Enhancements
 **Status:** ✅ Basic Complete, 🚧 Enhancements Needed
 
 - [ ] `forge startapp` - Create new app
@@ -159,9 +105,9 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Better developer experience
 
-### P2 - Medium Priority
+### P2 - Medium Priority (Next 12 Months)
 
-#### 9. Background Tasks
+#### 8. Background Tasks
 **Status:** 📋 Planned
 
 - [ ] Task queue integration
@@ -173,7 +119,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Async processing capabilities
 
-#### 10. Development Tools
+#### 9. Development Tools
 **Status:** 📋 Planned
 
 - [ ] Hot reload (file watching)
@@ -185,7 +131,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Better development experience
 
-#### 11. Monitoring & Observability
+#### 10. Monitoring & Observability
 **Status:** 📋 Planned
 
 - [ ] Metrics collection (Prometheus)
@@ -197,7 +143,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Production readiness
 
-#### 12. Documentation Enhancements
+#### 11. Documentation Enhancements
 **Status:** ✅ Basic Complete, 🚧 Enhancements Needed
 
 - [ ] Auto-generated API docs
@@ -209,9 +155,9 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Better onboarding
 
-### P3 - Nice to Have
+### P3 - Nice to Have (Future)
 
-#### 13. GraphQL Support
+#### 12. GraphQL Support
 **Status:** 📋 Planned
 
 - [ ] GraphQL schema generation
@@ -221,7 +167,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Alternative API style
 
-#### 14. WebSocket Support
+#### 13. WebSocket Support
 **Status:** 📋 Planned
 
 - [ ] WebSocket handlers
@@ -231,7 +177,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** Real-time features
 
-#### 15. Multi-Tenancy
+#### 14. Multi-Tenancy
 **Status:** 📋 Planned
 
 - [ ] Built-in multi-tenancy support
@@ -241,7 +187,7 @@ The framework has achieved MVP status with all core features working.
 
 **Impact:** SaaS applications
 
-#### 16. Internationalization (i18n)
+#### 15. Internationalization (i18n)
 **Status:** 📋 Planned
 
 - [ ] Translation system
@@ -254,13 +200,11 @@ The framework has achieved MVP status with all core features working.
 ## Timeline
 
 ### Q1 2025: Core Enhancements
-
 **Focus:** Complete advanced ORM features and admin enhancements
 
 **Deliverables:**
 - SelectRelated/PrefetchRelated implementation
 - Aggregates and annotations
-- AST parser enhancements
 - Admin template rendering
 - Comprehensive testing suite
 
@@ -270,7 +214,6 @@ The framework has achieved MVP status with all core features working.
 - Test coverage > 80%
 
 ### Q2 2025: API & Performance
-
 **Focus:** Auto-generated APIs and performance improvements
 
 **Deliverables:**
@@ -286,7 +229,6 @@ The framework has achieved MVP status with all core features working.
 - Performance benchmarks meet targets
 
 ### Q3 2025: Developer Experience
-
 **Focus:** Tools and documentation
 
 **Deliverables:**
@@ -302,7 +244,6 @@ The framework has achieved MVP status with all core features working.
 - 5+ example applications
 
 ### Q4 2025: Production & Ecosystem
-
 **Focus:** Production readiness and ecosystem
 
 **Deliverables:**
@@ -351,16 +292,65 @@ The framework has achieved MVP status with all core features working.
 
 **Target:** End of Q4 2025
 
-## Contributing
+## Community Goals
 
-We welcome contributions! Priority areas:
+### Year 1
+- **GitHub Stars:** 1,000+
+- **Contributors:** 20+
+- **Plugins:** 10+
+- **Production Users:** 50+
 
-- Advanced ORM features
-- Testing infrastructure
-- Documentation
-- Example applications
-- Plugin development
+### Year 2
+- **GitHub Stars:** 5,000+
+- **Contributors:** 50+
+- **Plugins:** 50+
+- **Production Users:** 500+
 
-See [Development Guide](/docs/contributing/development) for how to contribute.
+## Risk Mitigation
 
-**Last Updated:** January 2025
+### Technical Risks
+
+1. **Complex Query Features**
+   - **Mitigation:** Incremental implementation, use proven patterns
+   - **Status:** Structure ready, implementation in progress
+
+2. **Performance Issues**
+   - **Mitigation:** Benchmark early, optimize critical paths
+   - **Fallback:** Add caching layer
+
+3. **Code Generation Complexity**
+   - **Mitigation:** Incremental development, comprehensive tests
+   - **Fallback:** Manual code templates
+
+### Community Risks
+
+1. **Low Adoption**
+   - **Mitigation:** Great documentation, examples, tutorials
+   - **Fallback:** Focus on specific use cases
+
+2. **Maintenance Burden**
+   - **Mitigation:** Plugin system, community contributions
+   - **Fallback:** Core features only
+
+## Next Steps
+
+### Immediate (This Month)
+
+1. Implement SelectRelated/PrefetchRelated
+2. Complete aggregates and annotations
+3. Add admin template rendering
+4. Start comprehensive testing
+
+### Short Term (This Quarter)
+
+1. REST API auto-generation
+2. OpenAPI documentation
+3. Caching layer
+4. Comprehensive testing
+
+### Medium Term (This Year)
+
+1. Complete CLI toolset
+2. Development tools
+3. Production optimizations
+4. Plugin ecosystem

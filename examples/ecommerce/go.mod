@@ -1,6 +1,6 @@
 module examples/ecommerce
 
-go 1.25
+go 1.24.0
 
 require (
 	github.com/forgego/forge v0.1.0
@@ -8,7 +8,6 @@ require (
 	github.com/go-chi/cors v1.2.2
 	github.com/lib/pq v1.11.1
 	github.com/mattn/go-sqlite3 v1.14.33
-	go.mongodb.org/mongo-driver v1.17.9
 )
 
 require (

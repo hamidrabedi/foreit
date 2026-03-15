@@ -1006,3 +1006,13 @@
 - TODO snapshot: open=500, new=1, resolved=1
 - Last message summary: (no message file)
 - Run log: runs/run-20260213-124624.log
+
+## 2026-02-13
+- Batch: server reliability and test coverage
+- Changed:
+  - Added unit test coverage for `forge/server` module including `helpers.go`, `router.go`, and `response.go`.
+  - Added coverage for `context.go`, `health.go` and `server.go`.
+  - Improved robustness by discovering and fixing bugs in `Router.Group` and `Response.WriteHeader` found during unit testing.
+  - Increased `forge/server` unit test coverage from 17% to a robust level.
+- Tests:
+  - `go test ./... -count=1` in `forge` (pass)

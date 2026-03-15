@@ -1,14 +1,14 @@
 # Codex 24x7 Status
 
 ## Completed this run
-- Hardened migration runner initialization nil-safety in `forge/db/migrations.go`:
-  - Added an early nil guard in `NewMigrationRunner(...)` for `db == nil` to return `database connection is nil`.
-  - Prevents panic on nil receiver dereference (`db.DB`) during CLI/server migration bootstrap paths.
-- Added regression coverage in `forge/db/migrations_test.go`:
-  - `TestNewMigrationRunner_NilDB` verifies deterministic error behavior and nil runner result for nil DB input.
+- Increased unit testing coverage for the API/Server paths, specifically in the `forge/server` package.
+  - Added `forge/server/helpers_test.go` to cover `GetJSON`, `GetQueryInt`, `GetQueryString`, `GetQueryBool`, `GetParam`, `SendJSON`, `SendError`, and `SendSuccess`.
+  - Added `forge/server/router_test.go` to test wrapper functionality around `chi` router methods and middleware attachments.
+  - Added `forge/server/response_test.go` to provide exhaustive coverage for framework's `Response` type methods like JSON serialization, streaming, cache headers, content type inferences, and file serving features.
+  - Added `forge/server/context_test.go`, `forge/server/health_test.go`, and `forge/server/server_test.go`.
+  - Improved `forge/server` coverage from 17% to a robust level.
 - Ran verification for this batch:
-  - `go test ./db -count=1` in `forge` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
-  - `go test ./... -count=1` in `examples/ecommerce` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
+  - `go test ./... -count=1` in `forge` (pass)
 
 ## Remaining work
 - Continue high-impact TODO/FIXME burn-down across admin, ORM/schema/migrations, and API/server reliability paths in framework-owned source.

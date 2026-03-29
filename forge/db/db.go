@@ -77,12 +77,18 @@ func WithConnMaxIdleTime(d time.Duration) Option {
 // Dialect returns the SQL dialect for this database connection.
 // Use this to generate database-agnostic SQL queries.
 func (db *DB) Dialect() dialect.Dialect {
+	if db == nil {
+		return nil
+	}
 	return db.dialect
 }
 
 // SetDialect sets the SQL dialect for this database connection.
 // This is useful for tests or when creating DB instances directly.
 func (db *DB) SetDialect(d dialect.Dialect) {
+	if db == nil {
+		return
+	}
 	db.dialect = d
 }
 
@@ -91,6 +97,9 @@ func (db *DB) SetDialect(d dialect.Dialect) {
 // The returned sql.DBStats contains information about open connections,
 // in-use connections, idle connections, wait statistics, and more.
 func (db *DB) PoolStats() *sql.DBStats {
+	if db == nil || db.DB == nil {
+		return nil
+	}
 	stats := db.DB.Stats()
 	return &stats
 }
@@ -216,6 +225,9 @@ func NewDB(dsn string, opts ...Option) (*DB, error) {
 // This is useful when writing database-agnostic code that generates SQL with
 // PostgreSQL-style placeholders but needs to run on SQLite.
 func (db *DB) RebindPlaceholders(query string) string {
+	if db == nil {
+		return query
+	}
 	if db.Driver == "sqlite3" || db.Driver == "sqlite" {
 		return rebindPostgresToSQLite(query)
 	}
@@ -233,6 +245,9 @@ func (db *DB) RebindPlaceholders(query string) string {
 //	// New
 //	sql := db.RebindPlaceholders(query)
 func (db *DB) Rebind(query string) string {
+	if db == nil {
+		return query
+	}
 	return db.RebindPlaceholders(query)
 }
 
@@ -245,6 +260,9 @@ func rebindPostgresToSQLite(query string) string {
 // Ping verifies the database connection is still alive.
 // It returns an error if the connection is not initialized or cannot be reached.
 func (db *DB) Ping(ctx context.Context) error {
+	if db == nil {
+		return errors.New("database connection is nil")
+	}
 	if db.DB == nil {
 		return errors.New("database connection not initialized")
 	}
@@ -254,7 +272,7 @@ func (db *DB) Ping(ctx context.Context) error {
 // IsConnected checks if the database connection is valid.
 // It has a 5-second timeout for the ping operation.
 func (db *DB) IsConnected() bool {
-	if db.DB == nil {
+	if db == nil || db.DB == nil {
 		return false
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

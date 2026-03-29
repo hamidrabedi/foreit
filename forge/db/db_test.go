@@ -41,6 +41,60 @@ func TestIsConnected_NilDB(t *testing.T) {
 	}
 }
 
+func TestDB_Dialect_Nil(t *testing.T) {
+	var db *DB = nil
+	if db.Dialect() != nil {
+		t.Fatal("expected nil dialect for nil db")
+	}
+}
+
+func TestDB_SetDialect_Nil(t *testing.T) {
+	var db *DB = nil
+	// Should not panic
+	db.SetDialect(nil)
+}
+
+func TestDB_PoolStats_Nil(t *testing.T) {
+	var db *DB = nil
+	if db.PoolStats() != nil {
+		t.Fatal("expected nil stats for nil db")
+	}
+}
+
+func TestDB_RebindPlaceholders_Nil(t *testing.T) {
+	var db *DB = nil
+	query := "SELECT * FROM users WHERE id = ?"
+	if db.RebindPlaceholders(query) != query {
+		t.Fatal("expected unmodified query for nil db")
+	}
+}
+
+func TestDB_Rebind_Nil(t *testing.T) {
+	var db *DB = nil
+	query := "SELECT * FROM users WHERE id = ?"
+	if db.Rebind(query) != query {
+		t.Fatal("expected unmodified query for nil db")
+	}
+}
+
+func TestDB_Ping_Nil(t *testing.T) {
+	var db *DB = nil
+	err := db.Ping(context.Background())
+	if err == nil {
+		t.Fatal("expected error for nil db")
+	}
+	if err.Error() != "database connection is nil" {
+		t.Fatalf("expected 'database connection is nil', got: %v", err)
+	}
+}
+
+func TestDB_IsConnected_NilReceiver(t *testing.T) {
+	var db *DB = nil
+	if db.IsConnected() {
+		t.Fatal("expected false for nil db")
+	}
+}
+
 func TestNewDBWithValidation_InvalidDSN(t *testing.T) {
 	// Test with an invalid DSN that will fail to connect
 	database, err := NewDBWithValidation("invalid:dsn@tcp(localhost:3306)/nonexistent")

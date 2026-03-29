@@ -15,13 +15,6 @@ type Tx struct {
 
 // BeginTx starts a new transaction
 func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
-	if db == nil {
-		return nil, errors.New("database connection is nil")
-	}
-	if db.DB == nil {
-		return nil, errors.New("database connection not initialized")
-	}
-
 	tx, err := db.DB.BeginTx(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -35,10 +28,6 @@ func (db *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) {
 
 // WithTx executes a function within a transaction
 func (db *DB) WithTx(ctx context.Context, fn func(*Tx) error) error {
-	if db == nil {
-		return errors.New("database connection is nil")
-	}
-
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

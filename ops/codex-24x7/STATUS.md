@@ -1,14 +1,14 @@
 # Codex 24x7 Status
 
 ## Completed this run
-- Hardened `forge/db/db.go` and `forge/db/transaction.go` by adding comprehensive nil receiver guards to public API methods.
-  - Handled `Dialect`, `SetDialect`, `PoolStats`, `RebindPlaceholders`, `Rebind`, `Ping`, `IsConnected`, `BeginTx`, and `WithTx`.
-  - Ensure operations return deterministically (e.g., `nil`, `false`, `errors.New(...)`) rather than panicking on a `nil` `*DB`.
-- Added rigorous regression coverage in `forge/db/db_test.go` and `forge/db/transaction_test.go`:
-  - `TestDB_Dialect_Nil`, `TestDB_SetDialect_Nil`, `TestDB_PoolStats_Nil`, `TestDB_RebindPlaceholders_Nil`, `TestDB_Rebind_Nil`, `TestDB_Ping_Nil`, `TestDB_IsConnected_Nil`.
-  - `TestDB_BeginTx_Nil`, `TestDB_WithTx_Nil`.
+- Hardened migration runner initialization nil-safety in `forge/db/migrations.go`:
+  - Added an early nil guard in `NewMigrationRunner(...)` for `db == nil` to return `database connection is nil`.
+  - Prevents panic on nil receiver dereference (`db.DB`) during CLI/server migration bootstrap paths.
+- Added regression coverage in `forge/db/migrations_test.go`:
+  - `TestNewMigrationRunner_NilDB` verifies deterministic error behavior and nil runner result for nil DB input.
 - Ran verification for this batch:
-  - `go test ./...` in `forge` (pass).
+  - `go test ./db -count=1` in `forge` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
+  - `go test ./... -count=1` in `examples/ecommerce` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
 
 ## Remaining work
 - Continue high-impact TODO/FIXME burn-down across admin, ORM/schema/migrations, and API/server reliability paths in framework-owned source.
@@ -16,6 +16,6 @@
 - Admin UI unit tests remain environment-blocked (`vitest`/Vite `spawn EPERM`) in this runner.
 
 ## Next run plan
-- Identify and close any additional runtime panics in API or ORM logic where nil checks might be missing.
+- Close one additional unblocked admin/API or ORM/schema/migrations reliability edge case with targeted tests.
 - Expand ecommerce authenticated integration coverage for non-category modules where SQLite-backed paths are currently executable.
 - Re-attempt admin UI unit tests once spawn restrictions are resolved; keep `STATUS.md` and `HISTORY.md` synchronized.

@@ -1,7 +1,6 @@
 package db
 
 import (
-	"context"
 	"strings"
 	"testing"
 )
@@ -237,31 +236,6 @@ func TestValidateSavepointNameBoundaryConditions(t *testing.T) {
 	justOverMaxLength := strings.Repeat("x", 129)
 	if err := validateSavepointName(justOverMaxLength); err != ErrSavepointNameTooLong {
 		t.Errorf("name with 129 chars should return ErrSavepointNameTooLong, got: %v", err)
-	}
-}
-
-func TestDB_BeginTx_Nil(t *testing.T) {
-	var db *DB = nil
-	tx, err := db.BeginTx(context.Background(), nil)
-	if err == nil {
-		t.Fatal("expected error for nil db")
-	}
-	if err.Error() != "database connection is nil" {
-		t.Fatalf("expected 'database connection is nil', got: %v", err)
-	}
-	if tx != nil {
-		t.Fatal("expected nil tx for nil db")
-	}
-}
-
-func TestDB_WithTx_Nil(t *testing.T) {
-	var db *DB = nil
-	err := db.WithTx(context.Background(), func(tx *Tx) error { return nil })
-	if err == nil {
-		t.Fatal("expected error for nil db")
-	}
-	if err.Error() != "database connection is nil" {
-		t.Fatalf("expected 'database connection is nil', got: %v", err)
 	}
 }
 

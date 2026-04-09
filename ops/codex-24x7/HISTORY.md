@@ -1,3 +1,9 @@
+# History
+### Codex Run
+- Improved schema field lookup case insensitivity (`GetField` in `forge/orm/schema.go`), ensuring safe accessors work seamlessly when accessing via PascalCase or snake_case interchangeably.
+- Added extensive `SafeAccessor` unit tests that correctly mirror full Forge model definitions.
+
+
 ﻿# Codex 24x7 History
 
 ## 2026-02-12 17:43:14

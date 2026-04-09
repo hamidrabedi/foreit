@@ -1,6 +1,8 @@
 # Codex 24x7 Status
 
 ## Completed this run
+- Improved `GetField` in `forge/orm/schema.go` to handle case-insensitive fallbacks for schema field lookups, increasing reliability when accessing fields dynamically via `SafeAccessor` without strict exact casing.
+- Added comprehensive unit tests in `forge/orm/safe_accessor_test.go` confirming `SafeAccessor` correctly looks up fields using PascalCase, snake_case, and nested related references.
 - Hardened migration runner initialization nil-safety in `forge/db/migrations.go`:
   - Added an early nil guard in `NewMigrationRunner(...)` for `db == nil` to return `database connection is nil`.
   - Prevents panic on nil receiver dereference (`db.DB`) during CLI/server migration bootstrap paths.

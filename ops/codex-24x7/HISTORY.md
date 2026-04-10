@@ -1006,3 +1006,15 @@
 - TODO snapshot: open=500, new=1, resolved=1
 - Last message summary: (no message file)
 - Run log: runs/run-20260213-124624.log
+
+## 2026-02-13 12:46:59
+- Batch: Server config nil-safety hardening (API/server bootstrap reliability)
+- Changed:
+  - `forge/server/server.go`
+    - Added nil guards in `NewServer(...)` to return `server config is nil` or `server settings are nil` instead of panicking.
+  - `forge/server/server_test.go`
+    - Added `TestNewServer_NilInputs` to enforce deterministic error behavior and nil return object.
+- Tests:
+  - `go test ./server/... -count=1` in `forge` (pass)
+- TODO snapshot: open=500, new=1, resolved=1
+- Remaining: support/engagement ecommerce parity still blocked by stubbed/non-SQLite module paths; admin UI `vitest` remains blocked by `spawn EPERM`; broader TODO/FIXME burn-down remains.

@@ -1,14 +1,17 @@
 # Codex 24x7 Status
 
 ## Completed this run
+- Updated ETag middleware to use SHA-256 instead of MD5 for cryptographic security in `forge/server/middleware.go`.
+- Added comprehensive unit tests for `ETag` middleware in `forge/server/middleware_test.go` checking strong, weak, and If-None-Match behaviors.
 - Hardened migration runner initialization nil-safety in `forge/db/migrations.go`:
   - Added an early nil guard in `NewMigrationRunner(...)` for `db == nil` to return `database connection is nil`.
   - Prevents panic on nil receiver dereference (`db.DB`) during CLI/server migration bootstrap paths.
 - Added regression coverage in `forge/db/migrations_test.go`:
   - `TestNewMigrationRunner_NilDB` verifies deterministic error behavior and nil runner result for nil DB input.
 - Ran verification for this batch:
-  - `go test ./db -count=1` in `forge` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
-  - `go test ./... -count=1` in `examples/ecommerce` with `GOCACHE=C:\Users\hamid\AppData\Local\Temp\gocache` (pass)
+  - `go test ./server/... -count=1` in `forge` (pass)
+  - `go test ./db -count=1` in `forge` (pass)
+  - `go test ./... -count=1` in `examples/ecommerce` (pass)
 
 ## Remaining work
 - Continue high-impact TODO/FIXME burn-down across admin, ORM/schema/migrations, and API/server reliability paths in framework-owned source.

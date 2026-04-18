@@ -1006,3 +1006,7 @@
 - TODO snapshot: open=500, new=1, resolved=1
 - Last message summary: (no message file)
 - Run log: runs/run-20260213-124624.log
+
+### 2026-02-13
+- Updated ETag middleware to use SHA-256 instead of MD5 for cryptographic security in `forge/server/middleware.go`.
+- Added comprehensive unit tests for `ETag` middleware in `forge/server/middleware_test.go` checking strong, weak, and If-None-Match behaviors.

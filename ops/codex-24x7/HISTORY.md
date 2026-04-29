@@ -1,3 +1,9 @@
+## 2026-04-29 19:38:06
+- Batch: core database transaction nil-safety
+- Changed: Added early returns in `BeginTx` within `forge/db/transaction.go` if `db` or `db.DB` is nil, returning `database connection is nil`. Added tests `TestBeginTx_NilDB` and `TestWithTx_NilDB` to `forge/db/transaction_test.go`.
+- Tests: `go test ./db -run Tx_NilDB` (pass), `go test ./db -count=1` (pass).
+- Notes: Fixed potential panic during transaction initialization with nil receivers or uninitialized db.DB references.
+- Remaining: API exception handler and global panic test coverage improvements.
 ﻿# Codex 24x7 History
 
 ## 2026-02-12 17:43:14

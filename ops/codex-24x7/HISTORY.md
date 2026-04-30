@@ -1006,3 +1006,7 @@
 - TODO snapshot: open=500, new=1, resolved=1
 - Last message summary: (no message file)
 - Run log: runs/run-20260213-124624.log
+
+### $(date -u +"%Y-%m-%d %H:%M:%S") UTC
+- Fixed technical debt in `forge/log/encoder.go` by removing the `// TRACE is below DEBUG` TODO.
+- Verified framework tests pass successfully (`go test ./... -count=1`).

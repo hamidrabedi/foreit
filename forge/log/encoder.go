@@ -255,7 +255,7 @@ func traceLevelString(level zapcore.Level) string {
 func getZapLevel(level Level) zapcore.Level {
 	switch level {
 	case LevelTrace:
-		return traceZapLevel // TRACE is below DEBUG
+		return traceZapLevel
 	case LevelDebug:
 		return zapcore.DebugLevel
 	case LevelInfo:

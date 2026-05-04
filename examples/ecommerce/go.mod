@@ -7,8 +7,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
 	github.com/lib/pq v1.11.1
-	github.com/mattn/go-sqlite3 v1.14.33
-	go.mongodb.org/mongo-driver v1.17.9
+	github.com/mattn/go-sqlite3 v1.14.44
 )
 
 require (

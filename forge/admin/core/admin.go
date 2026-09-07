@@ -116,13 +116,16 @@ func (a *Admin[T]) Config() *Config[T] {
 }
 
 // GetMetadata returns the metadata for this admin
-// This is called by API handlers to send to frontend
+// This is called by API handlers to send to frontend.
+// Schema-derived parts are cached; per-request Permissions are computed
+// fresh on a copy so concurrent users never see each other's permissions.
 func (a *Admin[T]) GetMetadata(ctx context.Context, user interface{}) (*Metadata, error) {
 	// Return cached metadata if available
 	if a.metadata != nil {
-		// Update permissions for current user
-		a.metadata.Permissions = a.getPermissionsMetadata(ctx, user)
-		return a.metadata, nil
+		// Copy: never mutate the shared cache per-user
+		meta := *a.metadata
+		meta.Permissions = a.getPermissionsMetadata(ctx, user)
+		return &meta, nil
 	}
 
 	// Build metadata from schema
@@ -646,7 +649,7 @@ func (a *Admin[T]) HasAddPermission(ctx context.Context, user interface{}) bool 
 	if a.config.PermissionChecker != nil {
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermAdd))
 	}
-	return true // Default allow
+	return false // Default deny: configure Has*Permission or PermissionChecker to grant access
 }
 
 func (a *Admin[T]) HasChangePermission(ctx context.Context, user interface{}, obj interface{}) bool {
@@ -665,7 +668,7 @@ func (a *Admin[T]) HasChangePermission(ctx context.Context, user interface{}, ob
 	if a.config.PermissionChecker != nil {
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermChange))
 	}
-	return true // Default allow
+	return false // Default deny: configure Has*Permission or PermissionChecker to grant access
 }
 
 func (a *Admin[T]) HasDeletePermission(ctx context.Context, user interface{}, obj interface{}) bool {
@@ -684,7 +687,7 @@ func (a *Admin[T]) HasDeletePermission(ctx context.Context, user interface{}, ob
 	if a.config.PermissionChecker != nil {
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermDelete))
 	}
-	return true // Default allow
+	return false // Default deny: configure Has*Permission or PermissionChecker to grant access
 }
 
 func (a *Admin[T]) HasViewPermission(ctx context.Context, user interface{}, obj interface{}) bool {
@@ -703,7 +706,7 @@ func (a *Admin[T]) HasViewPermission(ctx context.Context, user interface{}, obj 
 	if a.config.PermissionChecker != nil {
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermView))
 	}
-	return true // Default allow
+	return false // Default deny: configure Has*Permission or PermissionChecker to grant access
 }
 
 func (a *Admin[T]) HasModulePermission(ctx context.Context, user interface{}) bool {
@@ -713,7 +716,7 @@ func (a *Admin[T]) HasModulePermission(ctx context.Context, user interface{}) bo
 	if a.config.PermissionChecker != nil {
 		return a.config.PermissionChecker.HasPermission(ctx, user, GetPermissionName(a.name, PermView))
 	}
-	return true // Default allow
+	return false // Default deny: configure Has*Permission or PermissionChecker to grant access
 }
 
 // Interface implementation for type-agnostic access

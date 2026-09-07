@@ -21,12 +21,12 @@ Per the ops run goals, a release is production-ready when **all three** hold:
       where SQLite-backed.
 - [ ] TODO/FIXME burn-down across admin, ORM/schema/migrations,
       API/server reliability edges.
-- [ ] Password-hash `BeforeUpdate` guard (`strings.HasPrefix(hash,"$2a$")`)
-      to avoid double-hashing (`skills` hooks backlog).
+- [x] Password-hash guard (`strings.HasPrefix(hash,"$2a$")`)
+      to avoid double-hashing in `forge/identity/utils`.
 - [ ] Analyzer corpus fixtures/goldens/benchmarks; RAG/evaluator ranking
       fixtures; harness-compatibility evidence (Claude/Codex/OpenCode/Zed/dmux).
-- [ ] `make seed` references `scripts/seed.go`, which does not exist —
-      recreate the seed script or drop the target.
+- [x] `make seed` references `scripts/seed.go` —
+      recreated seed script in `examples/ecommerce/scripts/seed.go`.
 - [ ] Ecommerce production hardening: rotate `session_secret`/`csrf_secret`,
       CORS/SSL, rate limits, backups, monitoring (`config.yaml:35-36`).
 - [ ] Ecommerce: auth middleware, caching layer, structured logging,

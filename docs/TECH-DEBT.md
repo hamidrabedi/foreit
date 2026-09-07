@@ -39,9 +39,8 @@
 - [ ] Runner env gotchas: default Go build cache may be access-denied
       (rerun with a temp `GOCACHE`); `git dubious ownership` needs the
       safe-directory policy. Document in CI/runner notes.
-- [ ] Auto-generated `foreit` skill/instincts claim a TypeScript/docs-site
-      stack from a single dependabot commit while the repo is Go/forge.
-      Regenerate or delete the ECC `foreit-*` bundle.
+- [x] Auto-generated `foreit` skill/instincts updated to accurately
+      reflect Go/Forge architecture, conventions, and test commands.
 
 ## Test contracts (must keep green)
 

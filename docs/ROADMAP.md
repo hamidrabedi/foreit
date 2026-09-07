@@ -17,8 +17,8 @@ Per the ops run goals, a release is production-ready when **all three** hold:
 
 - [ ] Ecommerce unit/integration/E2E suites for non-category modules
       (models/services, API/DB integration, purchase/return/support flows).
-- [ ] Authenticated integration coverage + object-specific 403 paths
-      where SQLite-backed.
+- [x] Authenticated integration coverage + object-specific 403 paths
+      where SQLite-backed (verified across Payment, Order, Warehouse, Coupon in `main_test.go`).
 - [ ] TODO/FIXME burn-down across admin, ORM/schema/migrations,
       API/server reliability edges.
 - [x] Password-hash guard (`strings.HasPrefix(hash,"$2a$")`)
@@ -31,10 +31,10 @@ Per the ops run goals, a release is production-ready when **all three** hold:
       CORS/SSL, rate limits, backups, monitoring (`config.yaml:35-36`).
 - [ ] Ecommerce: auth middleware, caching layer, structured logging,
       dashboard widgets, email templates, file uploads.
-- [ ] Ecommerce: `Mark Delivered` must set `delivered_at`; required-field
-      saves must return errors, not 500s.
-- [ ] Decide: "pre-built binaries are coming soon" (old install docs) —
-      implement releases or drop the promise.
+- [x] Ecommerce: `Mark Delivered` sets `delivered_at`; required-field
+      and validation saves return 400 `validation_error`, not 500s.
+- [x] Resolved "pre-built binaries are coming soon": updated install
+      docs to point to `go install` and GitHub tagged releases.
 
 ## Next (framework features)
 

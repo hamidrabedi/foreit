@@ -13,9 +13,8 @@
 - [ ] AST parser partial: field/relation/meta/hook/validation-tag
       extraction is incomplete for edge-case model files.
       Payoff: reliable `forge generate` on any model layout.
-- [ ] `validateChoices` always returns true; `unique` tag has no
-      registered validator; decimal validators miscount via `%g`.
-      Payoff: validation users can trust.
+- [x] `validateChoices` validates choice parameters; `unique` tag has a
+      registered validator; decimal validators use fixed-point float formatting.
 
 ## Admin
 

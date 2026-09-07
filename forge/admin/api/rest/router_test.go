@@ -957,3 +957,25 @@ func TestHandleLogout_RevokesSession(t *testing.T) {
 	root.ServeHTTP(configRec2, configReq2)
 	require.Equal(t, http.StatusUnauthorized, configRec2.Code)
 }
+
+func TestHandleCreate_ReturnsBadRequestOnValidationError(t *testing.T) {
+	admin := &mockAdmin{
+		createObjectFn: func(data map[string]interface{}) (interface{}, error) {
+			return nil, fmt.Errorf("validation failed: name is required")
+		},
+	}
+	router := NewRouter(core.NewRegistry())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/products/", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.handleCreate(admin)(rec, req)
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	errPayload, ok := payload["error"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "validation_error", errPayload["code"])
+}

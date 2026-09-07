@@ -526,6 +526,10 @@ func (r *Router) handleCreate(admin core.AdminInterface) http.HandlerFunc {
 		// Call implementation
 		obj, err := admin.CreateObject(ctx, data)
 		if err != nil {
+			if isValidationError(err) {
+				respondError(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+				return
+			}
 			respondError(w, http.StatusInternalServerError, "create_failed", err.Error(), nil)
 			return
 		}
@@ -573,6 +577,10 @@ func (r *Router) handleUpdate(admin core.AdminInterface) http.HandlerFunc {
 		// Call implementation
 		obj, err := admin.UpdateObject(ctx, id, data)
 		if err != nil {
+			if isValidationError(err) {
+				respondError(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+				return
+			}
 			respondError(w, http.StatusInternalServerError, "update_failed", err.Error(), nil)
 			return
 		}
@@ -623,12 +631,30 @@ func (r *Router) handleReplace(admin core.AdminInterface) http.HandlerFunc {
 
 		obj, err := admin.UpdateObject(ctx, id, data)
 		if err != nil {
+			if isValidationError(err) {
+				respondError(w, http.StatusBadRequest, "validation_error", err.Error(), nil)
+				return
+			}
 			respondError(w, http.StatusInternalServerError, "update_failed", err.Error(), nil)
 			return
 		}
 
 		respondJSON(w, http.StatusOK, obj)
 	}
+}
+
+func isValidationError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "validation") ||
+		strings.Contains(msg, "not null constraint") ||
+		strings.Contains(msg, "violates not-null") ||
+		strings.Contains(msg, "required") ||
+		strings.Contains(msg, "invalid input") ||
+		strings.Contains(msg, "cannot be null") ||
+		strings.Contains(msg, "is required")
 }
 
 // handleDelete deletes an object

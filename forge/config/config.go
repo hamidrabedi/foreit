@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
+	"log"
 	"time"
 
 	"github.com/spf13/viper"
@@ -41,9 +44,6 @@ func NewConfig() *Config {
 	v.SetDefault("database.max_idle_conns", 10)
 	v.SetDefault("database.conn_max_lifetime", "5m")
 	v.SetDefault("database.conn_max_idle_time", "2m")
-	v.SetDefault("security.secret_key", "change-me-in-production")
-	v.SetDefault("security.csrf_secret_key", "change-me-in-production")
-	v.SetDefault("security.session_secret", "change-me-in-production")
 	v.SetDefault("security.csrf_exempt_paths", []string{})
 	v.SetDefault("admin.enabled", true)
 	v.SetDefault("admin.path", "/admin")
@@ -54,7 +54,31 @@ func NewConfig() *Config {
 	// Read config file (ignore errors if file doesn't exist)
 	_ = v.ReadInConfig()
 
-	return &Config{Viper: v}
+	c := &Config{Viper: v}
+	c.ensureSecrets()
+	return c
+}
+
+// ensureSecrets generates random secrets for any secret key that was not
+// explicitly configured. Shipping predictable default secrets means every
+// deployment shares the same signing keys.
+func (c *Config) ensureSecrets() {
+	for _, key := range []string{
+		"security.secret_key",
+		"security.csrf_secret_key",
+		"security.session_secret",
+	} {
+		if c.Viper.IsSet(key) && c.Viper.GetString(key) != "" {
+			continue
+		}
+		var buf [32]byte
+		if _, err := rand.Read(buf[:]); err != nil {
+			log.Printf("forge/config: WARNING: could not generate random value for %s: %v", key, err)
+			continue
+		}
+		c.Viper.Set(key, hex.EncodeToString(buf[:]))
+		log.Printf("forge/config: WARNING: %s is not configured; using a generated ephemeral value (set it explicitly for production)", key)
+	}
 }
 
 // GetString gets a string value with a default

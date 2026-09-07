@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/forgego/forge/admin/core"
 	"github.com/forgego/forge/db"
@@ -225,6 +226,9 @@ func TestHandleConfig_UsesEnvironmentVariable(t *testing.T) {
 }
 
 func TestRegisterRoutes_RequiresAuthenticationForProtectedEndpoints(t *testing.T) {
+	t.Setenv("FORGE_ADMIN_USERNAME", "admin")
+	t.Setenv("FORGE_ADMIN_PASSWORD", "secret")
+
 	registry := core.NewRegistry()
 	err := registry.Register(&mockAdmin{
 		modelName:     "products",
@@ -294,7 +298,30 @@ func TestRegisterRoutes_RejectsInvalidOrMalformedTokens(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, invalidRec.Code)
 }
 
+func TestHandleLogin_DisabledWhenUnset(t *testing.T) {
+	t.Setenv("FORGE_ADMIN_USERNAME", "")
+	t.Setenv("FORGE_ADMIN_PASSWORD", "")
+
+	router := NewRouter(core.NewRegistry())
+
+	req := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"secret"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.handleLogin(rec, req)
+	require.Equal(t, http.StatusServiceUnavailable, rec.Code)
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	errPayload, ok := payload["error"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "admin_login_disabled", errPayload["code"])
+}
+
 func TestHandleLogin_RejectsInvalidCredentials(t *testing.T) {
+	t.Setenv("FORGE_ADMIN_USERNAME", "admin")
+	t.Setenv("FORGE_ADMIN_PASSWORD", "secret")
+
 	router := NewRouter(core.NewRegistry())
 
 	req := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"wrong"}`))
@@ -856,4 +883,77 @@ func withURLParam(req *http.Request, key string, value string) *http.Request {
 	routeCtx.URLParams.Add(key, value)
 	ctx := context.WithValue(req.Context(), chi.RouteCtxKey, routeCtx)
 	return req.WithContext(ctx)
+}
+
+func TestAdminSessionStore_TokenHashingAndRevocation(t *testing.T) {
+	store := newAdminSessionStore()
+
+	token, err := store.Issue("alice", 1*time.Hour)
+	require.NoError(t, err)
+	require.NotEmpty(t, token)
+
+	// Raw token must NOT exist directly in store.sessions map (must be hashed)
+	store.mu.RLock()
+	_, rawFound := store.sessions[token]
+	store.mu.RUnlock()
+	assert.False(t, rawFound, "raw token must not be stored as key in sessions map")
+
+	// Validate with token succeeds
+	session, ok := store.Validate(token)
+	require.True(t, ok)
+	assert.Equal(t, "alice", session.Username)
+	assert.True(t, session.Active)
+
+	// Revoke token
+	revoked := store.Revoke(token)
+	assert.True(t, revoked)
+
+	// Validate after revoke fails
+	_, ok = store.Validate(token)
+	assert.False(t, ok, "revoked session must fail validation")
+
+	// Second revoke returns false
+	assert.False(t, store.Revoke(token))
+}
+
+func TestHandleLogout_RevokesSession(t *testing.T) {
+	t.Setenv("FORGE_ADMIN_USERNAME", "admin")
+	t.Setenv("FORGE_ADMIN_PASSWORD", "secret")
+
+	registry := core.NewRegistry()
+	apiRouter := NewRouter(registry)
+	root := chi.NewRouter()
+	apiRouter.RegisterRoutes(root)
+
+	// Login
+	loginReq := httptest.NewRequest(http.MethodPost, "/api/login", bytes.NewBufferString(`{"username":"admin","password":"secret"}`))
+	loginRec := httptest.NewRecorder()
+	root.ServeHTTP(loginRec, loginReq)
+	require.Equal(t, http.StatusOK, loginRec.Code)
+
+	var loginPayload map[string]interface{}
+	require.NoError(t, json.Unmarshal(loginRec.Body.Bytes(), &loginPayload))
+	token, ok := loginPayload["token"].(string)
+	require.True(t, ok)
+
+	// Config endpoint succeeds with token
+	configReq := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	configReq.Header.Set("Authorization", "Bearer "+token)
+	configRec := httptest.NewRecorder()
+	root.ServeHTTP(configRec, configReq)
+	require.Equal(t, http.StatusOK, configRec.Code)
+
+	// Logout
+	logoutReq := httptest.NewRequest(http.MethodPost, "/api/logout", nil)
+	logoutReq.Header.Set("Authorization", "Bearer "+token)
+	logoutRec := httptest.NewRecorder()
+	root.ServeHTTP(logoutRec, logoutReq)
+	require.Equal(t, http.StatusOK, logoutRec.Code)
+
+	// Config endpoint now fails with 401 Unauthorized
+	configReq2 := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	configReq2.Header.Set("Authorization", "Bearer "+token)
+	configRec2 := httptest.NewRecorder()
+	root.ServeHTTP(configRec2, configReq2)
+	require.Equal(t, http.StatusUnauthorized, configRec2.Code)
 }

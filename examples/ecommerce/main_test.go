@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -24,6 +25,14 @@ import (
 	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/server"
 )
+
+// TestMain configures explicit admin credentials for the suite: since the
+// framework ships no default login, tests must provide their own.
+func TestMain(m *testing.M) {
+	_ = os.Setenv("FORGE_ADMIN_USERNAME", "admin")
+	_ = os.Setenv("FORGE_ADMIN_PASSWORD", "secret")
+	os.Exit(m.Run())
+}
 
 func TestNormalizePath(t *testing.T) {
 	tests := []struct {

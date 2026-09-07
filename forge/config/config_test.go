@@ -47,6 +47,27 @@ func TestNewConfig_GeneratesSecrets(t *testing.T) {
 	}
 }
 
+func TestNewConfig_OverridesPlaceholderSecrets(t *testing.T) {
+	t.Setenv("FORGE_SECURITY_SECRET_KEY", "change-me-in-production-with-random-string")
+	t.Setenv("FORGE_SECURITY_CSRF_SECRET_KEY", "change-me-in-production")
+	t.Setenv("FORGE_SECURITY_SESSION_SECRET", "secret")
+
+	cfg := NewConfig()
+	for _, key := range []string{
+		"security.secret_key",
+		"security.csrf_secret_key",
+		"security.session_secret",
+	} {
+		v := cfg.GetString(key, "")
+		if len(v) != 64 {
+			t.Errorf("GetString(%q) = %q, expected 64-char generated hex secret", key, v)
+		}
+		if isPlaceholderSecret(v) {
+			t.Errorf("GetString(%q) remained placeholder secret %q", key, v)
+		}
+	}
+}
+
 func TestNewConfig_Defaults(t *testing.T) {
 	cfg := NewConfig()
 

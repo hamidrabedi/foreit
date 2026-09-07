@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/spf13/viper"
@@ -59,16 +60,27 @@ func NewConfig() *Config {
 	return c
 }
 
+// isPlaceholderSecret detects unconfigured or insecure placeholder secrets.
+func isPlaceholderSecret(val string) bool {
+	s := strings.TrimSpace(val)
+	if s == "" {
+		return true
+	}
+	lower := strings.ToLower(s)
+	return strings.HasPrefix(lower, "change-me") || lower == "secret" || lower == "default"
+}
+
 // ensureSecrets generates random secrets for any secret key that was not
-// explicitly configured. Shipping predictable default secrets means every
-// deployment shares the same signing keys.
+// explicitly configured or was set to an insecure placeholder. Shipping
+// predictable default secrets means every deployment shares the same signing keys.
 func (c *Config) ensureSecrets() {
 	for _, key := range []string{
 		"security.secret_key",
 		"security.csrf_secret_key",
 		"security.session_secret",
 	} {
-		if c.Viper.IsSet(key) && c.Viper.GetString(key) != "" {
+		val := c.Viper.GetString(key)
+		if c.Viper.IsSet(key) && !isPlaceholderSecret(val) {
 			continue
 		}
 		var buf [32]byte
@@ -77,7 +89,11 @@ func (c *Config) ensureSecrets() {
 			continue
 		}
 		c.Viper.Set(key, hex.EncodeToString(buf[:]))
-		log.Printf("forge/config: WARNING: %s is not configured; using a generated ephemeral value (set it explicitly for production)", key)
+		if isPlaceholderSecret(val) && val != "" {
+			log.Printf("forge/config: WARNING: %s is set to an insecure placeholder value %q; overriding with a generated ephemeral value (set it explicitly for production)", key, val)
+		} else {
+			log.Printf("forge/config: WARNING: %s is not configured; using a generated ephemeral value (set it explicitly for production)", key)
+		}
 	}
 }
 

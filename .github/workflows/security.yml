@@ -45,7 +45,7 @@ jobs:
       docker: ${{ steps.force.outputs.docker || steps.filter.outputs.docker }}
       workflows: ${{ steps.force.outputs.workflows || steps.filter.outputs.workflows }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: dorny/paths-filter@v4
@@ -85,10 +85,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: '1.25'
       
@@ -113,10 +113,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: '1.25'
       
@@ -145,9 +145,9 @@ jobs:
       matrix:
         directory: ['forge/admin/ui/web', 'docs-site']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -172,7 +172,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Run Snyk to check for vulnerabilities
         uses: snyk/actions/golang@master
@@ -196,7 +196,7 @@ jobs:
       needs.changes.outputs.docker == 'true' ||
       needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Run Trivy vulnerability scanner in repo mode
         uses: aquasecurity/trivy-action@master
@@ -219,7 +219,7 @@ jobs:
     needs: changes
     if: github.event_name != 'schedule' && (needs.changes.outputs.docker == 'true' || needs.changes.outputs.examples == 'true' || needs.changes.outputs.workflows == 'true')
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Build Docker image
         run: docker build -t forge-ecommerce:test -f examples/ecommerce/Dockerfile examples/ecommerce
@@ -244,7 +244,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.examples == 'true' || needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Run OSV Scanner
         uses: google/osv-scanner-action@v1
@@ -268,7 +268,7 @@ jobs:
       needs.changes.outputs.docker == 'true' ||
       needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       
@@ -286,10 +286,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.go == 'true' || needs.changes.outputs.workflows == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
           go-version: '1.25'
       
@@ -308,7 +308,7 @@ jobs:
       security-events: write
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       

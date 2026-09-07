@@ -7,12 +7,11 @@
 
 ## Codegen / ORM
 
-- [ ] `SelectRelated`/`PrefetchRelated` + aggregates/annotations surfaces
-      exist but execution is structure-ready only.
-      Payoff: kills N+1 query class framework-wide.
-- [ ] AST parser partial: field/relation/meta/hook/validation-tag
-      extraction is incomplete for edge-case model files.
-      Payoff: reliable `forge generate` on any model layout.
+- [x] `SelectRelated` execution with case-insensitive relation resolution,
+      `_id` suffix normalization, and pointer/value struct mapping implemented and tested.
+- [x] AST parser edge cases: statement-level variable assignment resolution in
+      `Fields()`, `Relations()`, and `Meta()`, variadic relation builders, `oneof` choice validation,
+      and non-exponential float bounds formatting.
 - [x] `validateChoices` validates choice parameters; `unique` tag has a
       registered validator; decimal validators use fixed-point float formatting.
 

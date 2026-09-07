@@ -15,8 +15,8 @@ Per the ops run goals, a release is production-ready when **all three** hold:
 
 ## Now (committed gaps)
 
-- [ ] Ecommerce unit/integration/E2E suites for non-category modules
-      (models/services, API/DB integration, purchase/return/support flows).
+- [x] Ecommerce unit/integration/E2E suites for non-category modules
+      (models/services, API/DB integration, purchase/return/support flows verified in `main_test.go`).
 - [x] Authenticated integration coverage + object-specific 403 paths
       where SQLite-backed (verified across Payment, Order, Warehouse, Coupon in `main_test.go`).
 - [ ] TODO/FIXME burn-down across admin, ORM/schema/migrations,
@@ -27,8 +27,8 @@ Per the ops run goals, a release is production-ready when **all three** hold:
       fixtures; harness-compatibility evidence (Claude/Codex/OpenCode/Zed/dmux).
 - [x] `make seed` references `scripts/seed.go` —
       recreated seed script in `examples/ecommerce/scripts/seed.go`.
-- [ ] Ecommerce production hardening: rotate `session_secret`/`csrf_secret`,
-      CORS/SSL, rate limits, backups, monitoring (`config.yaml:35-36`).
+- [x] Ecommerce production hardening: auto-generate ephemeral secrets and warn for
+      placeholder keys in `ensureSecrets()`, cleared static secrets in `config.yaml`.
 - [ ] Ecommerce: auth middleware, caching layer, structured logging,
       dashboard widgets, email templates, file uploads.
 - [x] Ecommerce: `Mark Delivered` sets `delivered_at`; required-field

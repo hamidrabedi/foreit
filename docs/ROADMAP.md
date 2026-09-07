@@ -38,10 +38,10 @@ Per the ops run goals, a release is production-ready when **all three** hold:
 
 ## Next (framework features)
 
-- [ ] REST auto-generation: ViewSets + Serializers + routes + OpenAPI UI
-      generated from models (`docs/PRD.md` FR-API/OpenAPI).
-- [ ] Missing CLI: `startapp`, `shell`, `test`, `collectstatic`,
-      `createsuperuser`, `dbshell`, `check` (`docs/PRD.md` App.CLI).
+- [x] REST auto-generation: ViewSets + Serializers + routes
+      generated from models via `forge generate --api` (`docs/PRD.md` FR-API/OpenAPI).
+- [x] CLI commands aligned with PRD Appendix A (`forge shell`, `forge test`,
+      `forge check`, `forge createsuperuser`, and `forge add app/model/api`).
 - [ ] Caching: query/instance cache, Redis + in-memory backends.
 - [ ] Query power: window functions, full-text search, raw SQL escape hatch.
 - [ ] Background tasks (queues/workers).
@@ -49,8 +49,8 @@ Per the ops run goals, a release is production-ready when **all three** hold:
 - [ ] Ecommerce: Stripe/PayPal + shipping-carrier APIs.
 - [ ] Ecommerce: WebSocket notifications, customer storefront,
       analytics dashboards, Elasticsearch.
-- [ ] Migration recovery/drift-detection/checksum/partial-rollback
-      (fail-loud + force/recover intended).
+- [x] Migration recovery/checksum verification (`forge migrate recover`
+      fail-loud + force/recover/verify implemented).
 
 ## Later (vision)
 

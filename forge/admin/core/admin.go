@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -404,6 +405,13 @@ func (a *Admin[T]) CreateObject(ctx context.Context, data map[string]interface{}
 	if err != nil {
 		return nil, err
 	}
+
+	user, _ := apicore.UserFromContext(ctx)
+	objID := a.getObjectID(&instance)
+	repr := a.getObjectLabel(&instance)
+	changesJSON, _ := json.Marshal(data)
+	_ = a.LogAction(ctx, user, fmt.Sprintf("%v", objID), repr, ActionAdd, string(changesJSON))
+
 	return &instance, nil
 }
 
@@ -439,6 +447,12 @@ func (a *Admin[T]) UpdateObject(ctx context.Context, id interface{}, data map[st
 	if err != nil {
 		return nil, err
 	}
+
+	user, _ := apicore.UserFromContext(ctx)
+	repr := a.getObjectLabel(updated)
+	changesJSON, _ := json.Marshal(data)
+	_ = a.LogAction(ctx, user, fmt.Sprintf("%v", intID), repr, ActionChange, string(changesJSON))
+
 	return updated, nil
 }
 
@@ -452,7 +466,15 @@ func (a *Admin[T]) DeleteObject(ctx context.Context, id interface{}) error {
 	if err != nil {
 		return err
 	}
-	return a.DeleteModel(ctx, instance)
+	repr := a.getObjectLabel(instance)
+	if err := a.DeleteModel(ctx, instance); err != nil {
+		return err
+	}
+
+	user, _ := apicore.UserFromContext(ctx)
+	_ = a.LogAction(ctx, user, fmt.Sprintf("%v", intID), repr, ActionDelete, "")
+
+	return nil
 }
 
 func (a *Admin[T]) ExecuteAction(ctx context.Context, actionName string, ids []interface{}, params map[string]interface{}) (interface{}, error) {
@@ -815,6 +837,11 @@ func applyConfigDefaults[T any](config *Config[T], s schema.Schema) {
 	if config.ListMaxShowAll == 0 {
 		config.ListMaxShowAll = 100
 	}
+
+	// Set default history manager if not provided
+	if config.HistoryManager == nil {
+		config.HistoryManager = NewMemoryHistoryManager()
+	}
 }
 
 // getObjectID returns the primary key value of an object
@@ -855,12 +882,19 @@ func (a *Admin[T]) getObjectLabel(obj *T) string {
 	}
 
 	// 2. Try ID
-	id := a.getObjectID(obj)
-	if id != nil {
-		return fmt.Sprintf("%s #%v", a.metadata.VerboseName, id)
+	modelLabel := a.name
+	if a.metadata != nil && a.metadata.VerboseName != "" {
+		modelLabel = a.metadata.VerboseName
+	} else if a.config != nil && a.config.VerboseName != "" {
+		modelLabel = a.config.VerboseName
 	}
 
-	return a.metadata.VerboseName
+	id := a.getObjectID(obj)
+	if id != nil {
+		return fmt.Sprintf("%s #%v", modelLabel, id)
+	}
+
+	return modelLabel
 }
 
 // toInt64 converts interface{} to int64

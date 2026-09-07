@@ -44,6 +44,8 @@ type mockAdmin struct {
 	lastActionName       string
 	lastActionIDs        []interface{}
 	lastActionParams     map[string]interface{}
+	historyEntries       []core.LogEntry
+	historyErr           error
 }
 
 type mockUpdateCall struct {
@@ -86,7 +88,10 @@ func (m *mockAdmin) HasModulePermission(ctx context.Context, user interface{}) b
 func (m *mockAdmin) ManagerInterface() interface{} { return nil }
 func (m *mockAdmin) ConfigInterface() interface{}  { return nil }
 func (m *mockAdmin) GetHistory(ctx context.Context, objectID string) ([]core.LogEntry, error) {
-	return nil, nil
+	if m.historyErr != nil {
+		return nil, m.historyErr
+	}
+	return m.historyEntries, nil
 }
 func (m *mockAdmin) LogAction(ctx context.Context, user interface{}, objectID string, repr string, action core.ActionType, changes string) error {
 	return nil
@@ -979,3 +984,38 @@ func TestHandleCreate_ReturnsBadRequestOnValidationError(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "validation_error", errPayload["code"])
 }
+
+func TestHandleHistory_ReturnsAuditLog(t *testing.T) {
+	admin := &mockAdmin{
+		historyEntries: []core.LogEntry{
+			{
+				ID:         1,
+				Timestamp:  time.Now(),
+				ModelName:  "products",
+				ObjectID:   "10",
+				ObjectRepr: "Product #10",
+				Action:     core.ActionAdd,
+				UserID:     "admin",
+			},
+		},
+	}
+	router := NewRouter(core.NewRegistry())
+
+	req := httptest.NewRequest(http.MethodGet, "/api/products/10/history", nil)
+	req = withURLParam(req, "id", "10")
+	rec := httptest.NewRecorder()
+
+	router.handleHistory(admin)(rec, req)
+	require.Equal(t, http.StatusOK, rec.Code)
+
+	var payload map[string]interface{}
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &payload))
+	entries, ok := payload["entries"].([]interface{})
+	require.True(t, ok)
+	require.Len(t, entries, 1)
+	entryMap := entries[0].(map[string]interface{})
+	assert.Equal(t, "products", entryMap["model_name"])
+	assert.Equal(t, "10", entryMap["object_id"])
+	assert.Equal(t, "add", entryMap["action"])
+}
+

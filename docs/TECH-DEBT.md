@@ -17,14 +17,15 @@
 
 ## Admin
 
-- [ ] Admin template rendering, uploads, history/audit, pickers missing.
-- [ ] History/audit manager is a no-op while `/history` + `useModelHistory`
-      are exposed (always empty).
+- [ ] Admin template rendering, uploads, pickers missing.
+- [x] History/audit manager: implemented thread-safe `MemoryHistoryManager`,
+      hooked into `Admin[T]` lifecycle (`CreateObject`, `UpdateObject`, `DeleteObject`),
+      and tested `/history` REST endpoint.
 
 ## Migrations
 
-- [ ] Migration recovery, drift detection, checksum verification,
-      partial rollback missing (fail-loud + force/recover intended).
+- [x] Migration recovery and checksum verification: implemented `forge migrate recover`
+      CLI command with `--clean` and `--verify` flags, leveraging `execute.Recovery`.
 
 ## Tooling / repo hygiene
 

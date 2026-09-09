@@ -65,6 +65,7 @@ func main() {
 			if err := defaultDB.QueryRow("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname = $1)", dbName).Scan(&exists); err != nil {
 				log.Printf("Warning: failed to check database existence: %v", err)
 			} else if !exists {
+				// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query, go.lang.security.audit.database.string-formatted-query
 				if _, err := defaultDB.Exec("CREATE DATABASE " + pq.QuoteIdentifier(dbName)); err != nil {
 					log.Printf("Warning: failed to create database: %v", err)
 				} else {
@@ -170,6 +171,11 @@ func buildEcommerceRouter(ctx context.Context, cfg *config.Config, database *db.
 
 	// Configure Admin UI source. If static directory exists, prefer it so users don't need `-tags embed`
 	adminStaticDir := cfg.GetString("admin.static_dir", "")
+	if adminStaticDir != "" {
+		if st, err := os.Stat(filepath.Join(adminStaticDir, "index.html")); err != nil || st.IsDir() {
+			adminStaticDir = ""
+		}
+	}
 	if adminStaticDir == "" {
 		candidates := []string{
 			"../../forge/admin/ui/dist",

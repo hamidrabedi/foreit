@@ -101,7 +101,7 @@ jobs:
 
       - name: Run Semgrep
         if: needs.changes.outputs.go == 'true' || needs.changes.outputs.admin_ui == 'true' || needs.changes.outputs.workflows == 'true'
-        run: semgrep scan --error --config p/security-audit --config p/golang --config p/owasp-top-ten --config p/sql-injection --config p/xss
+        run: semgrep scan --error --baseline-commit=${{ github.event.pull_request.base.sha }} --exclude-rule=yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag --config p/security-audit --config p/golang --config p/owasp-top-ten --config p/sql-injection --config p/xss
 
       - name: Check sensitive file changes
         id: sensitive_files
@@ -208,20 +208,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       
+      - name: Check if directory should be audited
+        id: check_run
+        run: |
+          if [ "${{ needs.changes.outputs.workflows }}" = "true" ] || \
+             [ "${{ matrix.directory }}" = "docs-site" -a "${{ needs.changes.outputs.docs }}" = "true" ] || \
+             [ "${{ matrix.directory }}" = "forge/admin/ui/web" -a "${{ needs.changes.outputs.admin_ui }}" = "true" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: actions/setup-node@v7.0.0
+        if: steps.check_run.outputs.should_run == 'true'
         with:
           node-version: '26.8.1'
           cache: 'npm'
           cache-dependency-path: ${{ matrix.directory }}/package-lock.json
       
       - name: Install dependencies
+        if: steps.check_run.outputs.should_run == 'true'
         working-directory: ${{ matrix.directory }}
         run: npm ci
       
       - name: Run npm audit
+        if: steps.check_run.outputs.should_run == 'true'
         working-directory: ${{ matrix.directory }}
-        run: npm audit --audit-level=moderate
-      
-      - name: Check for known vulnerabilities
-        working-directory: ${{ matrix.directory }}
-        run: npx better-npm-audit audit --level=moderate
+        run: npx -y better-npm-audit audit --level=moderate

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -227,7 +228,7 @@ func (mr *MigrationRunner) validatePendingMigrations(ctx context.Context, curren
 
 		versionStr := parts[0]
 		version, err := strconv.ParseUint(versionStr, 10, 64)
-		if err != nil {
+		if err != nil || version > math.MaxUint {
 			continue
 		}
 
@@ -278,7 +279,7 @@ func (mr *MigrationRunner) validatePendingMigrationChecksums(ctx context.Context
 
 		versionStr := parts[0]
 		version, err := strconv.ParseUint(versionStr, 10, 64)
-		if err != nil {
+		if err != nil || version > math.MaxUint {
 			continue
 		}
 

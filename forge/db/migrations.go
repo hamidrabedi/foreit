@@ -506,6 +506,9 @@ type DetailedMigrationStatus struct {
 // Force sets a migration version and marks it as clean (for dirty state recovery)
 // WARNING: Use with caution - only after manually fixing a failed migration
 func (mr *MigrationRunner) Force(ctx context.Context, version uint) error {
+	if version > math.MaxInt {
+		return fmt.Errorf("migration version exceeds maximum supported value")
+	}
 	if err := mr.migrate.Force(int(version)); err != nil {
 		return fmt.Errorf("failed to force migration version: %w", err)
 	}

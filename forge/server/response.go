@@ -82,9 +82,7 @@ func (r *Response) Redirect(url string, code int) {
 
 // Cookie sets a cookie
 func (r *Response) Cookie(cookie *http.Cookie) {
-	if cookie != nil {
-		http.SetCookie(r, cookie)
-	}
+	http.SetCookie(r, cookie)
 }
 
 // Header sets a response header

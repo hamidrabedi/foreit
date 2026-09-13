@@ -3,12 +3,15 @@ package orm
 import (
 	"fmt"
 	"strings"
+
+	"github.com/forgego/forge/db/dialect"
 )
 
 // SQLBuilder provides safe SQL building with proper escaping and parameter binding
 type SQLBuilder struct {
 	paramIndex int
 	args       []interface{}
+	dialect    dialect.Dialect
 }
 
 // NewSQLBuilder creates a new SQL builder
@@ -17,6 +20,23 @@ func NewSQLBuilder() *SQLBuilder {
 		paramIndex: 1,
 		args:       []interface{}{},
 	}
+}
+
+// NewSQLBuilderWithDialect creates a new SQL builder with the specified dialect
+func NewSQLBuilderWithDialect(d dialect.Dialect) *SQLBuilder {
+	return &SQLBuilder{
+		paramIndex: 1,
+		args:       []interface{}{},
+		dialect:    d,
+	}
+}
+
+func (b *SQLBuilder) isSQLite() bool {
+	if b == nil || b.dialect == nil {
+		return false
+	}
+	name := strings.ToLower(b.dialect.Name())
+	return name == "sqlite" || name == "sqlite3"
 }
 
 // EscapeIdentifier escapes SQL identifiers (table/column names) to prevent SQL injection
@@ -215,6 +235,3 @@ func (b *SQLBuilder) BuildDelete(table string) string {
 	escapedTable := EscapeIdentifier(table)
 	return "DELETE FROM " + escapedTable
 }
-
-
-

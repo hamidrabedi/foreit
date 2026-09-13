@@ -17,6 +17,11 @@ type CacheBackend interface {
 	Delete(key string) error
 }
 
+// atomicCounter is implemented by caches that can check-and-increment atomically.
+type atomicCounter interface {
+	IncrementWithinLimit(key string, limit int, window time.Duration) (allowed bool, retryAfter time.Duration, err error)
+}
+
 // MemoryCache is an in-memory cache backend
 type MemoryCache struct {
 	mu   sync.Mutex
@@ -95,4 +100,47 @@ func (c *MemoryCache) Delete(key string) error {
 
 	delete(c.data, key)
 	return nil
+}
+
+// IncrementWithinLimit checks and increments the counter atomically within limit
+func (c *MemoryCache) IncrementWithinLimit(key string, limit int, window time.Duration) (allowed bool, retryAfter time.Duration, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := time.Now()
+	if limit <= 0 {
+		if entry, ok := c.data[key]; ok && now.Before(entry.expiresAt) {
+			return false, entry.expiresAt.Sub(now), nil
+		}
+		return false, window, nil
+	}
+
+	entry, ok := c.data[key]
+	if !ok || now.After(entry.expiresAt) {
+		c.data[key] = &cacheEntry{
+			value:     1,
+			expiresAt: now.Add(window),
+		}
+		return true, 0, nil
+	}
+
+	count, ok := entry.value.(int)
+	if !ok {
+		c.data[key] = &cacheEntry{
+			value:     1,
+			expiresAt: now.Add(window),
+		}
+		return true, 0, nil
+	}
+
+	if count >= limit {
+		retryAfter := entry.expiresAt.Sub(now)
+		if retryAfter < 0 {
+			retryAfter = 0
+		}
+		return false, retryAfter, nil
+	}
+
+	entry.value = count + 1
+	return true, 0, nil
 }

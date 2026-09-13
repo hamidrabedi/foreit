@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/forgego/forge/netutil"
 	"golang.org/x/time/rate"
 )
 
@@ -156,50 +156,7 @@ func rateLimitKey(requests int, window time.Duration) string {
 
 // getClientIP extracts the client IP from the request
 func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP (original client)
-		ips := splitIPs(xff)
-		if len(ips) > 0 {
-			return ips[0]
-		}
-	}
-
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	if host, _, err := splitHostPort(ip); err == nil {
-		return host
-	}
-
-	return ip
-}
-
-// splitIPs splits comma-separated IPs
-func splitIPs(s string) []string {
-	parts := strings.Split(s, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			result = append(result, part)
-		}
-	}
-	return result
-}
-
-// splitHostPort splits host:port (simplified)
-func splitHostPort(hostport string) (host, port string, err error) {
-	// Simple implementation - in production use net.SplitHostPort
-	idx := strings.LastIndex(hostport, ":")
-	if idx < 0 {
-		return hostport, "", nil
-	}
-	return hostport[:idx], hostport[idx+1:], nil
+	return netutil.ClientIP(r, netutil.TrustedProxies())
 }
 
 // RateLimitByIP creates a middleware that rate limits by IP address

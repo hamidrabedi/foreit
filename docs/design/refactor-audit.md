@@ -122,6 +122,16 @@ Use this on the code you touch, and on every refactor PR.
 | B28 | MINOR | R | `forge/api/content_negotiation.go:30,58` | `Renderers[0]` / `Parsers[0]` indexed without a length check | Validate configuration in the constructor |
 | B29 | MINOR | R | `forge/identity/middleware/auth.go:104-121` | Cookie session auth does not itself require CSRF; safe only if `server` CSRF middleware is mounted on the same routes | Document the requirement or enforce CSRF when auth came from a cookie |
 | B30 | MINOR | R | `forge/admin/api/rest/login_limiter.go:66-83` | Cleanup only runs above 10k entries and holds the lock while iterating; username rotation can grow memory | Fold into the shared limiter (§5) with TTL eviction |
+| B31 | MAJOR | V | `forge/db/migrate/sql/sqlite.go` `BuildAddForeignKey` → `base.go` | SQLite delegates to the base builder, which emits a PostgreSQL `DO $$ ... pg_constraint ... ::regclass` block, so any SQLite migration that adds a foreign key fails | SQLite: define FKs inside `CREATE TABLE`, or use the table-rebuild recipe; never share PG-only DDL through the base |
+| B32 | MAJOR | V | `forge/db/migrate/sql/postgres.go:137`, `sqlite.go:139` (down SQL for `DropColumn`/`DropTable`) | Down SQL returns an error when the original definition is unknown, so generating any migration that drops a column or table fails outright | Carry the previous column/table definition from state into the change, or emit an explicit irreversible marker |
+| B33 | MAJOR | V | `forge/db/migrate/sql/sqlite.go:106,138` and `DropForeignKey` case | SQLite down steps for `AddColumn`, `DropConstraint`, `DropForeignKey` are SQL comments; rollback "succeeds" and records the version as reverted while the schema is unchanged | Generate the SQLite table-rebuild sequence, or refuse to generate a no-op down |
+| B34 | MAJOR | V | `forge/db/migrate/execute/status.go` `mergeAppliedVersions` | Marks every integer from 1 to the current version as applied. With timestamp versions (`20240101120000`) this loops ~2×10¹³ times and exhausts memory; with gaps it reports versions that never existed | Merge only versions that exist as files or rows |
+| B35 | MAJOR | V | `forge/orm/queryset.go` `Last` / `Reverse` | `Reverse` only flips existing `orderBy`; on an unordered queryset `Last()` returns the first row | Default to primary key when no ordering (Django behaviour) |
+| B36 | MAJOR | V | `forge/config/settings.go:109` | `GetInt("database.conn_max_lifetime")` on the default `"5m"` returns 0, disabling the connection lifetime; `config.go:171` reads the same key correctly with `GetDuration`, i.e. two settings loaders disagree. `settings_test.go:124-128` asserts the 0 | One loader using `GetDuration`; fix the test |
+| B37 | MAJOR | V | `forge/orm/update_builder.go:53-56` | `reflect.TypeOf(nil)` is nil, so `UpdateBuilder.Set(field, nil)` panics on `.AssignableTo` when clearing a nullable column | Handle `nil` explicitly (allowed only for nullable fields) |
+| B38 | MAJOR | V | `forge/db/migrate/generate/generator.go:349-367` vs `execute/recover.go:50,79` | The first generated migration creates `schema_migrations(id, name, checksum, applied_at)` while golang-migrate (used to apply) owns `schema_migrations(version, dirty)`; `CREATE TABLE IF NOT EXISTS` silently no-ops, so the checksum column the verifier expects never exists | Let golang-migrate own its table; store checksums in a separate `forge_migration_checksums` table or drop the feature |
+| B39 | MINOR | V | `forge/orm/manager_helpers.go:192-198,385-399`, `orm/query_expr.go:183-272` | INSERT/UPDATE/DELETE helpers and `QueryExpr` interpolate table and column names unquoted, so reserved names (`order`, `user`) break; INSERT hardcodes `RETURNING id`. Not an injection path: names come from schema/codegen, and request filters go through `orm.F` → `FieldRef`, which is resolved against the schema and escaped | Quote through the dialect; use the schema PK in `RETURNING` |
+| B40 | MINOR | R | `forge/orm/queryset.go` `Exists`, `Update` | `Exists` runs a full `COUNT(*)` instead of `SELECT 1 ... LIMIT 1`; `Update` iterates a map so SET order and placeholder order change between calls | `LIMIT 1`; sort keys |
 
 ## 2. Security review items to re-check during the refactor
 
@@ -147,6 +157,10 @@ Each becomes a loud failure plus a row in `docs/design/feature-gaps.md`.
 | `cli/commands/development/test.go:48` | `forge test` only prints a hint | remove the command or document it |
 | Non-integer primary keys (`Manager.Update`, `Create` id set-back) | UUID/string PKs | explicit error at schema build (B6) |
 | MySQL | `db/dialect/dialect.go` docs and `filter/dialect.go` `MySQLAdapter` imply support; no driver exists | remove MySQL mentions; state "Postgres and SQLite only" in docs |
+| `orm/queryset.go:437` `Aggregate` | aggregates are appended to a slice that is never rendered into SQL | error until implemented |
+| Transactions in the ORM | `Manager` / `QuerySet` hold `*db.DB`; `getDB` never looks at a transaction, so ORM calls cannot join a `db.Tx` | document as unsupported now; D12 fixes it |
+| `forge migrations squash` | see B18 | command returns "not implemented" |
+| SQLite rollback of `AddColumn` / `DropConstraint` / `DropForeignKey` | down SQL is a comment, see B33 | generator refuses to emit a no-op down step |
 
 ## 4. Dead code to remove
 
@@ -172,6 +186,8 @@ Also unreachable, but only used inside their own package or by the identity rout
 - `filter/dialect.go`, `filter/optimizer.go` (`QueryOptimizer` built but `Optimize()` never called), `filter/persistence.go` (if nothing saves filters).
 - `db/migrate/migrate_impl.go` facade (`NewDetector` and friends only re-export `generate`/`sql`/`state`).
 - `identity/password.go` re-export shim of `identity/utils/password.go`.
+- Files whose exported types are referenced only in their own file (V, grep): `filter/cache.go` (`FilterCache`, deferred feature, see backend-tasks.md), `filter/metrics.go` (`Metrics`, `AlertChecker`), `filter/persistence.go` (`SavedFilter`), `filter/relations.go` (placeholder `JOIN %s ON ...` strings), `filter/typed_filter.go` (its `Build` keeps only the last filter), `schema/registry.go` (`RegisterFieldType`), `schema/field_traits.go` (`FieldTrait`), `orm/safe_accessor.go` (`SafeAccessor`, used only by its test). Not dead: `schema/helpers.go` (`IndexOn` has 10 users).
+- `orm/update_builder_helpers.go` `NewUpdateBuilderFromQuerySet` duplicates `NewUpdateBuilder` (R).
 - High dead ratio, prune function by function from `audit/deadcode-forge-tests.txt`: `schema` 78/114, `registry` 35/52, `validate` 46/70, `filter` 110/173, `api/errors` 60/119, `api/authentication` 13/23, `errors` 10/19.
 
 Rule: before deleting an exported function that `deadcode` lists, grep `forge/cli` templates and `docs-site/` for it; generated user code may call it.
@@ -209,6 +225,9 @@ Rule: before deleting an exported function that `deadcode` lists, grep `forge/cl
 | D9 | **Two filtering stacks** | `admin/core/admin.go` `ListObjects` hand-parses `field__lookup`, while `forge/filter` has its own parser and converter | Admin list uses `forge/filter` |
 | D10 | **Migration generation is a home-grown schema differ plus a DDL lexer** (`db/migrate/{generate,parse,state}`) on top of golang-migrate | ~3k LOC | Evaluate Atlas for diffing (see §8); keep golang-migrate for applying files |
 | D11 | **Dialect interface promises more than exists** | 16-method `Dialect` with MySQL docs, two implementations | Shrink to what Postgres and SQLite need |
+| D12 | **ORM cannot run inside a transaction** | `Manager.db *db.DB`, `BaseQuerySet.getDB` returns the pool only | A small `DBTX` interface (`ExecContext`, `QueryContext`, `QueryRowContext`) accepted by managers/querysets, plus `db.WithTx` passing a tx-bound manager |
+| D13 | **Two expression trees** | `orm/query_expr.go` `QueryExpr` (typed `FieldExpr` codegen API, unquoted, PG-only `EXTRACT`) vs `orm/expression.go` `Expression`/`FieldRef` (schema-resolved, escaped, dialect-aware) | Make typed field helpers return `Expression`; delete `QueryExpr` |
+| D14 | **`forge/filter` is mostly unconnected machinery** | cache, metrics, persistence, optimizer, relations, typed filter, dialect adapters: unreferenced; the admin parses lookups itself | Keep a thin "query params → `orm.Expression`" parser used by admin and API; delete the rest |
 
 ## 7. Tests to delete or fix
 
@@ -218,6 +237,10 @@ Rule: before deleting an exported function that `deadcode` lists, grep `forge/cl
 | `orm/expression_test.go` `TestCombinedExpression_WithValues`, `api/serializer_test.go` `TestBaseSerializer_Validate_Invalid`, `api/parsers/parser_test.go` `TestXMLParser_Parse`, `log/logger_test.go` `TestLoggerTrace` | no assertions | add the assertion the name promises or delete |
 | 29 `t.Skip` calls: `orm` 14, `db` 13, `identity/service` 2 | permanently skipped (e.g. `orm/schema_test.go:32,65,79,89` "schema not registered", `orm/date_parts_test.go:224` "no sqlite helper", `identity/service/password_test.go:255` expiry) | fix with existing helpers (sqlite helpers exist in `db`, schema registration now works after #215) or delete; env-guarded Postgres skips may stay |
 | Tests for dead packages (`api/caching`, `filter/filters`, `admin/utils`...) | test code that only keeps dead code alive | delete with the package |
+| `config/settings_test.go:124-128` | asserts `ConnMaxLifetime == 0` and `ConnMaxIdleTime == 0`, i.e. it locks in bug B36 | fix the loader, then assert 5m |
+| `orm/update_builder_test.go` (7 tests), `orm/schema_test.go:32,65,79,89` | skipped because the test model's schema is not registered | register the schema (works after #215) and un-skip |
+| `orm/schema_test.go` `TestGetModelSchema`, `TestNewFieldAccessor` | assertions only run `if err == nil`, so the test passes when setup fails | `require.NoError` first (R) |
+| `db/pool_test.go` | 12 tests skip without CGO because of `mattn/go-sqlite3` | consider `modernc.org/sqlite` for tests (§8) |
 | Concurrency tests without assertions (`TestRegistry_Concurrency`, `TestSettings_Concurrency`, `TestMemoryCache_Concurrency` x2) | fine: they exist for `-race` | keep; make sure CI runs `-race` |
 | **Missing**: `schema` package has 0 tests; `validate` has 71 test lines for 1271; set operations, admin write allow-list, M2M prefetch | critical untested code | add with the fixes above |
 
@@ -237,6 +260,7 @@ Already in `go.mod`: chi, cors, scs (sessions), gorilla/csrf, golang-jwt, golang
 | `config` typed getters over viper, re-instantiated per call | load once; optionally `github.com/knadh/koanf/v2` | viper boilerplate | medium |
 | `validate/field_validator.go`, `schema_validator.go`, `typed_validator.go` | express rules as `validator/v10` tags / custom validators (already a dependency) | second validation model | medium |
 | Postgres test driver `lib/pq` (maintenance mode) | `github.com/jackc/pgx/v5/stdlib` | deprecated driver | low |
+| SQLite driver `mattn/go-sqlite3` (CGO) | `modernc.org/sqlite` (pure Go) | CGO requirement; 12 `db/pool_test.go` skips; easier cross-compiles | low-medium (driver name and some pragmas differ) |
 | CSRF middleware | keep `gorilla/csrf` or move to Go's `http.CrossOriginProtection` (Go 1.25+) | one dependency | low |
 | `identity/repository/*` hand-written SQL | the framework's own ORM (dogfooding) or `sqlc` | ~8 clone groups | medium |
 
@@ -254,7 +278,16 @@ Asked to validate 14 claims and report what was missed.
 
 ### Nemotron 3 Ultra, data layer
 
-Did not finish: the run stalled for over 40 minutes while still reading files and produced no findings, so it was stopped. The data-layer findings above come from the Sonnet survey plus Claude's checks. Re-run the prompt in `tasks/audit-second-opinion-data.md` (agy or codex) before starting Wave 3.
+Did not finish: the run stalled for over 40 minutes while still reading files and produced no findings, so it was stopped. muse-spark 1.3 (free tier hangs; paid tier needs a payment method) and codex (usage limit) were also unavailable, so the same prompt went to agy.
+
+### agy (Gemini), data layer
+
+Prompt: `tasks/audit-second-opinion-data.md`. 20 bugs, 15 dead/dup/stub, 8 design, 8 test and 5 library items reported.
+
+- **Accepted after Claude read the code:** B31-B38 (SQLite FK DDL is PostgreSQL, drop-column migrations cannot be generated, SQLite no-op rollbacks, applied-version loop, `Last()` on unordered sets, duration parsed as int, `Set(nil)` panic, conflicting `schema_migrations` tables), the aggregate stub, missing ORM transactions (D12), the second expression tree (D13), the filter package (D14), the dead-file list in §4, and the test items in §7.
+- **Downgraded:** "SQL injection through unquoted identifiers" (CRITICAL → B39 MINOR). Names come from schema/codegen, and request-driven filters go through `orm.F`, which resolves against the schema and escapes. Reserved-word breakage is real.
+- **Rejected:** "unfiltered `Update`/`Delete` wipe tables" as a bug. `qs.Delete()` on an unfiltered queryset is intended (Django allows `Model.objects.all().delete()`); an opt-in guard is a possible API choice, not a defect. "`schema/helpers.go` is dead": `IndexOn` has 10 users. "Replace the migration engine with golang-migrate": golang-migrate cannot generate migrations from models, which is the feature; see D10/Atlas instead. `gorilla/schema` for filter params: not a fit for `field__lookup` keys.
+- **Kept as R (not re-checked):** annotations discarded on scan, `path_cache` keyed without the model, `NewUpdateBuilderFromQuerySet` duplicate, vacuous `schema_test.go` assertions, B40.
 
 ## 10. Plan
 
@@ -268,6 +301,8 @@ Sized for one delegate task and one PR each. Waves can run 2-3 PRs in parallel i
 5. API layer correctness: B16, B17, B21, B22, B23 (each small, one PR for parsers/decoding, one for filters/pagination).
 6. Permissions and auth: B19, B20, B24, B25.
 7. B18 (flag squash), B26 (history race), B27 (delete regex sanitizer and SQL blacklist).
+7a. Migrations: B31-B34 and B38 (SQLite DDL, down generation, applied-version merge, bookkeeping table). One PR per dialect builder, one for status/bookkeeping.
+7b. ORM/config: B35, B36 (+ its test), B37.
 
 **Wave 1: delete dead code (large diffs, no behaviour change)**
 8. Delete the ten unimported packages in §4 and their tests.

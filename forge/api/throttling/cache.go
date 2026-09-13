@@ -1,6 +1,9 @@
 package throttling
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 // CacheBackend is the interface for throttle cache backends
 type CacheBackend interface {
@@ -16,6 +19,7 @@ type CacheBackend interface {
 
 // MemoryCache is an in-memory cache backend
 type MemoryCache struct {
+	mu   sync.Mutex
 	data map[string]*cacheEntry
 }
 
@@ -33,6 +37,9 @@ func NewMemoryCache() *MemoryCache {
 
 // GetInt gets an integer value from cache
 func (c *MemoryCache) GetInt(key string) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	entry, ok := c.data[key]
 	if !ok {
 		return 0, nil
@@ -53,6 +60,9 @@ func (c *MemoryCache) GetInt(key string) (int, error) {
 
 // Set sets a value in cache with TTL
 func (c *MemoryCache) Set(key string, value interface{}, ttl time.Duration) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.data[key] = &cacheEntry{
 		value:     value,
 		expiresAt: time.Now().Add(ttl),
@@ -62,6 +72,9 @@ func (c *MemoryCache) Set(key string, value interface{}, ttl time.Duration) erro
 
 // GetTTL gets the remaining TTL for a key
 func (c *MemoryCache) GetTTL(key string) time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	entry, ok := c.data[key]
 	if !ok {
 		return 0
@@ -77,7 +90,9 @@ func (c *MemoryCache) GetTTL(key string) time.Duration {
 
 // Delete deletes a key from cache
 func (c *MemoryCache) Delete(key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	delete(c.data, key)
 	return nil
 }
-

@@ -18,6 +18,8 @@ type FilterCache struct {
 	metadata    map[string]*CacheEntry
 	mu          sync.RWMutex
 	defaultTTL  time.Duration
+	stop        chan struct{}
+	closeOnce   sync.Once
 }
 
 // NewFilterCache creates a new filter cache
@@ -27,6 +29,7 @@ func NewFilterCache(defaultTTL time.Duration) *FilterCache {
 		compiledSQL: make(map[string]*CacheEntry),
 		metadata:    make(map[string]*CacheEntry),
 		defaultTTL:  defaultTTL,
+		stop:        make(chan struct{}),
 	}
 
 	// Start cleanup goroutine
@@ -35,18 +38,29 @@ func NewFilterCache(defaultTTL time.Duration) *FilterCache {
 	return cache
 }
 
+// Close stops the background cleanup goroutine. Safe to call multiple times.
+func (c *FilterCache) Close() error {
+	c.closeOnce.Do(func() {
+		close(c.stop)
+	})
+	return nil
+}
+
 // GetParsedTree gets a cached parsed filter tree
 func (c *FilterCache) GetParsedTree(key string) (*FilterNode, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entry, ok := c.parsedTrees[key]
+	c.mu.RUnlock()
 	if !ok {
 		return nil, false
 	}
 
 	if time.Now().After(entry.ExpiresAt) {
-		delete(c.parsedTrees, key)
+		c.mu.Lock()
+		if cur, ok := c.parsedTrees[key]; ok && time.Now().After(cur.ExpiresAt) {
+			delete(c.parsedTrees, key)
+		}
+		c.mu.Unlock()
 		return nil, false
 	}
 
@@ -72,15 +86,18 @@ func (c *FilterCache) SetParsedTree(key string, node *FilterNode, ttl time.Durat
 // GetCompiledSQL gets cached compiled SQL
 func (c *FilterCache) GetCompiledSQL(key string) (string, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entry, ok := c.compiledSQL[key]
+	c.mu.RUnlock()
 	if !ok {
 		return "", false
 	}
 
 	if time.Now().After(entry.ExpiresAt) {
-		delete(c.compiledSQL, key)
+		c.mu.Lock()
+		if cur, ok := c.compiledSQL[key]; ok && time.Now().After(cur.ExpiresAt) {
+			delete(c.compiledSQL, key)
+		}
+		c.mu.Unlock()
 		return "", false
 	}
 
@@ -106,15 +123,18 @@ func (c *FilterCache) SetCompiledSQL(key string, sql string, ttl time.Duration) 
 // GetMetadata gets cached filter metadata
 func (c *FilterCache) GetMetadata(key string) (map[string]interface{}, bool) {
 	c.mu.RLock()
-	defer c.mu.RUnlock()
-
 	entry, ok := c.metadata[key]
+	c.mu.RUnlock()
 	if !ok {
 		return nil, false
 	}
 
 	if time.Now().After(entry.ExpiresAt) {
-		delete(c.metadata, key)
+		c.mu.Lock()
+		if cur, ok := c.metadata[key]; ok && time.Now().After(cur.ExpiresAt) {
+			delete(c.metadata, key)
+		}
+		c.mu.Unlock()
 		return nil, false
 	}
 
@@ -152,32 +172,36 @@ func (c *FilterCache) cleanup() {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		c.mu.Lock()
-		now := time.Now()
+	for {
+		select {
+		case <-ticker.C:
+			c.mu.Lock()
+			now := time.Now()
 
-		// Clean parsed trees
-		for k, entry := range c.parsedTrees {
-			if now.After(entry.ExpiresAt) {
-				delete(c.parsedTrees, k)
+			// Clean parsed trees
+			for k, entry := range c.parsedTrees {
+				if now.After(entry.ExpiresAt) {
+					delete(c.parsedTrees, k)
+				}
 			}
-		}
 
-		// Clean compiled SQL
-		for k, entry := range c.compiledSQL {
-			if now.After(entry.ExpiresAt) {
-				delete(c.compiledSQL, k)
+			// Clean compiled SQL
+			for k, entry := range c.compiledSQL {
+				if now.After(entry.ExpiresAt) {
+					delete(c.compiledSQL, k)
+				}
 			}
-		}
 
-		// Clean metadata
-		for k, entry := range c.metadata {
-			if now.After(entry.ExpiresAt) {
-				delete(c.metadata, k)
+			// Clean metadata
+			for k, entry := range c.metadata {
+				if now.After(entry.ExpiresAt) {
+					delete(c.metadata, k)
+				}
 			}
-		}
 
-		c.mu.Unlock()
+			c.mu.Unlock()
+		case <-c.stop:
+			return
+		}
 	}
 }
-

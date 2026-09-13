@@ -60,7 +60,7 @@ func TestBuildFieldsMetadata_AutoManagedAndReadOnlyFields(t *testing.T) {
 	assert.False(t, skuField.ReadOnly)
 	assert.True(t, skuField.Required)
 
-	// notes: Editable false -> read_only true (unchanged behaviour)
+	// notes: Editable false -> read_only true (unchanged behavior)
 	notesField := fieldMap["notes"]
 	assert.True(t, notesField.ReadOnly)
 	assert.False(t, notesField.Required)

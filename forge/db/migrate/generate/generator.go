@@ -4,12 +4,14 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
-	"github.com/forgego/forge/config"
 	codegen "github.com/forgego/forge/codegen"
+	"github.com/forgego/forge/config"
 	"github.com/forgego/forge/db/migrate/core"
 	"github.com/forgego/forge/db/migrate/sql"
 	"github.com/forgego/forge/db/migrate/state"
@@ -229,20 +231,11 @@ func (g *MigrationGenerator) GenerateMigrations(name string) error {
 		)
 	}
 
-	// Write up migration
-	if err := os.WriteFile(upPath, []byte(upSQL+"\n"), 0644); err != nil {
+	// Write migration files atomically
+	if err := writeMigrationPair(upPath, []byte(upSQL+"\n"), downPath, []byte(downSQL+"\n")); err != nil {
 		return core.NewMigrationError(
 			core.ErrInvalidChange,
-			"failed to write up migration",
-			err,
-		)
-	}
-
-	// Write down migration
-	if err := os.WriteFile(downPath, []byte(downSQL+"\n"), 0644); err != nil {
-		return core.NewMigrationError(
-			core.ErrInvalidChange,
-			"failed to write down migration",
+			"failed to write migration files",
 			err,
 		)
 	}
@@ -327,7 +320,7 @@ func getNextVersion(migrationsDir string) (string, error) {
 			}
 
 			versionStr := basename[0:idx]
-			version, err := parseUint(versionStr)
+			version, err := strconv.ParseUint(versionStr, 10, 64)
 			if err != nil {
 				continue
 			}
@@ -341,6 +334,9 @@ func getNextVersion(migrationsDir string) (string, error) {
 				if v > maxVersion {
 					maxVersion = v
 				}
+			}
+			if maxVersion == math.MaxUint64 {
+				return "", fmt.Errorf("migration version overflow")
 			}
 			nextSeq = maxVersion + 1
 		}
@@ -378,18 +374,6 @@ func calculateChecksum(sql string) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// parseUint helper
-func parseUint(s string) (uint64, error) {
-	var result uint64
-	for _, r := range s {
-		if r < '0' || r > '9' {
-			return 0, fmt.Errorf("invalid number")
-		}
-		result = result*10 + uint64(r-'0')
-	}
-	return result, nil
-}
-
 // getTableNameFromDef gets the table name from a model definition (helper)
 func getTableNameFromDef(def *codegen.ModelDefinition) string {
 	if def.Meta.TableName != "" {
@@ -409,4 +393,3 @@ func toSnakeCaseFromDef(s string) string {
 	}
 	return string(result)
 }
-

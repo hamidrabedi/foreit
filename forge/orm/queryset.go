@@ -191,6 +191,16 @@ func (qs *BaseQuerySet[T]) getDialect() (interface {
 	return nil, fmt.Errorf("database connection not set on QuerySet")
 }
 
+// newSQLBuilder creates an SQLBuilder configured with the queryset's dialect if available.
+func (qs *BaseQuerySet[T]) newSQLBuilder() *SQLBuilder {
+	if qs != nil && qs.db != nil {
+		if d, err := GetDialect(qs.db); err == nil && d != nil {
+			return NewSQLBuilderWithDialect(d)
+		}
+	}
+	return NewSQLBuilder()
+}
+
 // rebindSQL adapts a SQL query for the active database driver (e.g. converting ILIKE to LIKE for SQLite).
 func (qs *BaseQuerySet[T]) rebindSQL(query string) string {
 	if r, ok := qs.db.(interface{ RebindPlaceholders(string) string }); ok && r != nil {
@@ -502,7 +512,7 @@ func (qs *BaseQuerySet[T]) All(ctx context.Context) ([]*T, error) {
 
 // buildSQL builds the SQL query
 func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
-	builder := NewSQLBuilder()
+	builder := qs.newSQLBuilder()
 
 	// Build JOINs first (populates qs.joins and qs.joinMap)
 	qs.buildJoinClause(builder)
@@ -1193,7 +1203,7 @@ func (qs *BaseQuerySet[T]) Count(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	builder := NewSQLBuilder()
+	builder := qs.newSQLBuilder()
 	selectClause := fmt.Sprintf("SELECT COUNT(*) FROM %s", EscapeIdentifier(qs.table))
 	whereClause, _, whereErr := qs.buildWhereClause(builder)
 	if whereErr != nil {
@@ -1234,7 +1244,7 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 		return 0, err
 	}
 
-	builder := NewSQLBuilder()
+	builder := qs.newSQLBuilder()
 
 	// Build SET clause
 	var setParts []string
@@ -1315,7 +1325,7 @@ func (qs *BaseQuerySet[T]) Delete(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	builder := NewSQLBuilder()
+	builder := qs.newSQLBuilder()
 
 	// Build WHERE clause
 	whereClause, _, whereErr := qs.buildWhereClause(builder)

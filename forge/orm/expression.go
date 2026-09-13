@@ -492,6 +492,25 @@ func (c ComparisonExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface
 			placeholder1 := builder.AddArg(values[0])
 			placeholder2 := builder.AddArg(values[1])
 			sql = fmt.Sprintf("%s BETWEEN %s AND %s", fieldSQL, placeholder1, placeholder2)
+		case OpYear, OpMonth, OpDay:
+			var part, fmtCode string
+			switch c.Op {
+			case OpYear:
+				part = "YEAR"
+				fmtCode = "%Y"
+			case OpMonth:
+				part = "MONTH"
+				fmtCode = "%m"
+			case OpDay:
+				part = "DAY"
+				fmtCode = "%d"
+			}
+			placeholder := builder.AddArg(c.Value)
+			if builder.isSQLite() {
+				sql = fmt.Sprintf("CAST(strftime('%s', %s) AS INTEGER) = %s", fmtCode, fieldSQL, placeholder)
+			} else {
+				sql = fmt.Sprintf("EXTRACT(%s FROM %s) = %s", part, fieldSQL, placeholder)
+			}
 		default:
 			// Standard operators (=, !=, >, >=, <, <=)
 			placeholder := builder.AddArg(c.Value)

@@ -1,5 +1,5 @@
 import { Button } from "../ui/button";
-import { Menu, Bell, ChevronRight, Keyboard } from "lucide-react";
+import { Menu, ChevronRight, Keyboard } from "lucide-react";
 import { GlobalSearch } from "./GlobalSearch";
 import { ThemeCustomizer } from "../../features/theme/ThemeCustomizer";
 
@@ -73,15 +73,6 @@ export function TopBar({
               <Keyboard className="h-4 w-4" />
             </Button>
             <ThemeCustomizer />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="rounded-full text-muted-foreground hover:text-foreground"
-              title="Notifications"
-              aria-label="Notifications (none)"
-            >
-              <Bell className="h-4 w-4" />
-            </Button>
             <div className="h-6 w-[1px] bg-border mx-1 sm:mx-2" aria-hidden />
             <div className="flex items-center gap-3 pl-1 sm:pl-2">
               <div className="text-right hidden md:block">

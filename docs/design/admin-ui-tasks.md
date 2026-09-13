@@ -80,8 +80,8 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P6 — Backend
 | # | Task | Files | Status |
 |---|---|---|---|
-| 6.1 | **VB-06** emit `read_only: true` for auto timestamps in admin metadata — spec in `backend-handoff.md` BH-1 | `forge/admin/**.go` | todo (backend) |
-| 6.2 | **VB-02 phase 2** `<field>__display` relation labels in list serializer — spec in `backend-handoff.md` BH-2 | `forge/admin/**.go` | todo (backend) |
+| 6.1 | **VB-06** emit `read_only: true` for auto timestamps in admin metadata — spec in `backend-handoff.md` BH-1 | `forge/admin/**.go` | done — backend E1, PR #208 |
+| 6.2 | **VB-02 phase 2** `<field>__display` relation labels in list serializer — spec in `backend-handoff.md` BH-2 | `forge/admin/**.go` | done — backend E2a (PR #208) + UI 4.2b |
 
 ## P7 — Verification
 | # | Task | Files | Status |
@@ -97,5 +97,6 @@ The reference app `examples/ecommerce` serves the production admin bundle (`go r
 | # | Task | Files | Status |
 |---|---|---|---|
 | 8.1 | Build `dist`, boot ecommerce, run the full suite against the redesigned bundle | `examples/ecommerce/ui-tests` | run 2026-09-13: **14 passed / 2 failed**. Both failures are `page.selectOption` on controls that are now Radix comboboxes (`page-size-select`, `filter-is_active`); app behaviour correct |
-| 7.4 | Update `admin-redesign.spec.ts` to drive Radix Select (click trigger → click `role=option`) | `ui-tests/tests/admin-redesign.spec.ts` | dispatched (agy) |
-| 8.2 | Re-run the full ecommerce suite to 16/16; review README/SETUP instructions for the UI build step | `examples/ecommerce` | after 7.4 |
+| 7.4 | Update `admin-redesign.spec.ts` to drive Radix Select (click trigger → click `role=option`) | `ui-tests/tests/admin-redesign.spec.ts` | verified |
+| 8.2 | Re-run the full ecommerce suite against a fresh `vite build` | `examples/ecommerce/ui-tests` | verified 2026-09-13 — **16/16 passed** (1.1 min) |
+| 8.3 | Makefile `admin-ui` / `run-go` / `build-embed` / `ui-test` / `demo`; README "Admin UI" section; SETUP build step; docs URLs corrected 8000 → 8020 (`server.port`) | `examples/ecommerce/{Makefile,README.md,SETUP.md}` | verified (`make -n`, `make help`) |

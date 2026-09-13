@@ -58,16 +58,22 @@ Branch `fix/admin-metadata-readonly-display`, worktree `foreit-wt/admin-metadata
 |---|---|---|
 | E1 | BH-1 / VB-06: `read_only` for AutoNow / AutoNowAdd / Generated / auto-increment PK fields (`admin/core/metadata_builder.go`) | **PR #208** |
 | E2a | BH-2: list response `display` map (relation → id → label) via optional `core.LabelResolver`, one query per relation per page | **on PR #208** |
-| E2b | UI: FK cells show the label with a muted `#id` and fall back to `#id` (`tasks/t4.2b.md`, UI branch) | dispatched (agy) |
+| E2b | UI: FK cells show the label with a muted `#id` and fall back to `#id` (`tasks/t4.2b.md`, UI branch) | **on PR #204** |
 
 ## Phase 5: admin integration (frontend-touching, after the UI redesign lands)
 
 - ✅ Surface backend validation `details` in forms: UI task 5.4, on PR #204.
 - ✅ React Query v5 mutation-callback arguments: UI task 5.5, on PR #204.
 - ⏳ Custom admin mount prefix end to end:
-  - F1 (Go, branch `fix/admin-mount-prefix`, worktree `foreit-wt/admin-mount-prefix`): `server.WithIndexTransform`; the site injects `<meta name="forge-admin-prefix">` and rewrites `/admin/` asset URLs in index.html (`tasks/b-f1-admin-prefix-server.md`). Dispatched (agy).
-  - F2 (UI 5.6, PR #204): `src/lib/admin-prefix.ts` drives router basepath, API base, 401 redirect, search/nav/shortcuts; `experimental.renderBuiltUrl` for lazy chunks (`tasks/t5.6.md`). Spec ready, after F1.
+  - F1 (Go, branch `fix/admin-mount-prefix`, worktree `foreit-wt/admin-mount-prefix`): `server.WithIndexTransform`; the site injects `<meta name="forge-admin-prefix">` and rewrites `/admin/` asset URLs in index.html (`tasks/b-f1-admin-prefix-server.md`). **PR #209**.
+  - F2 (UI 5.6, PR #204): `src/lib/admin-prefix.ts` drives router basepath, API base, 401 redirect, search/nav/shortcuts; `experimental.renderBuiltUrl` for lazy chunks (`tasks/t5.6.md`). Dispatched (agy).
 - ⏳ Notifications: `useNotifications` has zero callers and targets `/api/admin/events`; `core.NotificationHub.SSEHandler` is never mounted and nothing calls `Notify`. Decision: remove the dead UI (task 5.7) and treat real notifications as planned work (see below).
+
+## Phase 6: CI hygiene
+
+| # | Slice / branch | Task | Status |
+|---|---|---|---|
+| G1 | fix/staticcheck-findings (worktree `foreit-wt/staticcheck`) | CI's Static Analysis installs `staticcheck@latest`; a newer release reports ~75 findings that already exist on master (37× U1000 unused, 7× SA1029 string context keys, 7× S1040, 6× ST1005, 4× SA1019, plus SA4000/SA4006/SA4010/SA1026 real bugs), so every PR fails that job. List: `tasks/staticcheck-findings.txt`; prompt `tasks/b-g1-staticcheck-cleanup.md`. Part A (admin api cli identity log) dispatched; part B (db filter orm server validate) next. Consider pinning the staticcheck version in CI afterwards. | in progress |
 
 ## Planned / deferred (not now)
 

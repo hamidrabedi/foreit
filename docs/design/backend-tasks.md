@@ -17,8 +17,8 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
 | P1 | fix/jwt-authentication-verification | JWT signature + HS256 allowlist; propagate invalid-credential errors | **PR #201 green, mergeable** |
-| A1 | fix/db-transaction-driver-integrity | `WithTx` swallows commit errors; PG→SQLite silent fallback; migration driver from global config | **PR #202** (agy; 1370 tests pass) |
-| A2 | same | migration version overflow; non-atomic/colliding migration file generation; semicolon splitting in recovery | todo (spec after A1) |
+| A1 | fix/db-transaction-driver-integrity | `WithTx` swallows commit errors; PG→SQLite silent fallback; migration driver from global config | **PR #202** (A1+A2) |
+| A2 | same | migration version overflow; non-atomic/colliding migration file generation; semicolon splitting in recovery | **on PR #202** |
 
 ## Phase 2: concurrency & lifecycle
 
@@ -26,27 +26,28 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 |---|---|---|---|
 | B1 | fix/cache-concurrency-lifecycle | throttling + API caches (no lock / delete under RLock); unstoppable cleanup goroutine | **PR #203** (filter cache removed, see Planned) |
 | B2 | same | atomic throttle increment (anon + user); trusted-proxy client IP (XFF/X-Real-IP spoofing) in `server/ratelimit.go` + `api/throttling/anon_rate.go` | **on PR #203** |
-| B3 | same | rate-limit store: goroutine leak on `stop`, expiry-based eviction instead of "keep a random half" | todo |
-| B4 | same | unsynchronised plugin registries + global API settings | todo (needs audit re-read) |
+| B3 | same | rate-limit store: goroutine leak on `stop`, expiry-based eviction instead of "keep a random half" | **on PR #203** |
+| B4 | fix/registry-settings-concurrency | unsynchronised plugin registry + global API settings | **PR #207** |
 
 ## Phase 3: filtering & ORM correctness
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
 | C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | **PR #205** |
-| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | dispatched (agy; EXTRACT + unsigned deferred to C3) |
-| C3 | same | relation-path joins; dialect-aware SQL generation | todo (larger — design first) |
+| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | **on PR #205** (EXTRACT + unsigned deferred to C3) |
+| C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | spec ready (tasks/b-c3a-date-parts-dialect.md) |
+| C3b | same | relation-path joins | todo (design first) |
 
 ## Phase 4: server/auth edge cases
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
 | D1 | fix/server-security-edge-cases | CSRF exemption raw-prefix match; `Redirect` panics without request; session auth accepts inactive/locked users | **PR #206** |
-| D2 | same | query-string API keys written to access logs; admin login brute-force; expired sessions never purged; password trimming | todo |
+| D2 | same | query-string API keys written to access logs; admin login brute-force; expired sessions never purged; password trimming | **on PR #206** |
 
 ## Admin UI redesign
 
-Draft **PR #204** (`feat/admin-ui-redesign`). 4.1a ListFilterPanel extracted (1343→1182 lines, pushed). In flight: 4.1b bulk toolbar (agy).
+Draft **PR #204** (`feat/admin-ui-redesign`). Extracted ListFilterPanel, ListBulkToolbar, ListCell (ModelListPage 1343→1035, pushed). 7.3b route lazy-loading pushed (initial JS 445→430 kB gz, still over 300). 7.3c lucide namespace import removed (committed, size to be measured). In flight: 5.4 backend validation errors in forms. Next: 4.1d toolbar + pagination.
 
 ## Phase 5: admin integration (frontend-touching, after the UI redesign lands)
 

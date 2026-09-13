@@ -16,34 +16,34 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| P1 | fix/jwt-authentication-verification | JWT signature + HS256 allowlist; propagate invalid-credential errors | **PR #201 green, mergeable** |
-| A1 | fix/db-transaction-driver-integrity | `WithTx` swallows commit errors; PG→SQLite silent fallback; migration driver from global config | **PR #202** (A1+A2) |
-| A2 | same | migration version overflow; non-atomic/colliding migration file generation; semicolon splitting in recovery | **on PR #202** |
+| P1 | fix/jwt-authentication-verification | JWT signature + HS256 allowlist; propagate invalid-credential errors | ✅ merged #201 |
+| A1 | fix/db-transaction-driver-integrity | `WithTx` swallows commit errors; PG→SQLite silent fallback; migration driver from global config | ✅ merged #202 |
+| A2 | same | migration version overflow; non-atomic/colliding migration file generation; semicolon splitting in recovery | **PR #213** (missed the #202 squash-merge; cherry-picked) |
 
 ## Phase 2: concurrency & lifecycle
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| B1 | fix/cache-concurrency-lifecycle | throttling + API caches (no lock / delete under RLock); unstoppable cleanup goroutine | **PR #203** (filter cache removed, see Planned) |
-| B2 | same | atomic throttle increment (anon + user); trusted-proxy client IP (XFF/X-Real-IP spoofing) in `server/ratelimit.go` + `api/throttling/anon_rate.go` | **on PR #203** |
-| B3 | same | rate-limit store: goroutine leak on `stop`, expiry-based eviction instead of "keep a random half" | **on PR #203** |
-| B4 | fix/registry-settings-concurrency | unsynchronised plugin registry + global API settings | **PR #207** |
+| B1 | fix/cache-concurrency-lifecycle | throttling + API caches (no lock / delete under RLock); unstoppable cleanup goroutine | ✅ merged #203 (filter cache removed, see Planned) |
+| B2 | same | atomic throttle increment (anon + user); trusted-proxy client IP (XFF/X-Real-IP spoofing) in `server/ratelimit.go` + `api/throttling/anon_rate.go` | ✅ merged #203 |
+| B3 | same | rate-limit store: goroutine leak on `stop`, expiry-based eviction instead of "keep a random half" | ✅ merged #203 |
+| B4 | fix/registry-settings-concurrency | unsynchronised plugin registry + global API settings | ✅ merged #207 |
 
 ## Phase 3: filtering & ORM correctness
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | **PR #205** |
-| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | **on PR #205** (EXTRACT + unsigned deferred to C3) |
-| C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | **on PR #205** |
-| C3b | same | relation-path filters/ordering (`customer__name`) render a non-existent quoted column and never JOIN; design: builder join resolver + LEFT JOIN per path prefix, COUNT(DISTINCT pk), refuse in Update/Delete (`tasks/b-c3b-relation-path-joins.md`) | **on PR #205** (reverse one-to-many filters can repeat parent rows, as in Django without `distinct()`) |
+| C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | ✅ merged #205 |
+| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | **PR #211** (missed the #205 squash-merge; cherry-picked) |
+| C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | **PR #211** |
+| C3b | same | relation-path filters/ordering (`customer__name`) render a non-existent quoted column and never JOIN; design: builder join resolver + LEFT JOIN per path prefix, COUNT(DISTINCT pk), refuse in Update/Delete (`tasks/b-c3b-relation-path-joins.md`) | **PR #211** (reverse one-to-many filters can repeat parent rows, as in Django without `distinct()`) |
 
 ## Phase 4: server/auth edge cases
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| D1 | fix/server-security-edge-cases | CSRF exemption raw-prefix match; `Redirect` panics without request; session auth accepts inactive/locked users | **PR #206** |
-| D2 | same | query-string API keys written to access logs; admin login brute-force; expired sessions never purged; password trimming | **on PR #206** |
+| D1 | fix/server-security-edge-cases | CSRF exemption raw-prefix match; `Redirect` panics without request; session auth accepts inactive/locked users | ✅ merged #206 |
+| D2 | same | query-string API keys written to access logs; admin login brute-force; expired sessions never purged; password trimming | **PR #212** (missed the #206 squash-merge; cherry-picked) |
 
 ## Admin UI redesign
 
@@ -99,6 +99,12 @@ To implement: mount `SSEHandler` under `${prefix}/api/events` behind admin auth,
 ## Known pre-existing failures (not ours)
 
 ## Incident log
+
+- **2026-09-13 commits pushed after squash-merge.** The owner squash-merged #202, #205 and #206 around
+  15:40 local while this session kept pushing slices to those branches. Only commits present at merge time
+  reached master; A2 (migrate), C2/C3a/C3b (filter/ORM) and D2 (auth) were stranded on closed PRs. They were
+  cherry-picked onto master as #213, #211 and #212. Lesson: check `gh api .../pulls/N --jq .merged` before
+  pushing to an existing PR branch, and open a follow-up branch from `origin/master` when it is merged.
 
 - **2026-09-13 git object corruption.** An unclean shutdown left 7 empty object files. The admin-metadata
   branch ref and its index pointed at the empty E2a commit. Recovery: `git fsck --no-dangling` mapped the

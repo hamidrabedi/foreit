@@ -92,7 +92,7 @@ Still open from the bug list: B10/B11 (placeholder rewriting, fixed by D3 in Wav
 1. Waves 1-2 (branch `refactor/wave1-dead-code-and-tests`, one PR): dead filter/migrate code; registry plugin stubs fail loudly; `forge test` runs `go test`; one viewset; one API error format (RFC 7807 via `api/errors`; `SetExceptionHandler` was a no-op); one rate-limit store; checksum, test helpers, settings durations (B36) and "user not found" deduplicated. Function-level pruning inside live packages only where `deadcode -test` and grep of cli templates/docs-site agree, since plain `deadcode ./...` on a library reports public API as dead.
    Decision: §5 proposed keeping the enhanced viewset. Re-checking showed generated code, CLI scaffolds and examples all use `BaseViewSet`, and every enhanced CRUD action except List answered "Manager not found" (`getManagerFromModel` is a stub). So `BaseViewSet` is kept and gains the authentication/permission/throttle classes.
 2. Wave 3 (branch `refactor/wave3-design`, one PR): D4/D5 in progress, then D12 transactions, D3 dialect placeholders, D13 one expression tree, D1 relation metadata, D7/D8 god-file splits, D2 `forge.App`.
-3. Wave 4: `log/slog` migration; Atlas decision doc before any code.
+3. Wave 4 (library swaps): **documented only, not scheduled** (owner, 2026-09-14). Recommendations per swap are in §8; nothing in Waves 1-3 adds or replaces a library. Merging duplicate code onto a dependency the repo already uses (API throttles onto the existing `x/time/rate` store) is a duplicate merge, not a swap.
 4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
 
 ## How the findings were produced
@@ -397,6 +397,8 @@ Rule: before deleting an exported function that `deadcode` lists, grep `forge/cl
 
 ## 8. Libraries instead of hand-rolled code
 
+**Status: recommendations only.** The owner decided (2026-09-14) not to swap libraries during this refactor. The only dependency change so far is `golang.org/x/term` for the superuser password prompt (B13, #229), a bug fix with no replacement of existing code. Each row below is ready to become its own PR later.
+
 Already in `go.mod`: chi, cors, scs (sessions), gorilla/csrf, golang-jwt, golang-migrate, validator/v10, viper, zap, cobra, survey, x/crypto, x/time, lib/pq (tests only), go-sqlite3, testify, uuid, strcase.
 
 | Hand-rolled | Use instead | Removes | Risk |
@@ -475,8 +477,8 @@ Sized for one delegate task and one PR each. Waves can run 2-3 PRs in parallel i
 20. D7/D8 split god files and complex functions (pure moves, separate PRs).
 21. D2 `forge.App` instead of globals.
 
-**Wave 4: libraries**
-22. `log/slog` migration.
+**Wave 4: libraries (documented only; owner decided not to swap libraries during this refactor)**
+22. `log/slog` migration: recommended, not scheduled. Scope when picked up: `forge/log` (1446 lines) wraps zap and exposes zap types (`Logger` embeds `*zap.Logger`, `With(...zapcore.Field)`, `String`/`Int` return `zap.Field`); callers outside the package are `server/server.go`, `server/errors.go`, `api/errors/{handler,builder}.go`, `cli/core/{registry,context}.go` and two tests. Port `log/hooks` to `slog.Handler` middlewares rather than deleting them.
 23. Atlas spike for migration diffing (decision doc before code). Decision below.
 
 ### Decision: keep the home-grown migration differ for now (Atlas not adopted)

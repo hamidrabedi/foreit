@@ -17,6 +17,7 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 | 2026-09-13 | 7.3 vendor split + lazy recharts | 272 kB | ~445 kB | |
 | 2026-09-13 | 7.3b lazy routes | 205 kB | ~430 kB | lucide namespace import still eager |
 | 2026-09-13 | 7.3c StatsWidget named icons | **62 kB** | **357 kB** | `charts` (113 kB) still wrongly preloaded; without it ≈244 kB → task 7.3d |
+| 2026-09-13 | 7.3d `includeDependenciesRecursively: false` on the `charts` group | 62 kB | **244 kB ✅** | under the 300 kB budget; recharts is a lazy 69 kB chunk, no longer preloaded |
 
 ## P1 — Foundation
 
@@ -51,7 +52,7 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P4 — Data surfaces
 | # | Task | Files | Status |
 |---|---|---|---|
-| 4.1 | Split `ModelListPage` into `src/components/list/`: ListFilterPanel (4.1a), ListBulkToolbar (4.1b), ListCell (4.1c), ListToolbar + ListPagination (4.1d) — 1343→906 lines; 4.1e (table header, row actions, save-view dialog) to reach <800 | `src/components/list/` | 4.1a–d verified, 4.1e dispatched |
+| 4.1 | Split `ModelListPage` into `src/components/list/`: ListFilterPanel (4.1a), ListBulkToolbar (4.1b), ListCell (4.1c), ListToolbar + ListPagination (4.1d) — 1343→906 lines; 4.1e (table header, row actions, save-view dialog) to reach <800 | `src/components/list/` | verified — 1343→754 lines (under the 800 cap) |
 | 4.2 | **VB-02** FK label resolution (list + view) | `src/components/data/`, `ModelViewPage` | verified |
 | 4.3a | `Select` primitive (radix wrapper, none existed) | `src/components/ui/select.tsx` | verified |
 | 4.3b | **VB-05/VB-13** typed filters: radix Select + numeric min/max | `src/pages/ModelListPage.tsx` | verified |
@@ -70,6 +71,7 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P5 addendum
 | # | Task | Files | Status |
 |---|---|---|---|
+| 5.5 | React Query v5 `onSuccess(data, variables, onMutateResult, context)`: `useUpdateObject` forwarded 3 args, so callers got the onMutate result as context. Now forwards 4, with a hook test | `src/api/hooks/adminHooks.ts` | verified |
 | 5.4 | Backend validation errors were discarded: UI read `data.details`, API sends `data.error.details`. `parseApiError` (`src/api/errors.ts`, 10 tests) + form-level `role=alert` banner for `non_field_errors` | `src/api/errors.ts`, `ModelUpsertPage.tsx` | verified |
 
 ## P6 — Backend
@@ -83,4 +85,4 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 |---|---|---|---|
 | 7.1 | Playwright sweep: routes × light/dark × 375/1280, assert no h-scroll + no console errors + rendered | `e2e/design-sweep.spec.ts` | authored |
 | 7.2 | Lint guards: no raw hex, no Tailwind palette colors, no `text-[Npx]` in `src/` | `eslint.config.js` | verified |
-| 7.3 | **Bundle budget.** 7.3: vendor code-splitting (rolldown `codeSplitting.groups`) + lazy recharts. 7.3b: lazy non-entry routes (445→430 kB gz initial). 7.3c: StatsWidget `import * as LucideIcons` removed (namespace import defeated tree-shaking). Budget 300 kB gz — see measurement note below. | `vite.config.ts`, `src/routes/`, widgets | 7.3/7.3b/7.3c verified; 7.3d (eager charts preload) queued |
+| 7.3 | **Bundle budget.** 7.3: vendor code-splitting (rolldown `codeSplitting.groups`) + lazy recharts. 7.3b: lazy non-entry routes (445→430 kB gz initial). 7.3c: StatsWidget `import * as LucideIcons` removed (namespace import defeated tree-shaking). Budget 300 kB gz — see measurement note below. | `vite.config.ts`, `src/routes/`, widgets | verified — eager JS 244 kB gz, under the 300 kB budget |

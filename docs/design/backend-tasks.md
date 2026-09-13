@@ -35,7 +35,7 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 |---|---|---|---|
 | C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | **PR #205** |
 | C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | **on PR #205** (EXTRACT + unsigned deferred to C3) |
-| C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | spec ready (tasks/b-c3a-date-parts-dialect.md) |
+| C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | **on PR #205** |
 | C3b | same | relation-path joins | todo (design first) |
 
 ## Phase 4: server/auth edge cases
@@ -49,10 +49,23 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 
 Draft **PR #204** (`feat/admin-ui-redesign`). Extracted ListFilterPanel, ListBulkToolbar, ListCell (ModelListPage 1343→1035, pushed). 7.3b route lazy-loading pushed (initial JS 445→430 kB gz, still over 300). 7.3c lucide namespace import removed (committed, size to be measured). In flight: 5.4 backend validation errors in forms. Next: 4.1d toolbar + pagination.
 
+## Phase 4b: admin metadata & list serialization (was the BH-1/BH-2 handoff)
+
+The backend is now owned by this session, so the handoff specs in `backend-handoff.md` became tasks.
+Branch `fix/admin-metadata-readonly-display`, worktree `foreit-wt/admin-metadata`.
+
+| # | Task | Status |
+|---|---|---|
+| E1 | BH-1 / VB-06: `read_only` for AutoNow / AutoNowAdd / Generated / auto-increment PK fields (`admin/core/metadata_builder.go`) | dispatched (agy) |
+| E2a | BH-2: list response `display` map (relation → id → label) via optional `core.LabelResolver`, one query per relation per page | spec ready (`tasks/b-e2a-list-display-labels.md`), after E1 |
+| E2b | UI: FK cells show the label with a muted `#id` and fall back to `#id` (`tasks/t4.2b.md`, UI branch) | spec ready, after E2a |
+
 ## Phase 5: admin integration (frontend-touching, after the UI redesign lands)
 
-Custom admin mount prefix end to end; surface backend validation `details` in forms;
-inert notification wiring; React Query v5 mutation-callback context argument.
+- ✅ Surface backend validation `details` in forms: UI task 5.4, on PR #204.
+- ✅ React Query v5 mutation-callback arguments: UI task 5.5, on PR #204.
+- ⏳ Custom admin mount prefix end to end (React router basepath, API base URL, redirects, search): todo.
+- ⏳ Notifications advertised but unwired; the dormant hook targets a nonexistent endpoint: todo (decide to remove or implement).
 
 ## Planned / deferred (not now)
 

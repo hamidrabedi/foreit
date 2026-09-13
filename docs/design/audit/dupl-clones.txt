@@ -1,0 +1,109 @@
+found 2 clones:
+  orm/update_builder.go:161,185
+  orm/update_builder.go:215,235
+found 2 clones:
+  identity/repository/permission.go:23,47
+  identity/repository/permission.go:50,74
+found 2 clones:
+  identity/repository/token.go:148,167
+  identity/repository/user.go:336,355
+found 2 clones:
+  codegen/ast_parser.go:260,272
+  codegen/ast_parser.go:278,290
+found 2 clones:
+  identity/repository/permission.go:203,225
+  identity/repository/permission.go:228,250
+found 2 clones:
+  identity/middleware/auth.go:177,195
+  identity/middleware/auth.go:198,216
+found 2 clones:
+  orm/manager_helpers.go:509,526
+  orm/manager_helpers.go:529,546
+found 2 clones:
+  identity/repository/permission.go:253,292
+  identity/repository/session.go:135,183
+found 2 clones:
+  api/serializers/fields/readonly.go:1,31
+  api/serializers/fields/writeonly.go:1,31
+found 2 clones:
+  filter/filters/date.go:196,213
+  filter/filters/date.go:250,267
+found 4 clones:
+  identity/repository/permission.go:274,292
+  identity/repository/session.go:165,183
+  identity/repository/token.go:127,145
+  identity/repository/token.go:268,286
+found 2 clones:
+  db/dialect/postgres.go:1,95
+  db/dialect/sqlite.go:1,98
+found 2 clones:
+  filter/expression_converter.go:233,254
+  filter/expression_converter.go:257,278
+found 3 clones:
+  identity/repository/permission.go:133,151
+  identity/repository/permission.go:379,397
+  identity/repository/permission.go:416,434
+found 2 clones:
+  db/migrate/execute/executor.go:92,121
+  db/migrations.go:138,167
+found 2 clones:
+  api/viewset_cache.go:24,58
+  api/viewset_cache.go:62,96
+found 2 clones:
+  server/response.go:315,347
+  server/static.go:484,516
+found 2 clones:
+  cli/commands/migrations/lint.go:57,78
+  cli/commands/migrations/show.go:127,147
+found 2 clones:
+  cli/commands/project/add_handler.go:24,36
+  cli/commands/project/new.go:23,35
+found 2 clones:
+  api/throttling/anon_rate.go:48,84
+  api/throttling/user_rate.go:63,93
+found 3 clones:
+  admin/core/admin.go:884,904
+  admin/core/admin.go:906,926
+  admin/core/admin.go:928,948
+found 2 clones:
+  orm/update_builder.go:42,65
+  orm/update_helpers.go:10,33
+found 2 clones:
+  db/migrate/execute/executor.go:153,236
+  db/migrations.go:327,410
+found 2 clones:
+  admin/core/admin.go:884,926
+  admin/core/admin.go:906,948
+found 2 clones:
+  filter/filters/boolean.go:49,65
+  filter/filters/char.go:52,69
+found 2 clones:
+  codegen/writer.go:26,56
+  codegen/writer.go:59,85
+found 2 clones:
+  codegen/ast_parser.go:1089,1099
+  codegen/ast_parser.go:1100,1110
+found 2 clones:
+  identity/repository/user.go:159,212
+  identity/repository/user.go:215,268
+found 3 clones:
+  identity/repository/user.go:123,133
+  identity/repository/user.go:179,189
+  identity/repository/user.go:235,245
+found 2 clones:
+  filter/filters/range.go:33,62
+  filter/filters/range.go:195,224
+found 2 clones:
+  db/migrate/sql/postgres.go:26,71
+  db/migrate/sql/sqlite.go:26,71
+found 2 clones:
+  cli/core/registry.go:106,125
+  cli/core/registry.go:147,163
+found 2 clones:
+  db/migrate/execute/checksum.go:1,91
+  db/migrate/verify/checksum.go:1,91
+found 2 clones:
+  server/ratelimit.go:126,148
+  server/ratelimit.go:151,173
+
+Found total 34 clone groups.

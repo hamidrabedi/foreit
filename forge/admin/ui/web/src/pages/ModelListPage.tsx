@@ -666,6 +666,7 @@ export default function ModelListPage() {
                           isSelected={isSelected}
                           metadata={metadata}
                           modelName={modelName}
+                          display={listData?.display}
                         />
                       ))}
                       <ListRowActions

@@ -16,6 +16,7 @@ export type ListCellProps = {
   isSelected?: boolean;
   metadata?: Metadata;
   modelName?: string;
+  display?: Record<string, Record<string, string>>;
 };
 
 export function ListCell({
@@ -28,6 +29,7 @@ export function ListCell({
   isSelected = false,
   metadata,
   modelName,
+  display,
 }: ListCellProps) {
   const val = obj[fieldName];
   const isPrimary = colIdx === 0;
@@ -39,6 +41,11 @@ export function ListCell({
   const matchedChoice = field?.choices?.find(
     (c) => String(c.value) === String(val)
   );
+  const labels = relation
+    ? (display?.[relation.name] ?? display?.[fieldName])
+    : undefined;
+  const label = labels?.[String(val)];
+  const hasLabel = typeof label === "string" && label.trim() !== "";
   const isEmpty =
     val === null || val === undefined || val === "";
 
@@ -87,23 +94,46 @@ export function ListCell({
           })()}
         </span>
       ) : relation ? (
-        <button
-          type="button"
-          data-testid={`fk-${fieldName}-${obj.id}`}
-          onClick={() =>
-            navigate({
-              to: "/$model/$id/view",
-              params: {
-                model: relation.related_model,
-                id: String(val),
-              },
-            })
-          }
-          title={`View related ${relation.label ?? relation.related_model}`}
-          className="font-mono text-meta tabular-nums text-muted-foreground transition-colors duration-fast ease-out hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-        >
-          #{String(val)}
-        </button>
+        hasLabel ? (
+          <button
+            type="button"
+            data-testid={`fk-${fieldName}-${obj.id}`}
+            onClick={() =>
+              navigate({
+                to: "/$model/$id/view",
+                params: {
+                  model: relation.related_model,
+                  id: String(val),
+                },
+              })
+            }
+            title={label}
+            className="text-ui truncate max-w-[16rem] transition-colors duration-fast ease-out hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            {label}
+            <span className="ml-1.5 font-mono text-meta text-muted-foreground tabular-nums">
+              #{String(val)}
+            </span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-testid={`fk-${fieldName}-${obj.id}`}
+            onClick={() =>
+              navigate({
+                to: "/$model/$id/view",
+                params: {
+                  model: relation.related_model,
+                  id: String(val),
+                },
+              })
+            }
+            title={`View related ${relation.label ?? relation.related_model}`}
+            className="font-mono text-meta tabular-nums text-muted-foreground transition-colors duration-fast ease-out hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          >
+            #{String(val)}
+          </button>
+        )
       ) : isPrimary ? (
         <button
           type="button"

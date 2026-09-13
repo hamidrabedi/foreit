@@ -48,6 +48,16 @@ func (f Field[T]) Table() string {
 
 // ToSQL converts field expression to SQL
 func (f Field[T]) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+	if builder != nil && strings.Contains(f.fieldPath, "__") {
+		col, err := builder.resolveColumn(f.fieldPath)
+		if err != nil {
+			return "", nil, err
+		}
+		if builder.joinResolver == nil && f.table != "" && !strings.Contains(f.fieldPath, ".") {
+			return EscapeIdentifier(f.table) + "." + col, nil, nil
+		}
+		return col, nil, nil
+	}
 	// Escape identifier - handle table prefix if needed
 	if f.table != "" && !strings.Contains(f.fieldPath, ".") {
 		escaped := EscapeIdentifier(f.table) + "." + EscapeIdentifier(f.fieldPath)
@@ -757,6 +767,43 @@ func F(fieldPath string) FieldRef {
 // NewFieldRef creates a field reference
 func NewFieldRef(fieldPath string) FieldRef {
 	return FieldRef{path: fieldPath}
+}
+
+// Path returns the field path
+func (f FieldRef) Path() string {
+	return f.path
+}
+
+// ToSQL converts field reference to SQL
+func (f FieldRef) ToSQL(builder *SQLBuilder) (string, []interface{}, error) {
+	if builder != nil && strings.Contains(f.path, "__") {
+		col, err := builder.resolveColumn(f.path)
+		if err != nil {
+			return "", nil, err
+		}
+		return col, nil, nil
+	}
+	return EscapeIdentifier(f.path), nil, nil
+}
+
+// Resolve validates the field reference exists in schema
+func (f FieldRef) Resolve(schema *ModelSchema) error {
+	parts := splitFieldPath(f.path)
+	if len(parts) == 0 {
+		return fmt.Errorf("empty field path")
+	}
+	if len(parts) == 1 {
+		field := schema.GetField(parts[0])
+		if field == nil {
+			if schema.GetRelation(parts[0]) != nil {
+				return fmt.Errorf("path %s resolves to relation, not a field", f.path)
+			}
+			return fmt.Errorf("field %s not found in model", parts[0])
+		}
+		return nil
+	}
+	_, err := resolveNestedFieldPath(schema, parts)
+	return err
 }
 
 // FieldRef methods (Eq, Ne, etc.)

@@ -38,7 +38,11 @@ export default defineConfig({
             { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
             { name: "router", test: /node_modules[\\/]@tanstack[\\/]react-router[\\/]/ },
             { name: "query", test: /node_modules[\\/]@tanstack[\\/]react-query[\\/]/ },
-            { name: "charts", test: /node_modules[\\/]recharts[\\/]/ },
+            {
+              name: "charts",
+              test: /node_modules[\\/]recharts[\\/]/,
+              includeDependenciesRecursively: false,
+            },
             { name: "motion", test: /node_modules[\\/]framer-motion[\\/]/ },
             {
               name: "radix",

@@ -20,7 +20,6 @@ import {
   TableRow,
 } from "../components/ui/table";
 import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
 import { Input } from "../components/ui/input";
 import { Checkbox } from "../components/ui/checkbox";
 import { Card, CardContent, CardHeader } from "../components/ui/card";
@@ -45,7 +44,6 @@ import {
   Edit,
   Eye,
   Trash2,
-  Filter,
   Download,
   FileSpreadsheet,
   FileCode,
@@ -53,7 +51,6 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  X,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import AdminLayout from "../components/layout/AdminLayout";
@@ -62,11 +59,12 @@ import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { cn } from "../lib/utils";
 import { useToast } from "../hooks/use-toast";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { PageHeader } from "../components/ui/page-header";
 import { ListFilterPanel } from "../components/list/ListFilterPanel";
 import { ListBulkToolbar } from "../components/list/ListBulkToolbar";
 import { ListCell } from "../components/list/ListCell";
+import { ListToolbar } from "../components/list/ListToolbar";
+import { ListPagination } from "../components/list/ListPagination";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -550,101 +548,23 @@ export default function ModelListPage() {
 
         <Card className="border-border-subtle overflow-hidden">
           <CardHeader className="bg-muted/40 border-b border-border-subtle py-4 space-y-4">
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <div className="relative flex-1 w-full">
-                <label htmlFor="list-search" className="sr-only">
-                  Search {metadata.verbose_name_plural}
-                </label>
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  id="list-search"
-                  data-testid="search-input"
-                  placeholder={`Search ${metadata.verbose_name_plural.toLowerCase()}...`}
-                  value={searchInput}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10 pr-9 h-10"
-                />
-                {searchInput && (
-                  <button
-                    type="button"
-                    aria-label="Clear search"
-                    data-testid="clear-search"
-                    onClick={() => handleSearchChange("")}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <label htmlFor="saved-view-select" className="sr-only">
-                  Saved views
-                </label>
-                <Select
-                  value={selectedSavedView || "__none__"}
-                  onValueChange={(v) => handleApplySavedView(v === "__none__" ? "" : v)}
-                >
-                  <SelectTrigger
-                    id="saved-view-select"
-                    data-testid="saved-view-select"
-                    aria-label="Saved views"
-                    className="h-9 w-auto min-w-[160px] text-ui"
-                  >
-                    <SelectValue placeholder="Saved views" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Saved views</SelectItem>
-                    {savedViews.map((view) => (
-                      <SelectItem key={view.id} value={view.id}>
-                        {view.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="save-view-button"
-                  className="h-10 px-4 text-body font-medium"
-                  onClick={() => {
-                    setSaveViewName("");
-                    setSaveViewOpen(true);
-                  }}
-                >
-                  Save view
-                </Button>
-                {selectedSavedView && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    data-testid="delete-view-button"
-                    className="h-10 px-3 text-meta text-muted-foreground hover:text-destructive"
-                    onClick={handleDeleteSavedView}
-                    disabled={deleteSavedViewMutation.isPending}
-                    title="Delete this saved view"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete saved view</span>
-                  </Button>
-                )}
-                <Button
-                  data-testid="filter-button"
-                  variant={isFilterOpen ? "secondary" : "ghost"}
-                  size="sm"
-                  className="h-10 px-4 text-body font-medium gap-2"
-                  onClick={() => setIsFilterOpen(!isFilterOpen)}
-                  aria-expanded={isFilterOpen}
-                >
-                  <Filter className="h-4 w-4" />
-                  Filters
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="ml-1 px-1.5">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </Button>
-              </div>
-            </div>
+            <ListToolbar
+              searchLabel={metadata.verbose_name_plural}
+              searchInput={searchInput}
+              onSearchChange={handleSearchChange}
+              savedViews={savedViews}
+              selectedSavedView={selectedSavedView}
+              onApplySavedView={handleApplySavedView}
+              onOpenSaveView={() => {
+                setSaveViewName("");
+                setSaveViewOpen(true);
+              }}
+              onDeleteSavedView={handleDeleteSavedView}
+              deleteViewPending={deleteSavedViewMutation.isPending}
+              isFilterOpen={isFilterOpen}
+              onToggleFilters={() => setIsFilterOpen(!isFilterOpen)}
+              activeFilterCount={activeFilterCount}
+            />
 
             {/* Expansible Filter Panel */}
             {isFilterOpen && metadata.filters.length > 0 && (
@@ -876,70 +796,21 @@ export default function ModelListPage() {
               </TableBody>
             </Table>
           </CardContent>
-          <div className="px-6 py-4 bg-muted/30 border-t border-border-subtle flex flex-col lg:flex-row lg:items-center gap-4">
-            <p
-              className="text-meta text-muted-foreground font-medium"
-              data-testid="pagination-status"
-              aria-live="polite"
-            >
-              Showing <span className="font-mono tabular-nums text-foreground font-semibold">{from}–{to}</span>{" "}
-              of <span className="font-mono tabular-nums text-foreground font-semibold">{totalCount.toLocaleString()}</span>
-            </p>
-            <div className="flex items-center gap-2 lg:ml-auto">
-              <label htmlFor="page-size-select" className="text-meta text-muted-foreground whitespace-nowrap">
-                Rows per page
-              </label>
-              <Select
-                value={String(effectivePageSize)}
-                onValueChange={(v) => {
-                  setPageSize(Number(v));
-                  resetPage();
-                }}
-              >
-                <SelectTrigger
-                  id="page-size-select"
-                  data-testid="page-size-select"
-                  aria-label="Rows per page"
-                  className="h-9 w-auto min-w-[80px] text-ui"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {pageSizeOptions.map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-meta text-muted-foreground font-medium mr-1">
-                Page <span className="font-mono tabular-nums text-foreground">{page}</span> of{" "}
-                <span className="font-mono tabular-nums text-foreground">{totalPages}</span>
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid="pagination-prev"
-                className="h-9 px-4 text-body font-medium"
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page <= 1}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                data-testid="pagination-next"
-                className="h-9 px-4 text-body font-medium"
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                disabled={page >= totalPages}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <ListPagination
+            from={from}
+            to={to}
+            totalCount={totalCount}
+            page={page}
+            totalPages={totalPages}
+            pageSize={effectivePageSize}
+            pageSizeOptions={pageSizeOptions}
+            onPageSizeChange={(v) => {
+              setPageSize(Number(v));
+              resetPage();
+            }}
+            onPrev={() => setPage((p) => Math.max(1, p - 1))}
+            onNext={() => setPage((p) => Math.min(totalPages, p + 1))}
+          />
         </Card>
 
         {/* Save view dialog */}

@@ -24,8 +24,8 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| B1 | fix/cache-concurrency-lifecycle | 3 unsafe caches (no lock / delete under RLock); unstoppable cleanup goroutines | dispatched |
-| B2 | same | atomic throttle increment (anon + user); trusted-proxy client IP (XFF/X-Real-IP spoofing) in `server/ratelimit.go` + `api/throttling/anon_rate.go` | todo (spec after B1) |
+| B1 | fix/cache-concurrency-lifecycle | throttling + API caches (no lock / delete under RLock); unstoppable cleanup goroutine | **PR #203** (filter cache removed, see Planned) |
+| B2 | same | atomic throttle increment (anon + user); trusted-proxy client IP (XFF/X-Real-IP spoofing) in `server/ratelimit.go` + `api/throttling/anon_rate.go` | **on PR #203** |
 | B3 | same | rate-limit store: goroutine leak on `stop`, expiry-based eviction instead of "keep a random half" | todo |
 | B4 | same | unsynchronised plugin registries + global API settings | todo (needs audit re-read) |
 
@@ -33,21 +33,40 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | todo |
-| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | todo (spec after C1) |
+| C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | **PR #205** |
+| C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | dispatched (agy; EXTRACT + unsigned deferred to C3) |
 | C3 | same | relation-path joins; dialect-aware SQL generation | todo (larger — design first) |
 
 ## Phase 4: server/auth edge cases
 
 | # | Slice / branch | Task | Status |
 |---|---|---|---|
-| D1 | fix/server-security-edge-cases | CSRF exemption raw-prefix match; `Redirect` panics without request; session auth accepts inactive/locked users | todo |
+| D1 | fix/server-security-edge-cases | CSRF exemption raw-prefix match; `Redirect` panics without request; session auth accepts inactive/locked users | **PR #206** |
 | D2 | same | query-string API keys written to access logs; admin login brute-force; expired sessions never purged; password trimming | todo |
+
+## Admin UI redesign
+
+Draft **PR #204** (`feat/admin-ui-redesign`). 4.1a ListFilterPanel extracted (1343→1182 lines, pushed). In flight: 4.1b bulk toolbar (agy).
 
 ## Phase 5: admin integration (frontend-touching, after the UI redesign lands)
 
 Custom admin mount prefix end to end; surface backend validation `details` in forms;
 inert notification wiring; React Query v5 mutation-callback context argument.
+
+## Planned / deferred (not now)
+
+### Filter result caching (`forge/filter/cache.go`)
+
+The owner has decided against caching filters for now: "we will implement that later". The
+fixes were removed from PR #203. `FilterCache` has no callers today. When filter caching is
+built, fix these known defects in the existing type first:
+
+- `GetParsedTree` / `GetCompiledSQL` / `GetMetadata` `delete` expired entries while holding
+  only `RLock`, a concurrent map write under a read lock. Re-check and delete under the write lock.
+- `NewFilterCache` starts a cleanup goroutine that can never stop. Add an idempotent `Close()`.
+- Cached values (`*FilterNode`, metadata maps) are returned by reference. Define a copy
+  contract so callers cannot mutate shared cached trees.
+- Decide on invalidation (schema change, per-model TTL) before wiring it into request paths.
 
 ## Known pre-existing failures (not ours)
 

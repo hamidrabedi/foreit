@@ -28,6 +28,8 @@ Every item below was re-verified on current master before its task prompt was wr
 | #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | merged |
 | #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | in review |
 | #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | merged |
+| #221 | W0-5 API correctness | B17, B23 | JSON `null` clears nillable fields instead of panicking; pagination links are absolute and keep filters/search/ordering | in review |
+| #222 | W0-6 Permissions and token auth | B19, B20, B25 | owner lookup matches db/json tags; `IsAdminUser` accepts IsStaff/IsSuperuser; unknown token → `ErrInvalidToken` | in review |
 
 ## Removal log
 
@@ -46,10 +48,7 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 
 | Where | Problem | Proposed fix | Audit ID |
 |---|---|---|---|
-| `api/pagination.go:99` (used by every viewset list and `identity/handlers/user.go`) | `next`/`previous` links are built from `r.URL.Scheme`/`Host`, which are empty on server requests, so links look like `://path?page=2` | build from `r.Host` + scheme (trusted proxy aware) or return relative links | B23 |
-| `api/viewset.go` `populateFromMap` → `setFieldValue` | JSON `null` for a float/pointer/slice/map field panics (500) | guard invalid values; decode via mapstructure | B17 |
 | `admin/api/rest/router.go` `handleLogin` | only `FORGE_ADMIN_USERNAME`/`PASSWORD` can log in; `forge createsuperuser` users cannot | authenticate staff/superusers through `identity`, keep env pair as bootstrap | B24 |
-| `api/authentication/token.go:52` | an unknown token is treated as anonymous instead of 401 | return an auth error when credentials were supplied | B25 |
 | `admin/api/rest/router.go:81-91` | CORS echoes every origin with credentials (not exploitable today: bearer tokens only) | origin allow-list from config | B12 |
 | `admin/history_manager.go` | lazy init race; history is in memory only | init in constructor; persistence is a feature decision | B26 |
 | Migrations on SQLite | adding a foreign key emits PostgreSQL DDL; some rollbacks are comments | per-dialect DDL, table-rebuild recipe | B31, B33 |
@@ -62,9 +61,9 @@ Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up v
 
 ## Next
 
-1. W0-5 (in progress): B17 (`null` panic) and B23 (pagination links), both live.
-2. W0-6 (in progress): B19/B20 (owner/admin permission lookups), B25 (unknown token). B24 (admin login only via env credentials) stays flagged for an owner decision.
-3. W0-7: migrations B31-B34, B38.
+1. W0-7a (in progress): migration status merge (B34) and the generator's conflicting `schema_migrations` table (B38).
+2. W0-7b (in progress): SQLite DDL for foreign keys, drop column and constraints (B31, B33).
+3. W0-7c: down SQL for dropped columns and tables (B32), after W0-7b (same files).
 4. W0-8: ORM/config B5, B6, B36.
 5. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 

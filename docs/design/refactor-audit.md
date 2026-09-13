@@ -3,8 +3,70 @@
 Baseline: `origin/master` @ 90e6bef plus the gofmt pass in #214 (2026-09-13).
 Scope: the Go module `forge/` and the test module `tests/`. The admin UI (`forge/admin/ui/web`) is out of scope.
 
-This document has two jobs. **Part A** is the playbook: how to run the refactor and what to look for in every PR.
-**Part B** is the findings list, ranked by severity, with one planned action per finding.
+This is the **single living document** for the refactor. It has three parts:
+
+- **Status**, directly below: what is done, what is in review, what was removed and why, what is flagged for the owner, and what is next.
+- **Part A**, the playbook: rules and coding principles for every refactor PR, and a checklist of what to look for.
+- **Part B**, the findings: ranked by severity, with one planned action each.
+
+---
+
+# Status
+
+Last updated: 2026-09-13.
+
+## Done / in review
+
+Every item below was re-verified on current master before its task prompt was written. Each fix was implemented by a delegate (agy) test-first, with the failing test shown before the fix, and then reviewed and gated by Claude (gofmt, vet, staticcheck 2026.2.1, `go test -race`, example build).
+
+| PR | Slice | Audit IDs | What changed | State |
+|---|---|---|---|---|
+| #214 | CI hygiene | G2 | staticcheck pinned and blocking; gofmt gate; one-time gofmt | merged |
+| #215 | ORM to-many filters | C3c, B15 | to-many filters use a pk subquery (no duplicate rows); `GetModelSchemaByType` builds schemas | merged |
+| #216 | This audit | — | audit, playbook, raw tool output | in review |
+| #217 | W0-1 ORM | B2, B35, B37, Aggregate stub | `Union`/`Intersection`/`Difference`/`Aggregate` return NotImplemented; unordered `First`/`Last` order by PK; `UpdateBuilder.Set(nil)` no longer panics | in review |
+| #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | in review |
+| #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | in review |
+| #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | in review |
+
+## Removal log
+
+Only code that was unreachable, a no-op pretending to work, or harmful. No working feature has been removed.
+
+| PR | Removed | Why |
+|---|---|---|
+| #220 | `log`: `createRemoteCore`, `remoteExporter`, `newRemoteExporter`, `noOpWriter` | the "remote output" wrote to a writer that discarded every line; replaced by a NotImplemented error |
+| #220 | `api/errors`: `DatabaseStore` SQL bodies, `ensureTable`, `DatabaseConnection` | SQL strings were built and never executed; `Set` reported success while storing nothing |
+| #220 | `db/migrate/generate`: `SquashMigrations` body, `getMigrationsInRange`, `MigrationFile` | squash produced a duplicate migration that would re-apply every statement |
+| #217 | stale `// For MVP` comments in set operations | comments described behaviour that did not exist |
+
+## Flagged for the owner (kept: works, but has a problem)
+
+These are live code paths. They are **not** removed. Each needs a decision or a fix PR.
+
+| Where | Problem | Proposed fix | Audit ID |
+|---|---|---|---|
+| `api/pagination.go:99` (used by every viewset list and `identity/handlers/user.go`) | `next`/`previous` links are built from `r.URL.Scheme`/`Host`, which are empty on server requests, so links look like `://path?page=2` | build from `r.Host` + scheme (trusted proxy aware) or return relative links | B23 |
+| `api/viewset.go` `populateFromMap` → `setFieldValue` | JSON `null` for a float/pointer/slice/map field panics (500) | guard invalid values; decode via mapstructure | B17 |
+| `admin/api/rest/router.go` `handleLogin` | only `FORGE_ADMIN_USERNAME`/`PASSWORD` can log in; `forge createsuperuser` users cannot | authenticate staff/superusers through `identity`, keep env pair as bootstrap | B24 |
+| `api/authentication/token.go:52` | an unknown token is treated as anonymous instead of 401 | return an auth error when credentials were supplied | B25 |
+| `admin/api/rest/router.go:81-91` | CORS echoes every origin with credentials (not exploitable today: bearer tokens only) | origin allow-list from config | B12 |
+| `admin/history_manager.go` | lazy init race; history is in memory only | init in constructor; persistence is a feature decision | B26 |
+| Migrations on SQLite | adding a foreign key emits PostgreSQL DDL; some rollbacks are comments | per-dialect DDL, table-rebuild recipe | B31, B33 |
+| Migration generation | dropping a column/table cannot be generated; status marks every version 1..N applied | carry previous definitions; merge real versions only | B32, B34 |
+| ORM | cannot run inside a transaction; update keys not mapped to DB columns; `Create` PK set-back int64-only | `DBTX` interface; column resolution helper; schema PK | D12, B5, B6 |
+| `config/settings.go:109` | connection lifetime parsed as int from `"5m"` → 0; its test asserts the bug | `GetDuration`, fix the test | B36 |
+| `identity` | "user not found" still defined separately in `service/user.go`, `backends/registry.go`, `backends/token.go` | reuse `repository.ErrUserNotFound` | new |
+
+Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up vs removal): API ordering filter (B21) and search filter (B22) — `GetFilterBackends()` has no caller; multipart parser (B16) — no code calls a parser's `Parse`; `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops, no implementers, global `RegisterPlugin` unused).
+
+## Next
+
+1. W0-5: B17 (`null` panic) and B23 (pagination links), both live.
+2. W0-6: B19/B20 (owner/admin permission lookups), B24 (admin login via identity), B25 (unknown token).
+3. W0-7: migrations B31-B34, B38.
+4. W0-8: ORM/config B5, B6, B36.
+5. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 
 ## How the findings were produced
 
@@ -30,12 +92,24 @@ Raw tool output lives next to this file in `audit/`: `deadcode-forge-tests.txt` 
 ## A1. Ground rules
 
 1. **One concern per PR, one package per PR where possible.** "Delete dead package X", "merge limiter A into B", "fix bug Y". Never mix a behaviour change with a move or a rename.
-2. **Delete before you refactor.** Removing dead code first shrinks every later diff and removes false duplicates from the picture.
+2. **Never remove a working feature (owner rule).** A feature that works but has problems is kept and listed under "Flagged for the owner" with the concrete problem. Code is removed only when it is unreachable, a no-op pretending to work, or a harmful implementation, and every removal is recorded in "Removal log" with its reason. Unfinished features fail loudly instead of being removed.
 3. **Pin behaviour before you change it.** Before merging duplicates or rewriting a component, add a test that captures current behaviour, including the SQL string where the ORM is involved. The refactor PR must keep that test green (or change it deliberately, with the reason in the PR body).
 4. **Incomplete features are flagged, not finished.** For every STUB finding (Part B §3), the refactor PR makes the stub fail loudly: return `errors.ErrNotImplemented` (or a typed error) and add a `// NOT IMPLEMENTED:` comment plus a row in `docs/design/feature-gaps.md`. No silent `return nil`, no clone-and-ignore.
 5. **Public API breaks are allowed, but listed.** The framework has no external users yet; still, every removed or renamed exported identifier goes in the PR body under "Breaking".
 6. **Gates for every PR**: `gofmt -l` empty, `go vet ./...`, `staticcheck ./...` (2026.2.1), `go test -race ./...` in `forge`, `go build ./...` in `examples/ecommerce`, and the relevant `tests/` integration package. Re-run `deadcode -test ./...` and paste the before/after count.
 7. **Delegation**: each item in Part B's plan (§10) is sized to be one agy/codex task prompt under `docs/design/tasks/`, verified by Claude, one PR each, 2-3 delegates at a time at most.
+
+## A1b. Coding principles (copied into every task prompt)
+
+1. **Verify the problem on current master first**, then write the failing test before the fix and show the failure in the report. No red test, no fix.
+2. **Smallest correct change.** Touch only the files the prompt names; no drive-by refactors or renames.
+3. **Fail loudly.** Unfinished features return `errors.NewNotImplementedError("<Type.Method>")` from `forge/errors`.
+4. **Small functions, early returns.** New functions under ~40 lines, nesting ≤ 3; extract helpers.
+5. **Errors carry context** (`fmt.Errorf("...: %w", err)`); use sentinel errors with `errors.Is`, never compare error text.
+6. **No new global mutable state**; immutable package-level values only when necessary (e.g. a precomputed dummy hash).
+7. **Table-driven tests** that assert behaviour (results, errors, SQL).
+8. **Match surrounding style**, gofmt, no new dependencies unless named.
+9. **Delegates never run git**; Claude verifies the diff, runs the gates, commits and opens the PR. At most 3 delegates at once, on disjoint packages.
 
 ## A2. What to look for (reviewer checklist)
 

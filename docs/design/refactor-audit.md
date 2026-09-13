@@ -23,19 +23,22 @@ Every item below was re-verified on current master before its task prompt was wr
 |---|---|---|---|---|
 | #214 | CI hygiene | G2 | staticcheck pinned and blocking; gofmt gate; one-time gofmt | merged |
 | #215 | ORM to-many filters | C3c, B15 | to-many filters use a pk subquery (no duplicate rows); `GetModelSchemaByType` builds schemas | merged |
-| #216 | This audit | — | audit, playbook, raw tool output | in review |
+| #216 | This audit | — | audit, playbook, raw tool output | merged |
 | #217 | W0-1 ORM | B2, B35, B37, Aggregate stub | `Union`/`Intersection`/`Difference`/`Aggregate` return NotImplemented; unordered `First`/`Last` order by PK; `UpdateBuilder.Set(nil)` no longer panics | merged |
 | #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | merged |
 | #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | merged |
 | #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | merged |
 | #221 | W0-5 API correctness | B17, B23 | JSON `null` clears nillable fields instead of panicking; pagination links are absolute and keep filters/search/ordering | merged |
-| #222 | W0-6 Permissions and token auth | B19, B20, B25 | owner lookup matches db/json tags; `IsAdminUser` accepts IsStaff/IsSuperuser; unknown token → `ErrInvalidToken` | in review |
+| #222 | W0-6 Permissions and token auth | B19, B20, B25 | owner lookup matches db/json tags; `IsAdminUser` accepts IsStaff/IsSuperuser; unknown token → `ErrInvalidToken` | merged |
 | #223 | W0-7a Migration status and bookkeeping | B34, B38 | status merges only real versions (no 1..N loop); generator no longer creates/drops golang-migrate's `schema_migrations` | merged |
 | #224 | W0-7b SQLite migration DDL | B31, B33 | foreign keys of new tables inlined into CREATE TABLE; drop column / add-column rollback emit `DROP COLUMN`; unsupported FK/constraint drops return errors instead of comments; tests run the SQL on SQLite | merged |
-| #225 | W0-8 ORM write columns and PK | B5, B6 | `Update`/`Increment`/`Decrement` map fields to db columns (case-insensitive, unknown → error); `Create` uses the schema PK column; non-integer PK → NotImplemented | in review |
-| #226 | Naming: ticket-named tests | A1c #8 | `w0_*_test.go` and `TestW0_*` renamed after behaviour; `orm/w0_orm_test.go` split in three; no logic changed | in review |
-| #227 | W0-7c Down SQL for drops | B32 | `DropTable`/`DropColumn` carry previous definitions; down SQL re-creates them (PostgreSQL and SQLite) instead of aborting generation | in review |
-| #228 | Wave 1a: unreachable packages | §4 | removed `cli/internal`, `filter/widgets`, `db/migrate/dependencies` (see removal log) | in review |
+| #225 | W0-8 ORM write columns and PK | B5, B6 | `Update`/`Increment`/`Decrement` map fields to db columns (case-insensitive, unknown → error); `Create` uses the schema PK column; non-integer PK → NotImplemented | merged |
+| #226 | Naming: ticket-named tests | A1c #8 | `w0_*_test.go` and `TestW0_*` renamed after behaviour; `orm/w0_orm_test.go` split in three; no logic changed | merged |
+| #227 | W0-7c Down SQL for drops | B32 | `DropTable`/`DropColumn` carry previous definitions; down SQL re-creates them (PostgreSQL and SQLite) instead of aborting generation | merged |
+| #228 | Wave 1a: unreachable packages | §4 | removed `cli/internal`, `filter/widgets`, `db/migrate/dependencies` (see removal log) | merged |
+| #229 | Wave 0 remaining bugs | B7, B13, B16, B21, B22, B24, B26, B27, B28, B39, B40 | multipart boundary; ordering/search filters; negotiation without renderers; superuser password without echo; admin history race; regex sanitizer and SQL blacklist removed; staff/superuser admin login via `identity` (env pair as fallback); quoted write identifiers; `Exists` with LIMIT 1; M2M through columns `<model>_id` | in review |
+| (branch) `refactor/wave1-dead-code-and-tests` | Waves 1-2 | §4, §5, §7, B8, B14, B30, B36 | tests: 4 tautological tests removed, 15 skips removed, missing assertions added; in progress: dead filter/migrate code, registry plugin stubs, `forge test`, viewset merge, API error format merge, rate-limit store merge, checksum/test-helper/settings/user-not-found duplicates | in progress |
+| (branch) `refactor/wave3-design` | Wave 3 | D4, D5 | in progress: config loaded once, generated managers fail at init | in progress |
 
 ## Removal log
 
@@ -51,6 +54,8 @@ Only code that was unreachable, a no-op pretending to work, or harmful. No worki
 | #228 | `cli/internal` (discovery, flags, output, helpers) | `internal` package no cli code imports: unreachable for any code or user |
 | #228 | `filter/widgets` (autosuggest, SQL preview) | no importers; rendered unescaped values into HTML and `<script>` (XSS, B14) |
 | #228 | `db/migrate/dependencies` (`Resolver`) | no importers; duplicate of `generate.DependencyDetector`, which the generator uses |
+| #229 | `server`: `XSS.SanitizeHTML`, `SanitizeHTMLStrict`, `SanitizeInput`, `HTMLPolicy`, `DefaultHTMLPolicy`, `SQLInjection.ValidateInput`, `EnsureParameterized` | regex sanitizer bypassable (`<img onerror=... src=x>`), keyword blacklist is not a defence; no callers (B27) |
+| wave1 branch | tests `TestPostgreSQLDialect_ImplementsDialect`, `TestSQLiteDialect_ImplementsDialect` (now compile-time assertions), `TestOptionType`, `TestTypeAliases` | only checked that code compiles |
 
 ## Flagged for the owner (kept: works, but has a problem)
 
@@ -58,9 +63,7 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 
 | Where | Problem | Proposed fix | Audit ID |
 |---|---|---|---|
-| `admin/api/rest/router.go` `handleLogin` | only `FORGE_ADMIN_USERNAME`/`PASSWORD` can log in; `forge createsuperuser` users cannot | authenticate staff/superusers through `identity`, keep env pair as bootstrap | B24 |
-| `admin/api/rest/router.go:81-91` | CORS echoes every origin with credentials (not exploitable today: bearer tokens only) | origin allow-list from config | B12 |
-| `admin/history_manager.go` | lazy init race; history is in memory only | init in constructor; persistence is a feature decision | B26 |
+| `admin/core/notifications.go:84` | SSE handler sets `Access-Control-Allow-Origin: *`; unrouted today (the router CORS echo from B12 is gone on master) | put behind admin auth with an origin allow-list if it is ever mounted | B12 |
 | Migrations on SQLite | dropping or adding a foreign key/constraint on an existing table now errors (needs a table rebuild) | table-rebuild recipe | B33 (rest fixed in #224) |
 | ORM | cannot run inside a transaction | `DBTX` interface | D12 (B5, B6 in #225) |
 | Migration down SQL | a re-created table (rollback of a drop) does not restore its foreign keys | include FKs when rebuilding | new |
@@ -78,16 +81,19 @@ Packages that **nothing imports** but that work, re-checked on master after Wave
 | `admin/utils` | errors, formatting, reflection helpers, flash messages; tests | merge into `admin/core` (Wave 2) |
 | `admin/codegen` | admin file generator, declares `package generator`, no CLI command calls it | expose as a CLI command or remove |
 
-Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up vs removal): API ordering filter (B21) and search filter (B22) — `GetFilterBackends()` has no caller; multipart parser (B16) — no code calls a parser's `Parse`; `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops, no implementers, global `RegisterPlugin` unused).
+Code that is **not wired anywhere**: API ordering filter and search filter (`GetFilterBackends()` has no caller) and the multipart parser (no code calls a parser's `Parse`). Their bugs B16/B21/B22 are fixed in #229 so they work when wired; wiring them into `BaseViewSet` is a feature decision. `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops) now fail loudly (Waves 1-2 branch).
 
 ## Next
 
-Wave 0 (critical bugs) is complete: all slices are merged or in review.
+Wave 0 (critical bugs) is complete: #217-#228 merged, the rest in #229. From now on each wave ships as one large PR (owner request, 2026-09-14).
 
-1. Wave 1 dead code: 1a (#228) removed the three unreachable packages; the other unimported packages work and are flagged above. Next: function-level pruning inside live packages (`schema`, `registry`, `validate`, `filter`, `api/errors`), verified with `deadcode -test` plus grep of cli templates and docs-site, since plain `deadcode ./...` on a library reports public API as dead.
-2. Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
+Still open from the bug list: B10/B11 (placeholder rewriting, fixed by D3 in Wave 3) and B29 (cookie session auth relies on CSRF middleware being mounted; document or enforce).
+
+1. Waves 1-2 (branch `refactor/wave1-dead-code-and-tests`, one PR): dead filter/migrate code; registry plugin stubs fail loudly; `forge test` runs `go test`; one viewset; one API error format (RFC 7807 via `api/errors`; `SetExceptionHandler` was a no-op); one rate-limit store; checksum, test helpers, settings durations (B36) and "user not found" deduplicated. Function-level pruning inside live packages only where `deadcode -test` and grep of cli templates/docs-site agree, since plain `deadcode ./...` on a library reports public API as dead.
+   Decision: §5 proposed keeping the enhanced viewset. Re-checking showed generated code, CLI scaffolds and examples all use `BaseViewSet`, and every enhanced CRUD action except List answered "Manager not found" (`getManagerFromModel` is a stub). So `BaseViewSet` is kept and gains the authentication/permission/throttle classes.
+2. Wave 3 (branch `refactor/wave3-design`, one PR): D4/D5 in progress, then D12 transactions, D3 dialect placeholders, D13 one expression tree, D1 relation metadata, D7/D8 god-file splits, D2 `forge.App`.
+3. Wave 4: `log/slog` migration; Atlas decision doc before any code.
 4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
-4. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 
 ## How the findings were produced
 

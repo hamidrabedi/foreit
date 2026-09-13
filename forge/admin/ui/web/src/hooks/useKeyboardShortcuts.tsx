@@ -212,14 +212,14 @@ export function ShortcutHelpDialog({
               <span className="text-muted-foreground font-medium">
                 {shortcut.description}
               </span>
-              <kbd className="px-2 py-1 bg-muted/80 border border-border/60 rounded text-[11px] font-mono font-semibold text-foreground shadow-xs">
+              <kbd className="px-2 py-1 bg-muted/80 border border-border/60 rounded text-micro font-mono font-semibold text-foreground shadow-xs">
                 {formatKey(shortcut)}
               </kbd>
             </div>
           ))}
         </div>
 
-        <div className="text-[11px] text-muted-foreground text-center pt-2 border-t border-border/40">
+        <div className="text-micro text-muted-foreground text-center pt-2 border-t border-border/40">
           Press <kbd className="px-1.5 py-0.5 bg-muted rounded font-mono">?</kbd> anywhere to open this cheat sheet
         </div>
       </DialogContent>

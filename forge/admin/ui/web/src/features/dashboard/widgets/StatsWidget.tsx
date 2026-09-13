@@ -20,7 +20,7 @@ export default function StatsWidget({ config }: WidgetProps) {
       {trend && (
         <div className={cn(
           "flex items-center text-xs font-semibold px-2 py-0.5 rounded-full w-fit",
-          isNegative ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-600 dark:text-green-400"
+          isNegative ? "bg-destructive/10 text-destructive" : "bg-success-surface text-success"
         )}>
           {isNegative ? (
             <LucideIcons.ArrowDownRight className="h-3 w-3 mr-1" />

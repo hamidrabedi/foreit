@@ -58,13 +58,17 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import AdminLayout from "../components/layout/AdminLayout";
 import { useUIComponent } from "../hooks/useUIComponent";
 import { useDebouncedValue } from "../hooks/useDebouncedValue";
 import { cn } from "../lib/utils";
 import { useToast } from "../hooks/use-toast";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { EmptyValue } from "../components/ui/empty-state";
+import { StatusBadge } from "../components/ui/status-badge";
+import { PageHeader } from "../components/ui/page-header";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -191,6 +195,17 @@ export default function ModelListPage() {
   });
 
   const resetPage = () => setPage(1);
+
+  const relationByField = useMemo(() => {
+    const map = new Map<string, any>();
+    (metadata?.relations ?? []).forEach((rel: any) => {
+      if (!rel?.name) return;
+      map.set(rel.name, rel);
+      // A column is often the raw fk column, e.g. relation "customer" -> column "customer_id"
+      map.set(`${rel.name}_id`, rel);
+    });
+    return map;
+  }, [metadata]);
 
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
@@ -406,7 +421,7 @@ export default function ModelListPage() {
           aria-label="Loading records"
         >
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Loading records…</p>
+          <p className="text-ui text-muted-foreground">Loading records…</p>
         </div>
       </AdminLayout>
     );
@@ -417,7 +432,7 @@ export default function ModelListPage() {
       <AdminLayout>
         <div className="flex items-center justify-center h-96">
           <div className="text-center space-y-3">
-            <h2 className="text-2xl font-bold text-destructive">
+            <h2 className="text-title font-bold text-destructive">
               Could not load records
             </h2>
             <p className="text-muted-foreground mt-2 max-w-md">
@@ -469,69 +484,74 @@ export default function ModelListPage() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          {/* eslint-disable-next-line react-hooks/static-components -- resolved via useUIComponent registry (stable ref) */}
-          <ListTitle className="space-y-1.5">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">
-              {metadata.verbose_name_plural}
-            </h1>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              {metadata.description}
-            </p>
-          </ListTitle>
-          {/* eslint-disable-next-line react-hooks/static-components -- resolved via useUIComponent registry (stable ref) */}
-          <ActionHeader className="flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  data-testid="export-select"
-                  variant="outline"
-                  className="h-10 px-4 text-[13px] font-medium gap-2"
-                  disabled={exporting}
-                >
-                  {exporting ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                  ) : (
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span>Export</span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem
-                  data-testid="export-csv"
-                  className="gap-2 cursor-pointer text-xs"
-                  onClick={() => handleExportChange("csv")}
-                >
-                  <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
-                  <span>Export CSV</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  data-testid="export-json"
-                  className="gap-2 cursor-pointer text-xs"
-                  onClick={() => handleExportChange("json")}
-                >
-                  <FileCode className="h-4 w-4 text-blue-600" />
-                  <span>Export JSON</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {metadata.permissions.add && (
-              <Button
-                data-testid="create-button"
-                onClick={handleCreateModel}
-                className="bg-primary hover:bg-primary/90 h-10"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add {metadata.verbose_name}
-              </Button>
-            )}
-          </ActionHeader>
-        </div>
+        {/* eslint-disable-next-line react-hooks/static-components -- resolved via useUIComponent registry (stable ref) */}
+        <ListTitle>
+          <PageHeader
+            eyebrow="Records"
+            title={metadata.verbose_name_plural}
+            description={metadata.description || undefined}
+            actions={
+              /* eslint-disable-next-line react-hooks/static-components -- resolved via useUIComponent registry (stable ref) */
+              <ActionHeader className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      data-testid="export-select"
+                      variant="outline"
+                      className="h-10 px-4 text-body font-medium gap-2"
+                      disabled={exporting}
+                    >
+                      {exporting ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : (
+                        <Download className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span>Export</span>
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem
+                      data-testid="export-csv"
+                      className="gap-2 cursor-pointer text-meta"
+                      onClick={() => handleExportChange("csv")}
+                    >
+                      <FileSpreadsheet className="h-4 w-4 text-success" />
+                      <span>Export CSV</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      data-testid="export-json"
+                      className="gap-2 cursor-pointer text-meta"
+                      onClick={() => handleExportChange("json")}
+                    >
+                      <FileCode className="h-4 w-4 text-info" />
+                      <span>Export JSON</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {metadata.permissions.add && (
+                  <Button
+                    data-testid="create-button"
+                    onClick={handleCreateModel}
+                    className="bg-primary hover:bg-primary/90 h-10"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add {metadata.verbose_name}
+                  </Button>
+                )}
+              </ActionHeader>
+            }
+            meta={
+              <span>
+                <span className="font-mono tabular-nums font-semibold">{totalCount.toLocaleString()}</span>{" "}
+                {totalCount === 1 ? "item" : "items"}
+              </span>
+            }
+          />
+        </ListTitle>
 
-        <Card className="border-border/60 shadow-sm overflow-hidden">
-          <CardHeader className="bg-muted/40 border-b border-border/60 py-4 space-y-4">
+        <Card className="border-border-subtle overflow-hidden">
+          <CardHeader className="bg-muted/40 border-b border-border-subtle py-4 space-y-4">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
               <div className="relative flex-1 w-full">
                 <label htmlFor="list-search" className="sr-only">
@@ -562,25 +582,32 @@ export default function ModelListPage() {
                 <label htmlFor="saved-view-select" className="sr-only">
                   Saved views
                 </label>
-                <select
-                  id="saved-view-select"
-                  data-testid="saved-view-select"
-                  className="h-10 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  value={selectedSavedView}
-                  onChange={(e) => handleApplySavedView(e.target.value)}
+                <Select
+                  value={selectedSavedView || "__none__"}
+                  onValueChange={(v) => handleApplySavedView(v === "__none__" ? "" : v)}
                 >
-                  <option value="">Saved views</option>
-                  {savedViews.map((view) => (
-                    <option key={view.id} value={view.id}>
-                      {view.name}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    id="saved-view-select"
+                    data-testid="saved-view-select"
+                    aria-label="Saved views"
+                    className="h-9 w-auto min-w-[160px] text-ui"
+                  >
+                    <SelectValue placeholder="Saved views" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Saved views</SelectItem>
+                    {savedViews.map((view) => (
+                      <SelectItem key={view.id} value={view.id}>
+                        {view.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Button
                   variant="outline"
                   size="sm"
                   data-testid="save-view-button"
-                  className="h-10 px-4 text-[13px] font-medium"
+                  className="h-10 px-4 text-body font-medium"
                   onClick={() => {
                     setSaveViewName("");
                     setSaveViewOpen(true);
@@ -593,7 +620,7 @@ export default function ModelListPage() {
                     variant="ghost"
                     size="sm"
                     data-testid="delete-view-button"
-                    className="h-10 px-3 text-xs text-muted-foreground hover:text-destructive"
+                    className="h-10 px-3 text-meta text-muted-foreground hover:text-destructive"
                     onClick={handleDeleteSavedView}
                     disabled={deleteSavedViewMutation.isPending}
                     title="Delete this saved view"
@@ -606,7 +633,7 @@ export default function ModelListPage() {
                   data-testid="filter-button"
                   variant={isFilterOpen ? "secondary" : "ghost"}
                   size="sm"
-                  className="h-10 px-4 text-[13px] font-medium gap-2"
+                  className="h-10 px-4 text-body font-medium gap-2"
                   onClick={() => setIsFilterOpen(!isFilterOpen)}
                   aria-expanded={isFilterOpen}
                 >
@@ -618,30 +645,21 @@ export default function ModelListPage() {
                     </Badge>
                   )}
                 </Button>
-                <div
-                  className="h-10 px-4 flex items-center bg-muted/60 border border-border/60 rounded-md"
-                  aria-live="polite"
-                >
-                  <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                    {totalCount.toLocaleString()}{" "}
-                    {totalCount === 1 ? "item" : "items"}
-                  </span>
-                </div>
               </div>
             </div>
 
             {/* Expansible Filter Panel */}
             {isFilterOpen && metadata.filters.length > 0 && (
-              <div className="p-4 bg-background rounded-lg border border-border/60">
+              <div className="p-4 bg-background rounded-lg border border-border-subtle">
                 <div className="flex items-center justify-between gap-2 mb-4">
-                  <p className="text-[13px] font-medium text-muted-foreground">
+                  <p className="text-body font-medium text-muted-foreground">
                     Filters
                   </p>
                   <Button
                     variant="ghost"
                     size="sm"
                     data-testid="reset-filters"
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    className="text-meta text-muted-foreground hover:text-foreground"
                     onClick={() => {
                       setActiveFilters({});
                       resetPage();
@@ -655,48 +673,42 @@ export default function ModelListPage() {
                     <div key={filter.name} className="space-y-1.5">
                       <label
                         htmlFor={`filter-${filter.name}`}
-                        className="text-xs font-semibold text-muted-foreground"
+                        className="text-meta font-semibold text-muted-foreground"
                       >
                         {filter.label}
                       </label>
                       {filter.type === "choice" ? (
-                        <select
-                          id={`filter-${filter.name}`}
-                          data-testid={`filter-${filter.name}`}
-                          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          value={activeFilters[filter.name] || ""}
-                          onChange={(e) => {
-                            setActiveFilters((prev) => ({
-                              ...prev,
-                              [filter.name]: e.target.value,
-                            }));
+                        <Select
+                          value={activeFilters[filter.name] || "__all__"}
+                          onValueChange={(v) => {
+                            setActiveFilters((prev) => ({ ...prev, [filter.name]: v === "__all__" ? "" : v }));
                             resetPage();
                           }}
                         >
-                          <option value="">All</option>
-                          {filter.choices?.map((c) => (
-                            <option
-                              key={String(c.value)}
-                              value={String(c.value)}
-                            >
-                              {c.label}
-                            </option>
-                          ))}
-                        </select>
+                          <SelectTrigger id={`filter-${filter.name}`} data-testid={`filter-${filter.name}`}>
+                            <SelectValue placeholder="All" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All</SelectItem>
+                            {filter.choices?.map((c) => (
+                              <SelectItem key={String(c.value)} value={String(c.value)}>{c.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       ) : filter.type === "date" ||
                         filter.type === "datetime" ? (
                         <div className="flex gap-2">
                           <div className="flex-1 space-y-1">
                             <label
                               htmlFor={`filter-${filter.name}-from`}
-                              className="text-[11px] text-muted-foreground"
+                              className="text-micro text-muted-foreground"
                             >
                               From
                             </label>
                             <Input
                               id={`filter-${filter.name}-from`}
                               type="date"
-                              className="h-9 text-xs"
+                              className="h-9 text-meta"
                               value={activeFilters[`${filter.name}__gte`] || ""}
                               onChange={(e) => {
                                 setActiveFilters((prev) => ({
@@ -710,14 +722,14 @@ export default function ModelListPage() {
                           <div className="flex-1 space-y-1">
                             <label
                               htmlFor={`filter-${filter.name}-to`}
-                              className="text-[11px] text-muted-foreground"
+                              className="text-micro text-muted-foreground"
                             >
                               To
                             </label>
                             <Input
                               id={`filter-${filter.name}-to`}
                               type="date"
-                              className="h-9 text-xs"
+                              className="h-9 text-meta"
                               value={activeFilters[`${filter.name}__lte`] || ""}
                               onChange={(e) => {
                                 setActiveFilters((prev) => ({
@@ -730,29 +742,68 @@ export default function ModelListPage() {
                           </div>
                         </div>
                       ) : filter.type === "boolean" ? (
-                        <select
-                          id={`filter-${filter.name}`}
-                          data-testid={`filter-${filter.name}`}
-                          className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                          value={activeFilters[filter.name] || ""}
-                          onChange={(e) => {
-                            setActiveFilters((prev) => ({
-                              ...prev,
-                              [filter.name]: e.target.value,
-                            }));
+                        <Select
+                          value={activeFilters[filter.name] || "__all__"}
+                          onValueChange={(v) => {
+                            setActiveFilters((prev) => ({ ...prev, [filter.name]: v === "__all__" ? "" : v }));
                             resetPage();
                           }}
                         >
-                          <option value="">All</option>
-                          <option value="true">Yes</option>
-                          <option value="false">No</option>
-                        </select>
+                          <SelectTrigger id={`filter-${filter.name}`} data-testid={`filter-${filter.name}`}>
+                            <SelectValue placeholder="All" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All</SelectItem>
+                            <SelectItem value="true">Yes</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : filter.type === "number" ? (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1">
+                            <label htmlFor={`filter-${filter.name}-min`} className="sr-only">
+                              {filter.label} minimum
+                            </label>
+                            <Input
+                              id={`filter-${filter.name}-min`}
+                              data-testid={`filter-${filter.name}-min`}
+                              type="number"
+                              inputMode="decimal"
+                              placeholder="Min"
+                              className="h-9 text-ui"
+                              value={activeFilters[`${filter.name}__gte`] || ""}
+                              onChange={(e) => {
+                                setActiveFilters((prev) => ({ ...prev, [`${filter.name}__gte`]: e.target.value }));
+                                resetPage();
+                              }}
+                            />
+                          </div>
+                          <span aria-hidden className="text-meta text-muted-foreground">–</span>
+                          <div className="flex-1">
+                            <label htmlFor={`filter-${filter.name}-max`} className="sr-only">
+                              {filter.label} maximum
+                            </label>
+                            <Input
+                              id={`filter-${filter.name}-max`}
+                              data-testid={`filter-${filter.name}-max`}
+                              type="number"
+                              inputMode="decimal"
+                              placeholder="Max"
+                              className="h-9 text-ui"
+                              value={activeFilters[`${filter.name}__lte`] || ""}
+                              onChange={(e) => {
+                                setActiveFilters((prev) => ({ ...prev, [`${filter.name}__lte`]: e.target.value }));
+                                resetPage();
+                              }}
+                            />
+                          </div>
+                        </div>
                       ) : (
                         <Input
                           id={`filter-${filter.name}`}
                           data-testid={`filter-${filter.name}`}
                           placeholder={filter.label}
-                          className="h-9 text-sm"
+                          className="h-9 text-ui"
                           value={activeFilters[filter.name] || ""}
                           onChange={(e) => {
                             setActiveFilters((prev) => ({
@@ -772,17 +823,17 @@ export default function ModelListPage() {
             <div
               data-testid="bulk-toolbar"
               className={cn(
-                "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border px-4 py-3 text-[13px]",
+                "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border px-4 py-3 text-body",
                 hasSelection
                   ? "bg-primary/[0.06] border-primary/20 text-foreground"
-                  : "bg-muted/40 border-border/60 text-muted-foreground"
+                  : "bg-muted/40 border-border-subtle text-muted-foreground"
               )}
               aria-live="polite"
             >
               <div className="flex flex-wrap items-center gap-3">
                 <span className="font-medium">
                   {hasSelection
-                    ? `${selectedIds.length} selected`
+                    ? <span className="font-mono tabular-nums">{selectedIds.length} selected</span>
                     : "Select rows to enable bulk actions"}
                 </span>
                 <div className="h-4 w-px bg-border hidden sm:block" />
@@ -793,7 +844,7 @@ export default function ModelListPage() {
                       data-testid={`bulk-action-${action.name}`}
                       variant="ghost"
                       size="sm"
-                      className="h-8 px-3 text-xs font-medium"
+                      className="h-8 px-3 text-meta font-medium"
                       onClick={() => handleActionClick(action)}
                       disabled={!hasSelection || actionLoading}
                     >
@@ -811,7 +862,7 @@ export default function ModelListPage() {
                       variant="destructive"
                       size="sm"
                       className={cn(
-                        "h-8 px-3 text-xs font-medium gap-1.5",
+                        "h-8 px-3 text-meta font-medium gap-1.5",
                         !hasSelection && "opacity-50"
                       )}
                       onClick={() => setBulkDeleteConfirmOpen(true)}
@@ -822,7 +873,7 @@ export default function ModelListPage() {
                       ) : (
                         <Trash2 className="h-3 w-3" />
                       )}
-                      Delete ({selectedIds.length})
+                      Delete (<span className="font-mono tabular-nums">{selectedIds.length}</span>)
                     </Button>
                   )}
                 </div>
@@ -831,7 +882,7 @@ export default function ModelListPage() {
                 data-testid="bulk-cancel"
                 variant="ghost"
                 size="sm"
-                className="h-8 px-3 text-xs font-medium text-muted-foreground hover:text-foreground self-start sm:self-auto"
+                className="h-8 px-3 text-meta font-medium text-muted-foreground hover:text-foreground self-start sm:self-auto"
                 onClick={() => setSelectedIds([])}
                 disabled={!hasSelection}
               >
@@ -839,11 +890,14 @@ export default function ModelListPage() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-0 overflow-x-auto">
+          <CardContent
+            className="p-0 overflow-x-auto [background:linear-gradient(to_right,hsl(var(--surface-2))_30%,transparent),linear-gradient(to_right,transparent,hsl(var(--surface-2))_70%)_right,radial-gradient(farthest-side_at_0_50%,rgba(0,0,0,0.12),transparent),radial-gradient(farthest-side_at_100%_50%,rgba(0,0,0,0.12),transparent)_right] [background-repeat:no-repeat] [background-size:40px_100%,40px_100%,14px_100%,14px_100%] [background-attachment:local,local,scroll,scroll]"
+            style={{ ["--sticky-id-offset" as any]: "3rem" }}
+          >
             <Table className="tabular-nums">
               <TableHeader className="bg-muted/40 sticky top-0">
-                <TableRow className="hover:bg-transparent border-border/60">
-                  <TableHead className="w-[52px] pl-6 py-3">
+                <TableRow className="hover:bg-transparent border-border-subtle">
+                  <TableHead className="w-[52px] pl-6 py-3 sticky left-0 z-20 bg-surface-sunken">
                     <Checkbox
                       data-testid="select-all"
                       aria-label="Select all rows on this page"
@@ -854,7 +908,7 @@ export default function ModelListPage() {
                       onChange={(e) => handleSelectAll(e.target.checked)}
                     />
                   </TableHead>
-                  {displayFields.map((fieldName) => {
+                  {displayFields.map((fieldName, colIdx) => {
                     const field = fieldsByName.get(fieldName);
                     const active = sortField === fieldName;
                     return (
@@ -867,7 +921,11 @@ export default function ModelListPage() {
                               : "descending"
                             : "none"
                         }
-                        className="py-3 min-w-[140px]"
+                        className={cn(
+                          "py-3 min-w-[140px]",
+                          colIdx === 0 &&
+                            "sticky left-[var(--sticky-id-offset)] z-20 bg-surface-sunken"
+                        )}
                       >
                         <button
                           type="button"
@@ -875,7 +933,7 @@ export default function ModelListPage() {
                           onClick={() => handleToggleSort(fieldName)}
                           title={`Sort by ${field?.label || fieldName}`}
                           className={cn(
-                            "inline-flex items-center gap-1.5 rounded px-1 py-0.5 -ml-1 text-xs font-semibold",
+                            "inline-flex items-center gap-1.5 rounded px-1 py-0.5 -ml-1 text-meta font-semibold",
                             active
                               ? "text-foreground"
                               : "text-muted-foreground hover:text-foreground"
@@ -887,7 +945,7 @@ export default function ModelListPage() {
                       </TableHead>
                     );
                   })}
-                  <TableHead className="w-[110px] text-xs font-semibold text-muted-foreground text-right pr-6">
+                  <TableHead className="w-[110px] text-meta font-semibold text-muted-foreground text-right pr-6">
                     Actions
                   </TableHead>
                 </TableRow>
@@ -903,10 +961,10 @@ export default function ModelListPage() {
                         <Search className="h-10 w-10 opacity-20" />
                         {hasActiveSearchOrFilters ? (
                           <>
-                            <p className="text-sm font-medium text-foreground">
+                            <p className="text-ui font-medium text-foreground">
                               No results found
                             </p>
-                            <p className="text-xs">
+                            <p className="text-meta">
                               Try adjusting your search or filters.
                             </p>
                             <Button
@@ -921,7 +979,7 @@ export default function ModelListPage() {
                           </>
                         ) : (
                           <>
-                            <p className="text-sm font-medium text-foreground">
+                            <p className="text-ui font-medium text-foreground">
                               No {metadata.verbose_name_plural.toLowerCase()} yet
                             </p>
                             {metadata.permissions.add && (
@@ -941,16 +999,23 @@ export default function ModelListPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  objects.map((obj: any) => (
+                  objects.map((obj: any) => {
+                    const isSelected = selectedIds.includes(obj.id);
+                    return (
                     <ListItem
                       key={obj.id}
                       className={cn(
-                        "group hover:bg-muted/40 border-border/60 transition-colors",
-                        selectedIds.includes(obj.id) &&
+                        "group hover:bg-surface-sunken/60 border-border-subtle transition-colors",
+                        isSelected &&
                           "bg-primary/5 hover:bg-primary/10"
                       )}
                     >
-                      <TableCell className="pl-6 py-3">
+                      <TableCell
+                        className={cn(
+                          "pl-6 py-3 sticky left-0 z-20",
+                          isSelected ? "bg-inherit" : "bg-surface-2"
+                        )}
+                      >
                         <Checkbox
                           data-testid={`select-${obj.id}`}
                           aria-label={`Select row ${obj.id}`}
@@ -970,35 +1035,40 @@ export default function ModelListPage() {
                         const matchedChoice = field?.choices?.find(
                           (c) => String(c.value) === String(val)
                         );
+                        const relation = relationByField.get(fieldName);
+                        const isEmpty =
+                          val === null || val === undefined || val === "";
 
                         return (
                           <TableCell
                             key={fieldName}
-                            className="py-3 text-sm font-medium text-foreground/80"
+                            className={cn(
+                              "py-3 text-ui font-medium text-foreground/80",
+                              isPrimary &&
+                                "sticky left-[var(--sticky-id-offset)] z-20",
+                              isPrimary &&
+                                (isSelected ? "bg-inherit" : "bg-surface-2")
+                            )}
                           >
-                            {fieldName === "active" ||
-                            typeof val === "boolean" ? (
+                            {isEmpty ? (
+                              <EmptyValue />
+                            ) : fieldName === "active" ||
+                              typeof val === "boolean" ? (
                               val ? (
-                                <Badge
-                                  variant="outline"
-                                  className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1 text-[11px] font-medium"
-                                >
-                                  <CheckCircle className="h-3 w-3" /> Yes
-                                </Badge>
+                                <StatusBadge tone="success">
+                                  <CheckCircle className="h-3 w-3" aria-hidden /> Yes
+                                </StatusBadge>
                               ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 gap-1 text-[11px] font-medium"
-                                >
-                                  <XCircle className="h-3 w-3" /> No
-                                </Badge>
+                                <StatusBadge tone="danger">
+                                  <XCircle className="h-3 w-3" aria-hidden /> No
+                                </StatusBadge>
                               )
                             ) : matchedChoice ? (
-                              <Badge variant="secondary" className="text-xs font-normal">
+                              <StatusBadge tone="neutral">
                                 {matchedChoice.label}
-                              </Badge>
+                              </StatusBadge>
                             ) : isDate && val ? (
-                              <span className="font-mono text-xs text-muted-foreground">
+                              <span className="font-mono text-meta tabular-nums text-muted-foreground">
                                 {(() => {
                                   try {
                                     const d = new Date(val);
@@ -1014,6 +1084,24 @@ export default function ModelListPage() {
                                   }
                                 })()}
                               </span>
+                            ) : relation ? (
+                              <button
+                                type="button"
+                                data-testid={`fk-${fieldName}-${obj.id}`}
+                                onClick={() =>
+                                  navigate({
+                                    to: "/$model/$id/view",
+                                    params: {
+                                      model: relation.related_model,
+                                      id: String(val),
+                                    },
+                                  })
+                                }
+                                title={`View related ${relation.label ?? relation.related_model}`}
+                                className="font-mono text-meta tabular-nums text-muted-foreground transition-colors duration-fast ease-out hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+                              >
+                                #{String(val)}
+                              </button>
                             ) : isPrimary ? (
                               <button
                                 type="button"
@@ -1030,9 +1118,7 @@ export default function ModelListPage() {
                                 {val?.toString() || `#${obj.id}`}
                               </button>
                             ) : (
-                              val?.toString() || (
-                                <span className="opacity-30">—</span>
-                              )
+                              String(val)
                             )}
                           </TableCell>
                         );
@@ -1092,51 +1178,59 @@ export default function ModelListPage() {
                         </div>
                       </TableCell>
                     </ListItem>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>
           </CardContent>
-          <div className="px-6 py-4 bg-muted/30 border-t border-border/60 flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="px-6 py-4 bg-muted/30 border-t border-border-subtle flex flex-col lg:flex-row lg:items-center gap-4">
             <p
-              className="text-xs text-muted-foreground font-medium"
+              className="text-meta text-muted-foreground font-medium"
               data-testid="pagination-status"
               aria-live="polite"
             >
-              Showing <span className="text-foreground font-semibold">{from}–{to}</span>{" "}
-              of <span className="text-foreground font-semibold">{totalCount.toLocaleString()}</span>
+              Showing <span className="font-mono tabular-nums text-foreground font-semibold">{from}–{to}</span>{" "}
+              of <span className="font-mono tabular-nums text-foreground font-semibold">{totalCount.toLocaleString()}</span>
             </p>
             <div className="flex items-center gap-2 lg:ml-auto">
-              <label htmlFor="page-size-select" className="text-xs text-muted-foreground whitespace-nowrap">
+              <label htmlFor="page-size-select" className="text-meta text-muted-foreground whitespace-nowrap">
                 Rows per page
               </label>
-              <select
-                id="page-size-select"
-                data-testid="page-size-select"
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                value={effectivePageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
+              <Select
+                value={String(effectivePageSize)}
+                onValueChange={(v) => {
+                  setPageSize(Number(v));
                   resetPage();
                 }}
               >
-                {pageSizeOptions.map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger
+                  id="page-size-select"
+                  data-testid="page-size-select"
+                  aria-label="Rows per page"
+                  className="h-9 w-auto min-w-[80px] text-ui"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {pageSizeOptions.map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-xs text-muted-foreground font-medium mr-1">
-                Page <span className="text-foreground">{page}</span> of{" "}
-                <span className="text-foreground">{totalPages}</span>
+              <p className="text-meta text-muted-foreground font-medium mr-1">
+                Page <span className="font-mono tabular-nums text-foreground">{page}</span> of{" "}
+                <span className="font-mono tabular-nums text-foreground">{totalPages}</span>
               </p>
               <Button
                 variant="outline"
                 size="sm"
                 data-testid="pagination-prev"
-                className="h-9 px-4 text-[13px] font-medium"
+                className="h-9 px-4 text-body font-medium"
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page <= 1}
               >
@@ -1146,7 +1240,7 @@ export default function ModelListPage() {
                 variant="outline"
                 size="sm"
                 data-testid="pagination-next"
-                className="h-9 px-4 text-[13px] font-medium"
+                className="h-9 px-4 text-body font-medium"
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page >= totalPages}
               >
@@ -1166,7 +1260,7 @@ export default function ModelListPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <label htmlFor="save-view-name" className="text-sm font-medium">
+              <label htmlFor="save-view-name" className="text-ui font-medium">
                 View name
               </label>
               <Input

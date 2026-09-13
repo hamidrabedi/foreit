@@ -477,7 +477,17 @@ Sized for one delegate task and one PR each. Waves can run 2-3 PRs in parallel i
 
 **Wave 4: libraries**
 22. `log/slog` migration.
-23. Atlas spike for migration diffing (decision doc before code).
+23. Atlas spike for migration diffing (decision doc before code). Decision below.
+
+### Decision: keep the home-grown migration differ for now (Atlas not adopted)
+
+Measured on master (non-blank lines): `db/migrate/generate` 1346, `parse` 1252, `state` 674, `sql` 1505, `core` 306, `execute` 1936, `verify` 741. Applying files is already delegated to golang-migrate v4.
+
+- **What Atlas would replace:** the schema differ (`generate` detector) and the DDL writers (`sql`), about 2.8k lines. `state` and `parse` exist to rebuild the previous schema from migration files; Atlas replaces them by inspecting a dev database, which means migration generation needs a running dev database (Docker or a temporary SQLite file for SQLite).
+- **What it would not replace:** models → schema conversion (the forge-specific part, driven by codegen), `execute`/`verify` around golang-migrate, the CLI.
+- **Why not now:** Wave 0 fixed the concrete differ bugs (SQLite DDL, down SQL for drops, status, bookkeeping) with tests that execute the SQL; the remaining gap is table rebuilds for SQLite FK/constraint changes (flagged). Adopting Atlas adds a large dependency and a dev-database requirement to `makemigrations`, and changes generated file contents for every user. That is a product decision with a migration story, not a refactor.
+- **When to revisit:** if SQLite table-rebuild support, MySQL, or data-preserving column type changes are required. Spike then: generate forge's `ModelDefinition` → Atlas `schema.Realm`, diff with Atlas against the realm rebuilt from existing migrations, compare output on `tests/integration/migrate` fixtures.
+- **Owner decision needed:** none now; flagged for the roadmap.
 
 ---
 

@@ -9,6 +9,7 @@ import {
   adminKeys,
 } from "../api/hooks/adminHooks";
 import { adminAPI } from "../api/client";
+import { parseApiError } from "../api/errors";
 import { Button } from "../components/ui/button";
 import { Card, CardContent } from "../components/ui/card";
 import { Loader2, Save } from "lucide-react";
@@ -38,6 +39,7 @@ export default function ModelFormPage({ mode }: ModelFormPageProps) {
   const { toast } = useToast();
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+  const [formErrors, setFormErrors] = useState<string[]>([]);
   const [inlineData, setInlineData] = useState<Record<string, any[]>>({});
   const [showExitDialog, setShowExitDialog] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -90,6 +92,23 @@ export default function ModelFormPage({ mode }: ModelFormPageProps) {
       ),
     [metadata?.relations]
   );
+
+  const displayedFormErrors = useMemo(() => {
+    const errors = [...formErrors];
+    const renderedFieldNames = new Set(
+      metadata?.fields
+        ?.filter((f) => !(f.name === "id" || (f.read_only && mode === "create")))
+        ?.map((f) => f.name) ?? []
+    );
+    for (const [key, msgs] of Object.entries(fieldErrors)) {
+      if (!renderedFieldNames.has(key)) {
+        for (const msg of msgs) {
+          errors.push(`${key}: ${msg}`);
+        }
+      }
+    }
+    return errors;
+  }, [formErrors, fieldErrors, metadata?.fields, mode]);
 
   const inlineMetadataQueries = useQueries({
     queries: inlineRelationDetails.map((detail) => ({
@@ -226,6 +245,7 @@ export default function ModelFormPage({ mode }: ModelFormPageProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFieldErrors({});
+    setFormErrors([]);
     if (!validateJsonFields()) return;
 
     try {
@@ -250,19 +270,17 @@ export default function ModelFormPage({ mode }: ModelFormPageProps) {
       }
       setHasUnsavedChanges(false);
       navigate({ to: "/$model", params: { model: modelName } });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Failed to save:", error);
-      const errorData = error.response?.data;
-      const errorMsg =
-        errorData?.message || "Failed to save changes. Please try again.";
-
-      if (errorData?.details) {
-        setFieldErrors(errorData.details);
-      }
-
+      const info = parseApiError(
+        error,
+        "Failed to save changes. Please try again."
+      );
+      setFieldErrors(info.fieldErrors);
+      setFormErrors(info.formErrors);
       toast({
-        title: "Error",
-        description: errorMsg,
+        title: "Could not save",
+        description: info.message,
         variant: "destructive",
       });
     }
@@ -392,6 +410,20 @@ export default function ModelFormPage({ mode }: ModelFormPageProps) {
         <Card className="overflow-hidden max-w-4xl mx-auto">
           <CardContent className="p-4 sm:p-8">
             <form ref={formRef} onSubmit={handleSubmit} className="space-y-8">
+              {displayedFormErrors.length > 0 && (
+                <div
+                  role="alert"
+                  data-testid="form-errors"
+                  className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-ui text-destructive"
+                >
+                  <ul className="list-disc pl-5 space-y-1">
+                    {displayedFormErrors.map((m) => (
+                      <li key={m}>{m}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               {FormBody ? (
                 // eslint-disable-next-line react-hooks/static-components -- useUIComponent returns a stable registry ref
                 <FormBody

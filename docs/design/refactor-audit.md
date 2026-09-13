@@ -33,6 +33,8 @@ Every item below was re-verified on current master before its task prompt was wr
 | #223 | W0-7a Migration status and bookkeeping | B34, B38 | status merges only real versions (no 1..N loop); generator no longer creates/drops golang-migrate's `schema_migrations` | merged |
 | #224 | W0-7b SQLite migration DDL | B31, B33 | foreign keys of new tables inlined into CREATE TABLE; drop column / add-column rollback emit `DROP COLUMN`; unsupported FK/constraint drops return errors instead of comments; tests run the SQL on SQLite | merged |
 | #225 | W0-8 ORM write columns and PK | B5, B6 | `Update`/`Increment`/`Decrement` map fields to db columns (case-insensitive, unknown → error); `Create` uses the schema PK column; non-integer PK → NotImplemented | in review |
+| #226 | Naming: ticket-named tests | A1c #8 | `w0_*_test.go` and `TestW0_*` renamed after behaviour; `orm/w0_orm_test.go` split in three; no logic changed | in review |
+| #227 | W0-7c Down SQL for drops | B32 | `DropTable`/`DropColumn` carry previous definitions; down SQL re-creates them (PostgreSQL and SQLite) instead of aborting generation | in review |
 
 ## Removal log
 
@@ -56,7 +58,6 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 | `admin/api/rest/router.go:81-91` | CORS echoes every origin with credentials (not exploitable today: bearer tokens only) | origin allow-list from config | B12 |
 | `admin/history_manager.go` | lazy init race; history is in memory only | init in constructor; persistence is a feature decision | B26 |
 | Migrations on SQLite | dropping or adding a foreign key/constraint on an existing table now errors (needs a table rebuild) | table-rebuild recipe | B33 (rest fixed in #224) |
-| Migration generation | removing a model or field aborts `makemigrations` (down SQL has no previous definition) | carry previous definitions (W0-7c, in progress) | B32 |
 | ORM | cannot run inside a transaction | `DBTX` interface | D12 (B5, B6 in #225) |
 | Migration down SQL | a re-created table (rollback of a drop) does not restore its foreign keys | include FKs when rebuilding | new |
 | `identity` | "user not found" still defined separately in `service/user.go`, `backends/registry.go`, `backends/token.go` | reuse `repository.ErrUserNotFound` | new |
@@ -65,9 +66,9 @@ Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up v
 
 ## Next
 
-1. W0-7c (in progress): down SQL for dropped columns and tables (B32); today removing any model or field makes migration generation fail.
-2. Naming PR (in progress): rename the ticket-named tests from #217/#220 (`w0_*_test.go`, `TestW0_*`).
-3. Wave 1 dead code, Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
+Wave 0 (critical bugs) is complete: all slices are merged or in review.
+
+1. Wave 1 dead code, Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
 4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
 4. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 

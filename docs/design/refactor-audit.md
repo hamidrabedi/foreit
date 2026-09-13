@@ -35,6 +35,7 @@ Every item below was re-verified on current master before its task prompt was wr
 | #225 | W0-8 ORM write columns and PK | B5, B6 | `Update`/`Increment`/`Decrement` map fields to db columns (case-insensitive, unknown → error); `Create` uses the schema PK column; non-integer PK → NotImplemented | in review |
 | #226 | Naming: ticket-named tests | A1c #8 | `w0_*_test.go` and `TestW0_*` renamed after behaviour; `orm/w0_orm_test.go` split in three; no logic changed | in review |
 | #227 | W0-7c Down SQL for drops | B32 | `DropTable`/`DropColumn` carry previous definitions; down SQL re-creates them (PostgreSQL and SQLite) instead of aborting generation | in review |
+| #228 | Wave 1a: unreachable packages | §4 | removed `cli/internal`, `filter/widgets`, `db/migrate/dependencies` (see removal log) | in review |
 
 ## Removal log
 
@@ -47,6 +48,9 @@ Only code that was unreachable, a no-op pretending to work, or harmful. No worki
 | #220 | `db/migrate/generate`: `SquashMigrations` body, `getMigrationsInRange`, `MigrationFile` | squash produced a duplicate migration that would re-apply every statement |
 | #223 | `db/migrate/generate`: `generateBookkeepingTable` and the first-migration bookkeeping block | created a conflicting `schema_migrations` table and dropped golang-migrate's table on full rollback |
 | #217 | stale `// For MVP` comments in set operations | comments described behaviour that did not exist |
+| #228 | `cli/internal` (discovery, flags, output, helpers) | `internal` package no cli code imports: unreachable for any code or user |
+| #228 | `filter/widgets` (autosuggest, SQL preview) | no importers; rendered unescaped values into HTML and `<script>` (XSS, B14) |
+| #228 | `db/migrate/dependencies` (`Resolver`) | no importers; duplicate of `generate.DependencyDetector`, which the generator uses |
 
 ## Flagged for the owner (kept: works, but has a problem)
 
@@ -62,13 +66,26 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 | Migration down SQL | a re-created table (rollback of a drop) does not restore its foreign keys | include FKs when rebuilding | new |
 | `identity` | "user not found" still defined separately in `service/user.go`, `backends/registry.go`, `backends/token.go` | reuse `repository.ErrUserNotFound` | new |
 
+Packages that **nothing imports** but that work, re-checked on master after Wave 0 (kept; decide wire-up, merge or removal):
+
+| Package | State | Recommendation |
+|---|---|---|
+| `filter/filters` | 8 complete filter types (choice, date, number, boolean, range, lookup, char, model choice); no tests | wire into admin/API filtering with tests, or remove |
+| `api/serializers` | typed serializer with tests; linked from docs-site `api/serializers` | merge with `identity/serializers` (Wave 2) |
+| `api/versioning` | URL/header/query version detection works; every `Reverse()` returns `""` | wire into the router and implement `Reverse`, docs-site already has a page |
+| `api/caching` | thread-safe TTL memory cache with tests; one of five cache types | merge caches (Wave 2) |
+| `log/hooks` + `log/hooks.go` | filter/metrics/sampling hooks and `HookCore` work, but the logger never installs a `HookRegistry` | add a logger option to install hooks, or remove |
+| `admin/utils` | errors, formatting, reflection helpers, flash messages; tests | merge into `admin/core` (Wave 2) |
+| `admin/codegen` | admin file generator, declares `package generator`, no CLI command calls it | expose as a CLI command or remove |
+
 Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up vs removal): API ordering filter (B21) and search filter (B22) — `GetFilterBackends()` has no caller; multipart parser (B16) — no code calls a parser's `Parse`; `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops, no implementers, global `RegisterPlugin` unused).
 
 ## Next
 
 Wave 0 (critical bugs) is complete: all slices are merged or in review.
 
-1. Wave 1 dead code, Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
+1. Wave 1 dead code: 1a (#228) removed the three unreachable packages; the other unimported packages work and are flagged above. Next: function-level pruning inside live packages (`schema`, `registry`, `validate`, `filter`, `api/errors`), verified with `deadcode -test` plus grep of cli templates and docs-site, since plain `deadcode ./...` on a library reports public API as dead.
+2. Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
 4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
 4. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 

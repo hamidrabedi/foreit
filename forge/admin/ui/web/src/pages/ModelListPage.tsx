@@ -46,8 +46,6 @@ import {
   Eye,
   Trash2,
   Filter,
-  CheckCircle,
-  XCircle,
   Download,
   FileSpreadsheet,
   FileCode,
@@ -65,11 +63,10 @@ import { cn } from "../lib/utils";
 import { useToast } from "../hooks/use-toast";
 import { ConfirmationDialog } from "../components/ui/confirmation-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { EmptyValue } from "../components/ui/empty-state";
-import { StatusBadge } from "../components/ui/status-badge";
 import { PageHeader } from "../components/ui/page-header";
 import { ListFilterPanel } from "../components/list/ListFilterPanel";
 import { ListBulkToolbar } from "../components/list/ListBulkToolbar";
+import { ListCell } from "../components/list/ListCell";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -804,106 +801,20 @@ export default function ModelListPage() {
                           onChange={() => toggleSelect(obj.id)}
                         />
                       </TableCell>
-                      {displayFields.map((fieldName, colIdx) => {
-                        const field = fieldsByName.get(fieldName);
-                        const val = obj[fieldName];
-                        const isPrimary = colIdx === 0;
-                        const isDate =
-                          field?.type === "date" ||
-                          field?.type === "datetime" ||
-                          fieldName.endsWith("_at") ||
-                          fieldName.endsWith("_date");
-                        const matchedChoice = field?.choices?.find(
-                          (c) => String(c.value) === String(val)
-                        );
-                        const relation = relationByField.get(fieldName);
-                        const isEmpty =
-                          val === null || val === undefined || val === "";
-
-                        return (
-                          <TableCell
-                            key={fieldName}
-                            className={cn(
-                              "py-3 text-ui font-medium text-foreground/80",
-                              isPrimary &&
-                                "sticky left-[var(--sticky-id-offset)] z-20",
-                              isPrimary &&
-                                (isSelected ? "bg-inherit" : "bg-surface-2")
-                            )}
-                          >
-                            {isEmpty ? (
-                              <EmptyValue />
-                            ) : fieldName === "active" ||
-                              typeof val === "boolean" ? (
-                              val ? (
-                                <StatusBadge tone="success">
-                                  <CheckCircle className="h-3 w-3" aria-hidden /> Yes
-                                </StatusBadge>
-                              ) : (
-                                <StatusBadge tone="danger">
-                                  <XCircle className="h-3 w-3" aria-hidden /> No
-                                </StatusBadge>
-                              )
-                            ) : matchedChoice ? (
-                              <StatusBadge tone="neutral">
-                                {matchedChoice.label}
-                              </StatusBadge>
-                            ) : isDate && val ? (
-                              <span className="font-mono text-meta tabular-nums text-muted-foreground">
-                                {(() => {
-                                  try {
-                                    const d = new Date(val);
-                                    return isNaN(d.getTime())
-                                      ? String(val)
-                                      : d.toLocaleDateString(undefined, {
-                                          month: "short",
-                                          day: "numeric",
-                                          year: "numeric",
-                                        });
-                                  } catch {
-                                    return String(val);
-                                  }
-                                })()}
-                              </span>
-                            ) : relation ? (
-                              <button
-                                type="button"
-                                data-testid={`fk-${fieldName}-${obj.id}`}
-                                onClick={() =>
-                                  navigate({
-                                    to: "/$model/$id/view",
-                                    params: {
-                                      model: relation.related_model,
-                                      id: String(val),
-                                    },
-                                  })
-                                }
-                                title={`View related ${relation.label ?? relation.related_model}`}
-                                className="font-mono text-meta tabular-nums text-muted-foreground transition-colors duration-fast ease-out hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
-                              >
-                                #{String(val)}
-                              </button>
-                            ) : isPrimary ? (
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  navigate({
-                                    to: metadata.permissions.view
-                                      ? "/$model/$id/view"
-                                      : "/$model/$id",
-                                    params: { model: modelName, id: obj.id },
-                                  })
-                                }
-                                className="font-semibold text-foreground hover:text-primary hover:underline transition-colors text-left rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              >
-                                {val?.toString() || `#${obj.id}`}
-                              </button>
-                            ) : (
-                              String(val)
-                            )}
-                          </TableCell>
-                        );
-                      })}
+                      {displayFields.map((fieldName, colIdx) => (
+                        <ListCell
+                          key={fieldName}
+                          fieldName={fieldName}
+                          colIdx={colIdx}
+                          obj={obj}
+                          field={fieldsByName.get(fieldName)}
+                          relation={relationByField.get(fieldName)}
+                          navigate={navigate}
+                          isSelected={isSelected}
+                          metadata={metadata}
+                          modelName={modelName}
+                        />
+                      ))}
                       <TableCell className="text-right pr-4">
                         <div className="flex justify-end gap-1 opacity-100 focus-within:opacity-100 lg:opacity-0 lg:group-hover:opacity-100 lg:group-focus-within:opacity-100 transition-opacity">
                           {metadata.permissions.view && (

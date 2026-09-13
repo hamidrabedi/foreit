@@ -8,6 +8,7 @@ import type { ModelListMetadata, SearchResultGroup } from "../../api/types";
 import { adminAPI } from "../../api/client";
 import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import { cn } from "../../lib/utils";
+import { stripAdminPrefix } from "../../lib/admin-prefix";
 
 type GlobalSearchProps = {
   models?: ModelListMetadata[];
@@ -161,7 +162,7 @@ export function GlobalSearch({
 
   const handleSelectRecord = React.useCallback(
     (url: string) => {
-      const to = url.startsWith("/admin") ? url.replace("/admin", "") || "/" : url;
+      const to = stripAdminPrefix(url) || "/";
       navigate({ to } as any);
       closePalette();
     },

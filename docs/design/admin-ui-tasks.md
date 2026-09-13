@@ -71,8 +71,8 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P5 addendum
 | # | Task | Files | Status |
 |---|---|---|---|
-| 4.2b | FK cells show backend `display` labels (relation name → id → label) with muted `#id`, fallback `#id` | `ListCell.tsx`, `ModelListPage.tsx`, `api/types.ts` | dispatched (agy) — needs PR #208 E2a |
-| 5.6 | Admin UI under any mount prefix (`src/lib/admin-prefix.ts`, `renderBuiltUrl`) — after backend F1 | see `tasks/t5.6.md` | spec ready |
+| 4.2b | FK cells show backend `display` labels (relation name → id → label) with muted `#id`, fallback `#id` | `ListCell.tsx`, `ModelListPage.tsx`, `api/types.ts` | verified — 54 tests; backend on PR #208 |
+| 5.6 | Admin UI under any mount prefix: `src/lib/admin-prefix.ts` (meta tag from server, default `/admin`) drives router basepath, API base, 401 redirect, search/nav/shortcuts; `experimental.renderBuiltUrl` routes JS asset URLs through `window.__forgeAssetUrl` | `src/lib/admin-prefix.ts`, `main.tsx`, `api/client.ts`, `vite.config.ts`, layout | implemented — gate + sweep running; server half PR #209 |
 | 5.7 | Remove dead notifications UI (`useNotifications` has no callers; hub never mounted) | `TopBar.tsx`, `hooks/useNotifications.ts` | spec ready |
 | 5.5 | React Query v5 `onSuccess(data, variables, onMutateResult, context)`: `useUpdateObject` forwarded 3 args, so callers got the onMutate result as context. Now forwards 4, with a hook test | `src/api/hooks/adminHooks.ts` | verified |
 | 5.4 | Backend validation errors were discarded: UI read `data.details`, API sends `data.error.details`. `parseApiError` (`src/api/errors.ts`, 10 tests) + form-level `role=alert` banner for `non_field_errors` | `src/api/errors.ts`, `ModelUpsertPage.tsx` | verified |

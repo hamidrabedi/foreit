@@ -8,6 +8,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Keyboard } from "lucide-react";
+import {
+  getAdminPrefix,
+  stripAdminPrefix,
+  withAdminPrefix,
+} from "@/lib/admin-prefix";
 
 export interface KeyboardShortcut {
   key: string;
@@ -128,8 +133,13 @@ export function useAdminShortcuts() {
       shift: true,
       action: () => {
         const path = window.location.pathname;
+        const prefix = getAdminPrefix();
+        const isInsideAdmin =
+          stripAdminPrefix(path, prefix) !== path ||
+          path === withAdminPrefix("/", prefix) ||
+          prefix === "";
         // Never hijack the browser's new-window shortcut outside the admin.
-        if (!path.startsWith("/admin") && path !== "/") return;
+        if (!isInsideAdmin) return;
         if (!path.includes("/create")) {
           navigate({ to: `${path}/create` });
         }

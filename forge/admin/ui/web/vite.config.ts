@@ -21,6 +21,14 @@ export default defineConfig({
     },
   },
   base: "/admin/",
+  experimental: {
+    renderBuiltUrl(filename, { hostType }) {
+      if (hostType === "js") {
+        return { runtime: `window.__forgeAssetUrl(${JSON.stringify(filename)})` };
+      }
+      return { relative: false };   // html/css keep the "/admin/" base (server rewrites html)
+    },
+  },
   build: {
     outDir: "../dist",
     emptyOutDir: true,

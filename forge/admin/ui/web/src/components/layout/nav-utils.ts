@@ -1,5 +1,7 @@
+import { stripAdminPrefix } from "../../lib/admin-prefix";
+
 export const normalizeAdminPath = (path?: string) =>
-  path?.startsWith("/admin/") ? path.substring(6) : path;
+  path ? stripAdminPrefix(path) : path;
 
 export const isEntryMatch = (entry: any, pathname: string): boolean => {
   const normalizedPath = normalizeAdminPath(entry.path);

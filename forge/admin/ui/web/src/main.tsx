@@ -1,3 +1,4 @@
+import "./lib/admin-prefix";
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
@@ -17,11 +18,12 @@ bootstrapAdmin();
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen';
+import { getAdminPrefix } from './lib/admin-prefix';
 
 // Create a new router instance
 const router = createRouter({ 
   routeTree,
-  basepath: '/admin' 
+  basepath: getAdminPrefix() || '/' 
 });
 
 // Register the router instance for type safety

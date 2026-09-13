@@ -56,7 +56,6 @@ import {
   ArrowDown,
   ArrowUpDown,
   X,
-  Zap,
 } from "lucide-react";
 import { useState, useMemo } from "react";
 import AdminLayout from "../components/layout/AdminLayout";
@@ -70,6 +69,7 @@ import { EmptyValue } from "../components/ui/empty-state";
 import { StatusBadge } from "../components/ui/status-badge";
 import { PageHeader } from "../components/ui/page-header";
 import { ListFilterPanel } from "../components/list/ListFilterPanel";
+import { ListBulkToolbar } from "../components/list/ListBulkToolbar";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
@@ -659,75 +659,17 @@ export default function ModelListPage() {
               />
             )}
 
-            <div
-              data-testid="bulk-toolbar"
-              className={cn(
-                "flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border px-4 py-3 text-body",
-                hasSelection
-                  ? "bg-primary/[0.06] border-primary/20 text-foreground"
-                  : "bg-muted/40 border-border-subtle text-muted-foreground"
-              )}
-              aria-live="polite"
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-medium">
-                  {hasSelection
-                    ? <span className="font-mono tabular-nums">{selectedIds.length} selected</span>
-                    : "Select rows to enable bulk actions"}
-                </span>
-                <div className="h-4 w-px bg-border hidden sm:block" />
-                <div className="flex flex-wrap items-center gap-2">
-                  {metadata.actions.map((action) => (
-                    <Button
-                      key={action.name}
-                      data-testid={`bulk-action-${action.name}`}
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-3 text-meta font-medium"
-                      onClick={() => handleActionClick(action)}
-                      disabled={!hasSelection || actionLoading}
-                    >
-                      {actionLoading ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-2" />
-                      ) : (
-                        <Zap className="h-3 w-3 mr-2 text-muted-foreground" />
-                      )}
-                      {action.label}
-                    </Button>
-                  ))}
-                  {metadata.permissions.delete && (
-                    <Button
-                      data-testid="bulk-delete-button"
-                      variant="destructive"
-                      size="sm"
-                      className={cn(
-                        "h-8 px-3 text-meta font-medium gap-1.5",
-                        !hasSelection && "opacity-50"
-                      )}
-                      onClick={() => setBulkDeleteConfirmOpen(true)}
-                      disabled={!hasSelection || bulkDeleteMutation.isPending}
-                    >
-                      {bulkDeleteMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-3 w-3" />
-                      )}
-                      Delete (<span className="font-mono tabular-nums">{selectedIds.length}</span>)
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <Button
-                data-testid="bulk-cancel"
-                variant="ghost"
-                size="sm"
-                className="h-8 px-3 text-meta font-medium text-muted-foreground hover:text-foreground self-start sm:self-auto"
-                onClick={() => setSelectedIds([])}
-                disabled={!hasSelection}
-              >
-                Clear selection
-              </Button>
-            </div>
+            <ListBulkToolbar
+              hasSelection={hasSelection}
+              selectedIds={selectedIds}
+              setSelectedIds={setSelectedIds}
+              actions={metadata.actions}
+              permissions={metadata.permissions}
+              handleActionClick={handleActionClick}
+              actionLoading={actionLoading}
+              setBulkDeleteConfirmOpen={setBulkDeleteConfirmOpen}
+              bulkDeletePending={bulkDeleteMutation.isPending}
+            />
           </CardHeader>
           <CardContent
             className="p-0 overflow-x-auto [background:linear-gradient(to_right,hsl(var(--surface-2))_30%,transparent),linear-gradient(to_right,transparent,hsl(var(--surface-2))_70%)_right,radial-gradient(farthest-side_at_0_50%,rgba(0,0,0,0.12),transparent),radial-gradient(farthest-side_at_100%_50%,rgba(0,0,0,0.12),transparent)_right] [background-repeat:no-repeat] [background-size:40px_100%,40px_100%,14px_100%,14px_100%] [background-attachment:local,local,scroll,scroll]"

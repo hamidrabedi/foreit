@@ -1,8 +1,6 @@
 package generate
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -366,12 +364,6 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     checksum TEXT,
     applied_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );`
-}
-
-// calculateChecksum calculates SHA256 checksum of SQL
-func calculateChecksum(sql string) string {
-	hash := sha256.Sum256([]byte(sql))
-	return hex.EncodeToString(hash[:])
 }
 
 // getTableNameFromDef gets the table name from a model definition (helper)

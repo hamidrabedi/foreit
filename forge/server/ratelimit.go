@@ -87,11 +87,6 @@ func (s *rateLimitStore) cleanupExpired() {
 	}
 }
 
-// stop stops the cleanup ticker
-func (s *rateLimitStore) stop() {
-	s.cleanup.Stop()
-}
-
 // global stores for different rate limit types
 var (
 	ipRateLimitStores   = make(map[string]*rateLimitStore)

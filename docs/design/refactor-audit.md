@@ -24,10 +24,10 @@ Every item below was re-verified on current master before its task prompt was wr
 | #214 | CI hygiene | G2 | staticcheck pinned and blocking; gofmt gate; one-time gofmt | merged |
 | #215 | ORM to-many filters | C3c, B15 | to-many filters use a pk subquery (no duplicate rows); `GetModelSchemaByType` builds schemas | merged |
 | #216 | This audit | — | audit, playbook, raw tool output | in review |
-| #217 | W0-1 ORM | B2, B35, B37, Aggregate stub | `Union`/`Intersection`/`Difference`/`Aggregate` return NotImplemented; unordered `First`/`Last` order by PK; `UpdateBuilder.Set(nil)` no longer panics | in review |
-| #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | in review |
+| #217 | W0-1 ORM | B2, B35, B37, Aggregate stub | `Union`/`Intersection`/`Difference`/`Aggregate` return NotImplemented; unordered `First`/`Last` order by PK; `UpdateBuilder.Set(nil)` no longer panics | merged |
+| #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | merged |
 | #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | in review |
-| #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | in review |
+| #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | merged |
 
 ## Removal log
 
@@ -62,8 +62,8 @@ Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up v
 
 ## Next
 
-1. W0-5: B17 (`null` panic) and B23 (pagination links), both live.
-2. W0-6: B19/B20 (owner/admin permission lookups), B24 (admin login via identity), B25 (unknown token).
+1. W0-5 (in progress): B17 (`null` panic) and B23 (pagination links), both live.
+2. W0-6 (in progress): B19/B20 (owner/admin permission lookups), B25 (unknown token). B24 (admin login only via env credentials) stays flagged for an owner decision.
 3. W0-7: migrations B31-B34, B38.
 4. W0-8: ORM/config B5, B6, B36.
 5. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
@@ -110,6 +110,56 @@ Raw tool output lives next to this file in `audit/`: `deadcode-forge-tests.txt` 
 7. **Table-driven tests** that assert behaviour (results, errors, SQL).
 8. **Match surrounding style**, gofmt, no new dependencies unless named.
 9. **Delegates never run git**; Claude verifies the diff, runs the gates, commits and opens the PR. At most 3 delegates at once, on disjoint packages.
+10. **Names follow §A1c.** New files and tests are named after the behaviour, never after tickets or waves.
+
+## A1c. Naming conventions (every file, package, identifier and folder)
+
+Sources: Effective Go, Go Code Review Comments, the Go blog "Package names", the Uber Go style guide, and the TypeScript/React conventions the admin UI already uses. New code follows these rules. Existing violations are fixed in dedicated rename PRs (§ "Naming violations found" below), never mixed into behaviour changes.
+
+**Go packages and folders**
+1. Package name equals the directory name: lower case, one word, no underscores or mixedCaps. `validate/` holds `package validate`, not `package validation`.
+2. Name packages after what they provide, never `core`, `utils`, `helpers`, `common`, `base` or `misc`.
+3. No stutter. Callers write `pkg.Name`, so the name must not repeat the package: `state.Manager`, not `state.StateManager`.
+4. One import path, one name. Use an alias only for a real collision, and then the same alias everywhere.
+5. Test-only helpers live in one `internal/testutil` (singular) per module.
+
+**Go files**
+6. Lower-case `snake_case.go`, named after the main type or concern (`pagination.go`, `password_backend.go`). No `_enhanced`, `_integrated`, `_impl`, `_new`, `_v2` or `_old` suffixes: if two versions exist, one of them must go.
+7. `_helpers.go` / `_utils.go` only as a last resort, for a few unexported helpers of one type. Prefer naming the concern (`column_resolution.go`).
+8. Test files mirror the file under test (`pagination.go` → `pagination_test.go`) or name the behaviour (`password_enumeration_test.go`). Never name files or tests after tickets or waves (`w0_orm_test.go`, `TestW0_...`).
+
+**Go identifiers**
+9. `MixedCaps`; export only what is used outside the package.
+10. Initialisms keep one case: `ID`, `URL`, `HTTP`, `JSON`, `SQL`, `API` (`userID`, `ParseURL`; not `UserId`, `ParseUrl`).
+11. Short names for short scopes (`i`, `r`, `w`, `ctx`), descriptive names for package-level identifiers. No type suffixes (`nameStr`, `userMap`) and no names like `valueValue`.
+12. Constructors are `New` or `NewThing`; `MustThing` panics. Getters have no `Get` prefix (`Owner()`); setters are `SetOwner`.
+13. One-method interfaces end in `-er` (`Authenticator`, `Renderer`). No `I` prefix, no `Interface` suffix.
+14. Sentinel errors are `ErrThing`, error types are `ThingError`. Messages are lower case with no trailing punctuation.
+15. Booleans read as questions (`isActive`, `hasNext`, `canHoldNil`). Receivers are one or two letters, consistent per type, never `this` or `self`.
+16. Tests are named `TestType_Method_Condition`, or use `t.Run` subtests with descriptive names.
+
+**Data, API and CLI**
+17. Database tables and columns are `snake_case`, tables plural (`order_items`). Foreign-key columns are `<singular>_id`, indexes `idx_<table>_<columns>`, foreign-key constraints `fk_<table>_<column>`.
+18. Migration files are `NNNNNN_verb_object.up.sql` / `.down.sql` (`000012_add_status_to_orders`).
+19. JSON fields and query parameters are `snake_case` (`page_size`, `is_staff`).
+20. Environment variables are `FORGE_UPPER_SNAKE_CASE`. CLI commands and flags are `kebab-case`.
+
+**Admin UI (TypeScript/React)**
+21. Components and their files are `PascalCase.tsx`, hooks `useThing.ts`, other modules `kebab-case.ts`, folders `kebab-case`. Types and interfaces are `PascalCase` with no `I` prefix; constants are `UPPER_SNAKE_CASE`.
+
+### Naming violations found (V, scanned on master 135e46c)
+
+| Rule | Violation | Fix (rename PR) |
+|---|---|---|
+| 1 | `forge/codegen` declares `package generator`; `forge/validate` declares `package validation` (so callers write `generator "…/codegen"`, `validation "…/validate"`) | rename packages to `codegen` / `validate` |
+| 2 | five `core` packages: `admin/core`, `api/core`, `cli/core`, `cli/commands/core`, `db/migrate/core`; `utils` in `forge/utils`, `admin/utils`, `identity/utils` | name by purpose (e.g. `admin/modeladmin`, `db/migrate/change`, `identity/password`) |
+| 3 | `validation.ValidationError(s)`, `state.StateManager`, `parse.ParseError`, `identity.IdentitySystem`, `versioning.VersioningList`, `filter.FilterNode`/`FilterOp`/`FilterMetadata`, `server.ServerInfoHandler` | drop the repeated package word |
+| 4 | `forge/server` imported as `forgehttp` (12 files) and `httplib` (2); `forge/admin` imported as `admincore` | one canonical name |
+| 5 | test helpers in `internal/testutils`, `identity/testutils`, `tests/helpers`, `tests/testhelpers` | one `internal/testutil` per module |
+| 6 | `api/viewset_enhanced.go`, `api/viewset_enhanced_integrated.go`, `api/router_enhanced.go`, `db/migrate/migrate_impl.go` | resolved by the viewset merge (§5) and facade removal |
+| 7 | `orm/manager_helpers.go`, `orm/update_helpers.go`, `orm/update_builder_helpers.go`, `orm/field_helpers.go` | name by concern when those files are split |
+| 8 | wave-named tests from this refactor: `orm/w0_orm_test.go` (#217), `*/w0_not_implemented_test.go` (#220), `TestW0_*` | rename in the first naming PR |
+| 11 | `valueValue` in `api/viewset.go` `setFieldValue` | rename with the decoding cleanup |
 
 ## A2. What to look for (reviewer checklist)
 

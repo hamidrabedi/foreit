@@ -6,8 +6,13 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
+	"github.com/forgego/forge/api/authentication"
+	"github.com/forgego/forge/api/exceptions"
+	"github.com/forgego/forge/api/permissions"
+	"github.com/forgego/forge/api/throttling"
 	"github.com/forgego/forge/orm"
 	forgehttp "github.com/forgego/forge/server"
 )
@@ -49,9 +54,15 @@ type ManagerInterface interface {
 
 // BaseViewSet provides common viewset functionality
 type BaseViewSet struct {
-	Serializer func() Serializer
-	Queryset   interface{} // This would be a QuerySet in real implementation
-	Model      interface{}
+	Serializer     func() Serializer
+	Queryset       interface{} // This would be a QuerySet in real implementation
+	Model          interface{}
+	Authentication []authentication.Authentication
+	Permissions    []permissions.Permission
+	Throttles      []throttling.Throttle
+
+	actionMu sync.RWMutex
+	action   string
 }
 
 // NewBaseViewSet creates a new base viewset
@@ -76,18 +87,105 @@ func (vs *BaseViewSet) getManager() reflect.Value {
 		}
 	}
 
-	// Fallback to finding manager from model instance
-	// This creates a new instance of the model type to search for manager
-	modelType := reflect.TypeOf(vs.Model)
-	if modelType.Kind() == reflect.Ptr {
-		modelType = modelType.Elem()
+	return reflect.Value{}
+}
+
+// GetAction returns the current action name for permission checks.
+func (vs *BaseViewSet) GetAction() string {
+	vs.actionMu.RLock()
+	defer vs.actionMu.RUnlock()
+	return vs.action
+}
+
+// SetAction sets the current action name for permission checks.
+func (vs *BaseViewSet) SetAction(action string) {
+	vs.actionMu.Lock()
+	defer vs.actionMu.Unlock()
+	vs.action = action
+}
+
+func (vs *BaseViewSet) authenticateRequest(r *http.Request) error {
+	result, err := authentication.AuthenticateRequest(r, vs.Authentication)
+	if err != nil {
+		return exceptions.NewAuthenticationFailed(err.Error())
 	}
-	instance := reflect.New(modelType).Interface()
-	return getManagerFromModel(instance)
+	if result == nil {
+		return nil
+	}
+	authentication.SetUserOnRequest(r, result.User)
+	authentication.SetAuthOnRequest(r, result.Auth)
+	return nil
+}
+
+func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
+	if permissions.CheckPermissions(r, vs, vs.Permissions) {
+		return nil
+	}
+	for _, permission := range vs.Permissions {
+		if !permission.HasPermission(r, vs) {
+			return exceptions.NewPermissionDenied(permission.GetMessage())
+		}
+	}
+	return exceptions.NewPermissionDenied("Permission denied")
+}
+
+func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{}) error {
+	if permissions.CheckObjectPermissions(r, vs, object, vs.Permissions) {
+		return nil
+	}
+	for _, permission := range vs.Permissions {
+		if !permission.HasObjectPermission(r, vs, object) {
+			return exceptions.NewPermissionDenied(permission.GetMessage())
+		}
+	}
+	return exceptions.NewPermissionDenied("Permission denied")
+}
+
+func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
+	err := throttling.CheckThrottles(r, vs, vs.Throttles)
+	if err == nil {
+		return nil
+	}
+	throttled, ok := err.(*throttling.ThrottledError)
+	if !ok {
+		return err
+	}
+	return exceptions.NewThrottled("Request was throttled", throttled.WaitDuration)
+}
+
+func (vs *BaseViewSet) checkRequest(w http.ResponseWriter, r *http.Request, action string) bool {
+	vs.SetAction(action)
+	checks := []func(*http.Request) error{
+		vs.authenticateRequest,
+		vs.checkPermissions,
+		vs.checkThrottles,
+	}
+	for _, check := range checks {
+		if err := check(r); err != nil {
+			vs.handleException(w, r, err)
+			return false
+		}
+	}
+	return true
+}
+
+func (vs *BaseViewSet) handleException(w http.ResponseWriter, r *http.Request, err error) {
+	exceptions.HandleExceptionHTTP(w, r, err, nil)
+}
+
+func (vs *BaseViewSet) allowObject(w http.ResponseWriter, r *http.Request, object interface{}) bool {
+	if err := vs.checkObjectPermissions(r, object); err != nil {
+		vs.handleException(w, r, err)
+		return false
+	}
+	return true
 }
 
 // List handles GET /resource/
 func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
+	if !vs.checkRequest(w, r, "list") {
+		return
+	}
 	ctx := r.Context()
 
 	// Get pagination parameters
@@ -196,6 +294,9 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 
 // Create handles POST /resource/
 func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
+	if !vs.checkRequest(w, r, "create") {
+		return
+	}
 	ctx := r.Context()
 
 	var data map[string]interface{}
@@ -261,6 +362,9 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 
 // Retrieve handles GET /resource/{id}/
 func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
+	if !vs.checkRequest(w, r, "retrieve") {
+		return
+	}
 	ctx := r.Context()
 
 	// Get ID from URL
@@ -315,6 +419,9 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	instance := results[0].Interface()
+	if !vs.allowObject(w, r, instance) {
+		return
+	}
 	serialized := SerializeModel(instance)
 	// nolint:errcheck // HTTP response errors can't be handled meaningfully
 	_ = forgehttp.SendJSON(w, http.StatusOK, serialized)
@@ -322,6 +429,13 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 
 // Update handles PUT /resource/{id}/
 func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
+	vs.update(w, r, "update")
+}
+
+func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action string) {
+	if !vs.checkRequest(w, r, action) {
+		return
+	}
 	ctx := r.Context()
 
 	idStr := forgehttp.GetParam(r, "id")
@@ -387,6 +501,9 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	instance := getResults[0].Interface()
+	if !vs.allowObject(w, r, instance) {
+		return
+	}
 
 	// Populate from data
 	populateFromMap(instance, data)
@@ -419,12 +536,14 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 
 // PartialUpdate handles PATCH /resource/{id}/
 func (vs *BaseViewSet) PartialUpdate(w http.ResponseWriter, r *http.Request) {
-	// Similar to Update but only updates provided fields
-	vs.Update(w, r)
+	vs.update(w, r, "partial_update")
 }
 
 // Destroy handles DELETE /resource/{id}/
 func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
+	if !vs.checkRequest(w, r, "destroy") {
+		return
+	}
 	ctx := r.Context()
 
 	idStr := forgehttp.GetParam(r, "id")
@@ -472,6 +591,9 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	instance := getResults[0].Interface()
+	if !vs.allowObject(w, r, instance) {
+		return
+	}
 
 	// Delete
 	deleteMethod, ok := globalCache.GetMethod(managerType, "Delete")
@@ -750,14 +872,6 @@ func applyOrdering(qs reflect.Value, r *http.Request) reflect.Value {
 	}
 
 	return qs
-}
-
-// getManagerFromModel gets the manager for a model using reflection
-func getManagerFromModel(_ interface{}) reflect.Value {
-	// This is a simplified approach - assumes model has package-level manager
-	// Full implementation would use model registry
-	// For MVP, return invalid value - full implementation needed
-	return reflect.Value{}
 }
 
 // populateFromMap populates a model instance from a map

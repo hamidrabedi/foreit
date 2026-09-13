@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/forgego/forge/api/core"
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/service"
 )
@@ -62,7 +63,7 @@ func TestRequirePermission_UsesPermissionService(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req = req.WithContext(context.WithValue(req.Context(), "user", &models.User{
+	req = req.WithContext(core.WithUser(req.Context(), &models.User{
 		ID:       7,
 		IsActive: true,
 	}))
@@ -91,7 +92,7 @@ func TestRequirePermission_DeniesWhenPermissionServiceReturnsFalse(t *testing.T)
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req = req.WithContext(context.WithValue(req.Context(), "user", &models.User{
+	req = req.WithContext(core.WithUser(req.Context(), &models.User{
 		ID:       7,
 		IsActive: true,
 	}))
@@ -117,7 +118,7 @@ func TestRequirePermission_ReturnsInternalErrorWhenPermissionCheckFails(t *testi
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req = req.WithContext(context.WithValue(req.Context(), "user", &models.User{
+	req = req.WithContext(core.WithUser(req.Context(), &models.User{
 		ID:       7,
 		IsActive: true,
 	}))
@@ -145,7 +146,7 @@ func TestRequirePermission_SuperuserBypassesPermissionService(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest(http.MethodGet, "/protected", nil)
-	req = req.WithContext(context.WithValue(req.Context(), "user", &models.User{
+	req = req.WithContext(core.WithUser(req.Context(), &models.User{
 		ID:          1,
 		IsActive:    true,
 		IsSuperuser: true,

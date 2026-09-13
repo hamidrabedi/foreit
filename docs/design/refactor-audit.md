@@ -26,10 +26,11 @@ Every item below was re-verified on current master before its task prompt was wr
 | #216 | This audit | — | audit, playbook, raw tool output | in review |
 | #217 | W0-1 ORM | B2, B35, B37, Aggregate stub | `Union`/`Intersection`/`Difference`/`Aggregate` return NotImplemented; unordered `First`/`Last` order by PK; `UpdateBuilder.Set(nil)` no longer panics | merged |
 | #218 | W0-2 Admin writes | B3 | create/update only write writable fields (Fields, Exclude, ReadOnlyFields, non-editable, auto-managed); unknown keys → 400 | merged |
-| #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | in review |
+| #219 | W0-3 Auth backend | B4 | unknown users pay one bcrypt compare; password checked before active/locked; repository errors not masked; `repository.ErrUserNotFound` sentinel | merged |
 | #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | merged |
-| #221 | W0-5 API correctness | B17, B23 | JSON `null` clears nillable fields instead of panicking; pagination links are absolute and keep filters/search/ordering | in review |
+| #221 | W0-5 API correctness | B17, B23 | JSON `null` clears nillable fields instead of panicking; pagination links are absolute and keep filters/search/ordering | merged |
 | #222 | W0-6 Permissions and token auth | B19, B20, B25 | owner lookup matches db/json tags; `IsAdminUser` accepts IsStaff/IsSuperuser; unknown token → `ErrInvalidToken` | in review |
+| #223 | W0-7a Migration status and bookkeeping | B34, B38 | status merges only real versions (no 1..N loop); generator no longer creates/drops golang-migrate's `schema_migrations` | in review |
 
 ## Removal log
 
@@ -40,6 +41,7 @@ Only code that was unreachable, a no-op pretending to work, or harmful. No worki
 | #220 | `log`: `createRemoteCore`, `remoteExporter`, `newRemoteExporter`, `noOpWriter` | the "remote output" wrote to a writer that discarded every line; replaced by a NotImplemented error |
 | #220 | `api/errors`: `DatabaseStore` SQL bodies, `ensureTable`, `DatabaseConnection` | SQL strings were built and never executed; `Set` reported success while storing nothing |
 | #220 | `db/migrate/generate`: `SquashMigrations` body, `getMigrationsInRange`, `MigrationFile` | squash produced a duplicate migration that would re-apply every statement |
+| #223 | `db/migrate/generate`: `generateBookkeepingTable` and the first-migration bookkeeping block | created a conflicting `schema_migrations` table and dropped golang-migrate's table on full rollback |
 | #217 | stale `// For MVP` comments in set operations | comments described behaviour that did not exist |
 
 ## Flagged for the owner (kept: works, but has a problem)
@@ -54,18 +56,16 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 | Migrations on SQLite | adding a foreign key emits PostgreSQL DDL; some rollbacks are comments | per-dialect DDL, table-rebuild recipe | B31, B33 |
 | Migration generation | dropping a column/table cannot be generated; status marks every version 1..N applied | carry previous definitions; merge real versions only | B32, B34 |
 | ORM | cannot run inside a transaction; update keys not mapped to DB columns; `Create` PK set-back int64-only | `DBTX` interface; column resolution helper; schema PK | D12, B5, B6 |
-| `config/settings.go:109` | connection lifetime parsed as int from `"5m"` → 0; its test asserts the bug | `GetDuration`, fix the test | B36 |
 | `identity` | "user not found" still defined separately in `service/user.go`, `backends/registry.go`, `backends/token.go` | reuse `repository.ErrUserNotFound` | new |
 
 Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up vs removal): API ordering filter (B21) and search filter (B22) — `GetFilterBackends()` has no caller; multipart parser (B16) — no code calls a parser's `Parse`; `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops, no implementers, global `RegisterPlugin` unused).
 
 ## Next
 
-1. W0-7a (in progress): migration status merge (B34) and the generator's conflicting `schema_migrations` table (B38).
-2. W0-7b (in progress): SQLite DDL for foreign keys, drop column and constraints (B31, B33).
-3. W0-7c: down SQL for dropped columns and tables (B32), after W0-7b (same files).
-4. W0-8: ORM/config B5, B6, B36.
-5. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
+1. W0-7b (in progress): SQLite DDL for foreign keys, drop column and constraints (B31, B33).
+2. W0-7c: down SQL for dropped columns and tables (B32), after W0-7b (same files).
+3. W0-8 (in progress): ORM write paths B5 (custom `DBColumn` names ignored by `Update`/`Increment`) and B6 (`Create` PK set-back). B36 moved to Wave 2 after re-checking.
+4. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 
 ## How the findings were produced
 
@@ -250,7 +250,7 @@ Use this on the code you touch, and on every refactor PR.
 | B33 | MAJOR | V | `forge/db/migrate/sql/sqlite.go:106,138` and `DropForeignKey` case | SQLite down steps for `AddColumn`, `DropConstraint`, `DropForeignKey` are SQL comments; rollback "succeeds" and records the version as reverted while the schema is unchanged | Generate the SQLite table-rebuild sequence, or refuse to generate a no-op down |
 | B34 | MAJOR | V | `forge/db/migrate/execute/status.go` `mergeAppliedVersions` | Marks every integer from 1 to the current version as applied. With timestamp versions (`20240101120000`) this loops ~2×10¹³ times and exhausts memory; with gaps it reports versions that never existed | Merge only versions that exist as files or rows |
 | B35 | MAJOR | V | `forge/orm/queryset.go` `Last` / `Reverse` | `Reverse` only flips existing `orderBy`; on an unordered queryset `Last()` returns the first row | Default to primary key when no ordering (Django behaviour) |
-| B36 | MAJOR | V | `forge/config/settings.go:109` | `GetInt("database.conn_max_lifetime")` on the default `"5m"` returns 0, disabling the connection lifetime; `config.go:171` reads the same key correctly with `GetDuration`, i.e. two settings loaders disagree. `settings_test.go:124-128` asserts the 0 | One loader using `GetDuration`; fix the test |
+| B36 | MINOR | V | `forge/config/settings.go:109` vs `config/config.go:171` | Re-checked 2026-09-13: not a live bug. `LoadSettings` reads `conn_max_lifetime`/`conn_max_idle_time` with `GetInt` ("5m" → 0), but the only caller (`cli/core/registry.go:177`) uses `settings.App.Debug`; the pool (`db/pool.go:57`) gets its value from `config.go`'s `GetDuration`, which is correct. The real problem is two settings loaders with different types, plus `settings_test.go:124-128` asserting the 0 | Wave 2: one settings loader (`time.Duration` fields), fix the test |
 | B37 | MAJOR | V | `forge/orm/update_builder.go:53-56` | `reflect.TypeOf(nil)` is nil, so `UpdateBuilder.Set(field, nil)` panics on `.AssignableTo` when clearing a nullable column | Handle `nil` explicitly (allowed only for nullable fields) |
 | B38 | MAJOR | V | `forge/db/migrate/generate/generator.go:349-367` vs `execute/recover.go:50,79` | The first generated migration creates `schema_migrations(id, name, checksum, applied_at)` while golang-migrate (used to apply) owns `schema_migrations(version, dirty)`; `CREATE TABLE IF NOT EXISTS` silently no-ops, so the checksum column the verifier expects never exists | Let golang-migrate own its table; store checksums in a separate `forge_migration_checksums` table or drop the feature |
 | B39 | MINOR | V | `forge/orm/manager_helpers.go:192-198,385-399`, `orm/query_expr.go:183-272` | INSERT/UPDATE/DELETE helpers and `QueryExpr` interpolate table and column names unquoted, so reserved names (`order`, `user`) break; INSERT hardcodes `RETURNING id`. Not an injection path: names come from schema/codegen, and request filters go through `orm.F` → `FieldRef`, which is resolved against the schema and escaped | Quote through the dialect; use the schema PK in `RETURNING` |
@@ -425,7 +425,7 @@ Sized for one delegate task and one PR each. Waves can run 2-3 PRs in parallel i
 6. Permissions and auth: B19, B20, B24, B25.
 7. B18 (flag squash), B26 (history race), B27 (delete regex sanitizer and SQL blacklist).
 7a. Migrations: B31-B34 and B38 (SQLite DDL, down generation, applied-version merge, bookkeeping table). One PR per dialect builder, one for status/bookkeeping.
-7b. ORM/config: B35, B36 (+ its test), B37.
+7b. ORM: B35, B37 (B36 moved to Wave 2 after re-checking).
 
 **Wave 1: delete dead code (large diffs, no behaviour change)**
 8. Delete the ten unimported packages in §4 and their tests.

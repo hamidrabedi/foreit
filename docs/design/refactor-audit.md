@@ -30,7 +30,9 @@ Every item below was re-verified on current master before its task prompt was wr
 | #220 | W0-4 Stubs | B1, B9, B18 | DB idempotency store, remote log output and migration squash return NotImplemented | merged |
 | #221 | W0-5 API correctness | B17, B23 | JSON `null` clears nillable fields instead of panicking; pagination links are absolute and keep filters/search/ordering | merged |
 | #222 | W0-6 Permissions and token auth | B19, B20, B25 | owner lookup matches db/json tags; `IsAdminUser` accepts IsStaff/IsSuperuser; unknown token → `ErrInvalidToken` | in review |
-| #223 | W0-7a Migration status and bookkeeping | B34, B38 | status merges only real versions (no 1..N loop); generator no longer creates/drops golang-migrate's `schema_migrations` | in review |
+| #223 | W0-7a Migration status and bookkeeping | B34, B38 | status merges only real versions (no 1..N loop); generator no longer creates/drops golang-migrate's `schema_migrations` | merged |
+| #224 | W0-7b SQLite migration DDL | B31, B33 | foreign keys of new tables inlined into CREATE TABLE; drop column / add-column rollback emit `DROP COLUMN`; unsupported FK/constraint drops return errors instead of comments; tests run the SQL on SQLite | merged |
+| #225 | W0-8 ORM write columns and PK | B5, B6 | `Update`/`Increment`/`Decrement` map fields to db columns (case-insensitive, unknown → error); `Create` uses the schema PK column; non-integer PK → NotImplemented | in review |
 
 ## Removal log
 
@@ -53,18 +55,20 @@ These are live code paths. They are **not** removed. Each needs a decision or a 
 | `admin/api/rest/router.go` `handleLogin` | only `FORGE_ADMIN_USERNAME`/`PASSWORD` can log in; `forge createsuperuser` users cannot | authenticate staff/superusers through `identity`, keep env pair as bootstrap | B24 |
 | `admin/api/rest/router.go:81-91` | CORS echoes every origin with credentials (not exploitable today: bearer tokens only) | origin allow-list from config | B12 |
 | `admin/history_manager.go` | lazy init race; history is in memory only | init in constructor; persistence is a feature decision | B26 |
-| Migrations on SQLite | adding a foreign key emits PostgreSQL DDL; some rollbacks are comments | per-dialect DDL, table-rebuild recipe | B31, B33 |
-| Migration generation | dropping a column/table cannot be generated; status marks every version 1..N applied | carry previous definitions; merge real versions only | B32, B34 |
-| ORM | cannot run inside a transaction; update keys not mapped to DB columns; `Create` PK set-back int64-only | `DBTX` interface; column resolution helper; schema PK | D12, B5, B6 |
+| Migrations on SQLite | dropping or adding a foreign key/constraint on an existing table now errors (needs a table rebuild) | table-rebuild recipe | B33 (rest fixed in #224) |
+| Migration generation | removing a model or field aborts `makemigrations` (down SQL has no previous definition) | carry previous definitions (W0-7c, in progress) | B32 |
+| ORM | cannot run inside a transaction | `DBTX` interface | D12 (B5, B6 in #225) |
+| Migration down SQL | a re-created table (rollback of a drop) does not restore its foreign keys | include FKs when rebuilding | new |
 | `identity` | "user not found" still defined separately in `service/user.go`, `backends/registry.go`, `backends/token.go` | reuse `repository.ErrUserNotFound` | new |
 
 Code that is **not wired anywhere** but contains bugs (flagged, decide wire-up vs removal): API ordering filter (B21) and search filter (B22) — `GetFilterBackends()` has no caller; multipart parser (B16) — no code calls a parser's `Parse`; `registry` plugin extensions (`applyAdminExtensions`/`applyAPIExtensions` no-ops, no implementers, global `RegisterPlugin` unused).
 
 ## Next
 
-1. W0-7b (in progress): SQLite DDL for foreign keys, drop column and constraints (B31, B33).
-2. W0-7c: down SQL for dropped columns and tables (B32), after W0-7b (same files).
-3. W0-8 (in progress): ORM write paths B5 (custom `DBColumn` names ignored by `Update`/`Increment`) and B6 (`Create` PK set-back). B36 moved to Wave 2 after re-checking.
+1. W0-7c (in progress): down SQL for dropped columns and tables (B32); today removing any model or field makes migration generation fail.
+2. Naming PR (in progress): rename the ticket-named tests from #217/#220 (`w0_*_test.go`, `TestW0_*`).
+3. Wave 1 dead code, Wave 2 duplicates (includes B36: two settings loaders that disagree; the duplicate "user not found" errors), Wave 3 design, Wave 4 libraries.
+4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
 4. Then Wave 1 (dead code, with the removal policy above), Wave 2 (duplicates), Wave 3 (design), Wave 4 (libraries).
 
 ## How the findings were produced

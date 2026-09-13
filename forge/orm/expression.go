@@ -411,33 +411,55 @@ func (c ComparisonExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface
 			return "", nil, fmt.Errorf("EndsWith operator requires string value")
 		}
 	} else if c.Op == OpIContains {
-		// ILIKE '%value%'
 		if strVal, ok := c.Value.(string); ok {
 			pattern := "%" + strVal + "%"
 			placeholder := builder.AddArg(pattern)
-			sql = fmt.Sprintf("%s ILIKE %s", fieldSQL, placeholder)
+			sql = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", fieldSQL, placeholder)
 		} else {
 			return "", nil, fmt.Errorf("IContains operator requires string value")
 		}
 	} else if c.Op == OpIExact {
-		// ILIKE 'value'
 		if strVal, ok := c.Value.(string); ok {
 			placeholder := builder.AddArg(strVal)
-			sql = fmt.Sprintf("%s ILIKE %s", fieldSQL, placeholder)
+			sql = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", fieldSQL, placeholder)
 		} else {
 			return "", nil, fmt.Errorf("IExact operator requires string value")
+		}
+	} else if c.Op == OpIStartsWith {
+		if strVal, ok := c.Value.(string); ok {
+			pattern := strVal + "%"
+			placeholder := builder.AddArg(pattern)
+			sql = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", fieldSQL, placeholder)
+		} else {
+			return "", nil, fmt.Errorf("IStartsWith operator requires string value")
+		}
+	} else if c.Op == OpIEndsWith {
+		if strVal, ok := c.Value.(string); ok {
+			pattern := "%" + strVal
+			placeholder := builder.AddArg(pattern)
+			sql = fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", fieldSQL, placeholder)
+		} else {
+			return "", nil, fmt.Errorf("IEndsWith operator requires string value")
 		}
 	} else {
 		// Use switch for operators with unique values
 		switch c.Op {
 		case OpIsNull:
-			sql = fmt.Sprintf("%s IS NULL", fieldSQL)
+			if b, ok := c.Value.(bool); ok && !b {
+				sql = fmt.Sprintf("%s IS NOT NULL", fieldSQL)
+			} else {
+				sql = fmt.Sprintf("%s IS NULL", fieldSQL)
+			}
 		case OpIsNotNull:
 			sql = fmt.Sprintf("%s IS NOT NULL", fieldSQL)
 		case OpIn:
-			values, ok := c.Value.([]T)
+			values, ok := toInterfaceSlice(c.Value)
 			if !ok {
 				return "", nil, fmt.Errorf("IN operator requires slice value")
+			}
+			if len(values) == 0 {
+				sql = "1=0"
+				break
 			}
 			placeholders := make([]string, len(values))
 			for i, val := range values {
@@ -445,9 +467,13 @@ func (c ComparisonExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface
 			}
 			sql = fmt.Sprintf("%s IN (%s)", fieldSQL, strings.Join(placeholders, ", "))
 		case OpNotIn:
-			values, ok := c.Value.([]T)
+			values, ok := toInterfaceSlice(c.Value)
 			if !ok {
 				return "", nil, fmt.Errorf("NOT IN operator requires slice value")
+			}
+			if len(values) == 0 {
+				sql = "1=1"
+				break
 			}
 			placeholders := make([]string, len(values))
 			for i, val := range values {
@@ -455,9 +481,13 @@ func (c ComparisonExpression[T]) ToSQL(builder *SQLBuilder) (string, []interface
 			}
 			sql = fmt.Sprintf("%s NOT IN (%s)", fieldSQL, strings.Join(placeholders, ", "))
 		case OpRange:
-			values, ok := c.Value.([]T)
-			if !ok || len(values) != 2 {
+			values, ok := toInterfaceSlice(c.Value)
+			if !ok {
 				return "", nil, fmt.Errorf("Range operator requires slice of 2 values")
+			}
+			if len(values) != 2 {
+				sql = "1=0"
+				break
 			}
 			placeholder1 := builder.AddArg(values[0])
 			placeholder2 := builder.AddArg(values[1])

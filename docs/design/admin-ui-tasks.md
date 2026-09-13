@@ -71,6 +71,9 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P5 addendum
 | # | Task | Files | Status |
 |---|---|---|---|
+| 4.2b | FK cells show backend `display` labels (relation name → id → label) with muted `#id`, fallback `#id` | `ListCell.tsx`, `ModelListPage.tsx`, `api/types.ts` | dispatched (agy) — needs PR #208 E2a |
+| 5.6 | Admin UI under any mount prefix (`src/lib/admin-prefix.ts`, `renderBuiltUrl`) — after backend F1 | see `tasks/t5.6.md` | spec ready |
+| 5.7 | Remove dead notifications UI (`useNotifications` has no callers; hub never mounted) | `TopBar.tsx`, `hooks/useNotifications.ts` | spec ready |
 | 5.5 | React Query v5 `onSuccess(data, variables, onMutateResult, context)`: `useUpdateObject` forwarded 3 args, so callers got the onMutate result as context. Now forwards 4, with a hook test | `src/api/hooks/adminHooks.ts` | verified |
 | 5.4 | Backend validation errors were discarded: UI read `data.details`, API sends `data.error.details`. `parseApiError` (`src/api/errors.ts`, 10 tests) + form-level `role=alert` banner for `non_field_errors` | `src/api/errors.ts`, `ModelUpsertPage.tsx` | verified |
 
@@ -83,6 +86,6 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 ## P7 — Verification
 | # | Task | Files | Status |
 |---|---|---|---|
-| 7.1 | Playwright sweep: routes × light/dark × 375/1280, assert no h-scroll + no console errors + rendered | `e2e/design-sweep.spec.ts` | authored |
+| 7.1 | Playwright design sweep with mocked `/admin/api/**` (no backend): dashboard/registry/list/create × light/dark × 1280/375 — asserts rendered main+h1, no horizontal overflow, no console/page errors, screenshot per case | `e2e/design-sweep.spec.ts`, `e2e/fixtures/admin-api-mock.ts`, `playwright.config.ts` | verified — 16/16 passed |
 | 7.2 | Lint guards: no raw hex, no Tailwind palette colors, no `text-[Npx]` in `src/` | `eslint.config.js` | verified |
 | 7.3 | **Bundle budget.** 7.3: vendor code-splitting (rolldown `codeSplitting.groups`) + lazy recharts. 7.3b: lazy non-entry routes (445→430 kB gz initial). 7.3c: StatsWidget `import * as LucideIcons` removed (namespace import defeated tree-shaking). Budget 300 kB gz — see measurement note below. | `vite.config.ts`, `src/routes/`, widgets | verified — eager JS 244 kB gz, under the 300 kB budget |

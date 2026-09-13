@@ -36,7 +36,7 @@ Status: `todo` → `dispatched` → `verified` → `pushed`
 | C1 | fix/filter-expression-correctness | `AndGroup`/`OrGroup` build no groups; `OrFilter` is a no-op alias | **PR #205** |
 | C2 | same | `IN`/range with `[]T`, empty `IN` → invalid SQL, HTTP `field__in=` → nil, `isnull=false`, SQLite `EXTRACT`, case-insensitive prefix/suffix, unsigned field path | **on PR #205** (EXTRACT + unsigned deferred to C3) |
 | C3a | same | year/month/day filters emit invalid SQL on every DB (ComparisonExpression has no date-part case); dialect-aware SQLBuilder (EXTRACT vs SQLite strftime) | **on PR #205** |
-| C3b | same | relation-path joins | todo (design first) |
+| C3b | same | relation-path filters/ordering (`customer__name`) render a non-existent quoted column and never JOIN; design: builder join resolver + LEFT JOIN per path prefix, COUNT(DISTINCT pk), refuse in Update/Delete (`tasks/b-c3b-relation-path-joins.md`) | spec ready |
 
 ## Phase 4: server/auth edge cases
 
@@ -57,17 +57,17 @@ Branch `fix/admin-metadata-readonly-display`, worktree `foreit-wt/admin-metadata
 | # | Task | Status |
 |---|---|---|
 | E1 | BH-1 / VB-06: `read_only` for AutoNow / AutoNowAdd / Generated / auto-increment PK fields (`admin/core/metadata_builder.go`) | **PR #208** |
-| E2a | BH-2: list response `display` map (relation → id → label) via optional `core.LabelResolver`, one query per relation per page | dispatched (agy), lands on PR #208 |
-| E2b | UI: FK cells show the label with a muted `#id` and fall back to `#id` (`tasks/t4.2b.md`, UI branch) | spec ready, after E2a |
+| E2a | BH-2: list response `display` map (relation → id → label) via optional `core.LabelResolver`, one query per relation per page | **on PR #208** |
+| E2b | UI: FK cells show the label with a muted `#id` and fall back to `#id` (`tasks/t4.2b.md`, UI branch) | dispatched (agy) |
 
 ## Phase 5: admin integration (frontend-touching, after the UI redesign lands)
 
 - ✅ Surface backend validation `details` in forms: UI task 5.4, on PR #204.
 - ✅ React Query v5 mutation-callback arguments: UI task 5.5, on PR #204.
 - ⏳ Custom admin mount prefix end to end:
-  - F1 (Go, branch `fix/admin-mount-prefix`, worktree `foreit-wt/admin-mount-prefix`): `server.WithIndexTransform`; the site injects `<meta name="forge-admin-prefix">` and rewrites `/admin/` asset URLs in index.html (`tasks/b-f1-admin-prefix-server.md`). Spec ready.
+  - F1 (Go, branch `fix/admin-mount-prefix`, worktree `foreit-wt/admin-mount-prefix`): `server.WithIndexTransform`; the site injects `<meta name="forge-admin-prefix">` and rewrites `/admin/` asset URLs in index.html (`tasks/b-f1-admin-prefix-server.md`). Dispatched (agy).
   - F2 (UI 5.6, PR #204): `src/lib/admin-prefix.ts` drives router basepath, API base, 401 redirect, search/nav/shortcuts; `experimental.renderBuiltUrl` for lazy chunks (`tasks/t5.6.md`). Spec ready, after F1.
-- ⏳ Notifications advertised but unwired; the dormant hook targets a nonexistent endpoint: todo (decide to remove or implement).
+- ⏳ Notifications: `useNotifications` has zero callers and targets `/api/admin/events`; `core.NotificationHub.SSEHandler` is never mounted and nothing calls `Notify`. Decision: remove the dead UI (task 5.7) and treat real notifications as planned work (see below).
 
 ## Planned / deferred (not now)
 
@@ -84,6 +84,20 @@ built, fix these known defects in the existing type first:
   contract so callers cannot mutate shared cached trees.
 - Decide on invalidation (schema change, per-model TTL) before wiring it into request paths.
 
+### Real-time notifications
+
+Planned, not built. `forge/admin/core/notifications.go` (`NotificationHub`, `SSEHandler`) exists but is unrouted.
+To implement: mount `SSEHandler` under `${prefix}/api/events` behind admin auth, decide which events call
+`Notify` (e.g. bulk action completion, import/export jobs), then add a UI subscriber and a bell with an unread count.
+
 ## Known pre-existing failures (not ours)
+
+## Incident log
+
+- **2026-09-13 git object corruption.** An unclean shutdown left 7 empty object files. The admin-metadata
+  branch ref and its index pointed at the empty E2a commit. Recovery: `git fsck --no-dangling` mapped the
+  damage, the empty objects were backed up then deleted with `/usr/bin/find ... -empty -delete` (rtk blocks
+  `find -delete`), `update-ref` restored the branch to the pushed E1 commit `2a26e6d`, `git reset` rebuilt
+  the index, and E2a was re-committed from the intact working tree. `fsck` clean afterwards; no work lost.
 
 - `./orm` `TestPrefetchRelated_Integration`: failed on the clean-master baseline 2026-09-13, passed on the A1 run. Treat it as flaky, not ours.

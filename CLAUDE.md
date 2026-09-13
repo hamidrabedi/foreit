@@ -28,8 +28,8 @@ its pr on remote branch"*. So:
 - **Never put worktrees in `/tmp`.** A reboot wiped codex's four `/tmp` worktrees and all
   their uncommitted work on 2026-09-13.
 - Committing and pushing the backend slices (and updating their PRs) is explicitly
-  authorized by the user. The UI redesign in the main checkout stays uncommitted until
-  the user asks.
+  authorized by the user. The UI redesign is also committed and pushed now (user: "keep all
+  tasks going and committing and pr and all that") on `feat/admin-ui-redesign`, draft PR #204.
 - Other agents may still be active: stay inside the worktree/branch you own.
 
 ## Delegation rule: Claude does NOT write code in this repo (MANDATORY)
@@ -107,10 +107,12 @@ pkill -f "^opencode"           # reap the hung process, ALWAYS (anchored!)
 Check `pgrep -af "opencode run"` before dispatching; kill anything still alive first.
 A timeout-killed pipeline exits 144 — that is the reaping, not a failure.
 
-### Parallel dispatch — DON'T (user's IDE crashed 2026-09-13)
+### Parallel dispatch — 2-3 agents max (user's rule, 2026-09-13)
 
-**Run ONE delegate at a time.** Four parallel agy runs plus test jobs crashed the user's IDE.
-Dispatch, wait, verify, then send the next. The notes below are historical.
+Four parallel agy runs plus test jobs crashed the user's IDE; the user then set the cap: *"do not kill
+my pc cpu and ram, 2-3 agents max at the same time"*. Run 2 (at most 3) delegates on disjoint
+worktrees/files, never stack heavy test suites on top, and keep verified work flowing to commits and PRs.
+The rules below still apply.
 
 #### (historical) Parallel dispatch rules
 
@@ -140,6 +142,17 @@ An NVIDIA model returning HTTP 410 is retired — pick another, do not retry.
 - **One retry maximum.** If the second attempt is still wrong, re-scope the prompt
   into smaller pieces rather than iterating with the same model a third time.
 - Never let a delegate run git commands or commit.
+
+
+### Recovering from an unclean shutdown (happened 2026-09-13)
+
+- `/tmp` is wiped on reboot: session scratchpad files (commit messages, PR bodies, logs) vanish. Re-write them.
+- Background agents and their logs die with the session. Check each worktree's `git status` before re-dispatching:
+  a delegate may have left partial edits, which you should verify rather than redo.
+- Git objects can be left as empty files (`error: object file ... is empty`, `bad object HEAD`). Recover:
+  `git fsck --no-dangling` → back up and delete the empty objects with `/usr/bin/find .git/objects -type f -empty -delete`
+  (rtk refuses `find -delete`) → `git update-ref refs/heads/<branch> <last good or pushed sha>` → `git -C <worktree> reset -q`
+  (keeps working files) → re-stage and re-commit. Pushed commits are always a safe restore point.
 
 ## Git
 

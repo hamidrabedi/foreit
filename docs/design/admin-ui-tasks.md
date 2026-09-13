@@ -89,3 +89,13 @@ Status: `todo` → `dispatched` → `verified` / `rejected`
 | 7.1 | Playwright design sweep with mocked `/admin/api/**` (no backend): dashboard/registry/list/create × light/dark × 1280/375 — asserts rendered main+h1, no horizontal overflow, no console/page errors, screenshot per case | `e2e/design-sweep.spec.ts`, `e2e/fixtures/admin-api-mock.ts`, `playwright.config.ts` | verified — 16/16 passed |
 | 7.2 | Lint guards: no raw hex, no Tailwind palette colors, no `text-[Npx]` in `src/` | `eslint.config.js` | verified |
 | 7.3 | **Bundle budget.** 7.3: vendor code-splitting (rolldown `codeSplitting.groups`) + lazy recharts. 7.3b: lazy non-entry routes (445→430 kB gz initial). 7.3c: StatsWidget `import * as LucideIcons` removed (namespace import defeated tree-shaking). Budget 300 kB gz — see measurement note below. | `vite.config.ts`, `src/routes/`, widgets | verified — eager JS 244 kB gz, under the 300 kB budget |
+
+## P8 — Ecommerce example readiness
+
+The reference app `examples/ecommerce` serves the production admin bundle (`go run -tags embed .`, which embeds `forge/admin/ui/dist`) on :8020 and has a real Playwright suite in `ui-tests/` (admin-redesign, admin-smoke, framework-features) running against Chrome.
+
+| # | Task | Files | Status |
+|---|---|---|---|
+| 8.1 | Build `dist`, boot ecommerce, run the full suite against the redesigned bundle | `examples/ecommerce/ui-tests` | run 2026-09-13: **14 passed / 2 failed**. Both failures are `page.selectOption` on controls that are now Radix comboboxes (`page-size-select`, `filter-is_active`); app behaviour correct |
+| 7.4 | Update `admin-redesign.spec.ts` to drive Radix Select (click trigger → click `role=option`) | `ui-tests/tests/admin-redesign.spec.ts` | dispatched (agy) |
+| 8.2 | Re-run the full ecommerce suite to 16/16; review README/SETUP instructions for the UI build step | `examples/ecommerce` | after 7.4 |

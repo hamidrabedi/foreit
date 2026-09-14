@@ -172,7 +172,7 @@ func TestRelationPathJoin_FilterTwoHops(t *testing.T) {
 	sql, _, err := twoHopQS.(*BaseQuerySet[TestOrder]).buildSQL()
 	require.NoError(t, err)
 	t.Logf("Exact SQL for two-hop filter: %s", sql)
-	assert.Equal(t, `SELECT "orders".* FROM "orders" LEFT JOIN "customers" AS "customer" ON "customer"."id" = "orders"."customer_id" LEFT JOIN "companies" AS "customer__company" ON "customer__company"."id" = "customer"."company_id" WHERE "customer__company"."name" = ?1`, sql)
+	assert.Equal(t, `SELECT "orders".* FROM "orders" LEFT JOIN "customers" AS "customer" ON "customer"."id" = "orders"."customer_id" LEFT JOIN "companies" AS "customer__company" ON "customer__company"."id" = "customer"."company_id" WHERE "customer__company"."name" = ?`, sql)
 
 	orders, err := twoHopQS.All(ctx)
 	require.NoError(t, err)
@@ -243,7 +243,7 @@ func TestRelationPathJoin_NoRelationPathProducesIdenticalSQL(t *testing.T) {
 	// Simple filter without relation path: assert SQL byte-identical
 	sql, _, err := orderQS.Filter(F("total").Eq(100.0)).(*BaseQuerySet[TestOrder]).buildSQL()
 	require.NoError(t, err)
-	const expectedSQL = `SELECT * FROM "orders" WHERE "total" = ?1`
+	const expectedSQL = `SELECT * FROM "orders" WHERE "total" = ?`
 	assert.Equal(t, expectedSQL, sql)
 }
 
@@ -382,5 +382,5 @@ func TestRelationPathJoin_ToManyFilter_CombinedWithToOneOrderBy(t *testing.T) {
 		Filter(F("orders__total").Gt(100.0)).
 		OrderBy("company__name").(*BaseQuerySet[TestCustomer]).buildSQL()
 	require.NoError(t, err)
-	assert.Equal(t, `SELECT "customers".* FROM "customers" LEFT JOIN "companies" AS "company" ON "company"."id" = "customers"."company_id" WHERE "customers"."id" IN (SELECT "customers"."id" FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "orders"."total" > ?1) ORDER BY "company"."name" ASC`, sql)
+	assert.Equal(t, `SELECT "customers".* FROM "customers" LEFT JOIN "companies" AS "company" ON "company"."id" = "customers"."company_id" WHERE "customers"."id" IN (SELECT "customers"."id" FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "orders"."total" > ?) ORDER BY "company"."name" ASC`, sql)
 }

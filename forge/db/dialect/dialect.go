@@ -63,6 +63,11 @@ type Dialect interface {
 	// Most databases use backslash, but some may differ.
 	LikeEscape() string
 
+	// CaseInsensitiveLike returns a case-insensitive LIKE expression.
+	// PostgreSQL: column ILIKE placeholder
+	// SQLite: LOWER(column) LIKE LOWER(placeholder)
+	CaseInsensitiveLike(column, placeholder string) string
+
 	// ConcatOperator returns the string concatenation operator or function.
 	// PostgreSQL: "||" or CONCAT()
 	// SQLite: "||"
@@ -162,6 +167,11 @@ func (d BaseDialect) SupportsReturning() bool {
 // LikeEscape returns the escape character for LIKE patterns.
 func (d BaseDialect) LikeEscape() string {
 	return "\\"
+}
+
+// CaseInsensitiveLike returns a case-insensitive LIKE expression.
+func (d BaseDialect) CaseInsensitiveLike(column, placeholder string) string {
+	return fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", column, placeholder)
 }
 
 // ConcatOperator returns the string concatenation operator.

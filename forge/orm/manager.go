@@ -205,6 +205,15 @@ func (m *Manager[T]) Count(ctx context.Context) (int64, error) {
 	return qs.Count(ctx)
 }
 
+func (m *Manager[T]) placeholderFunc() func(int) string {
+	if m != nil && m.db != nil {
+		if d, err := m.db.dialect(); err == nil && d != nil {
+			return d.Placeholder
+		}
+	}
+	return defaultPlaceholder
+}
+
 // Create creates a new model instance
 func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	if !m.hasDB() {
@@ -227,7 +236,8 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	}
 
 	// Build and execute INSERT
-	sql, args, _, err := BuildInsertSQL(instance, m.tableName, m.primaryKeyColumn())
+	ph := m.placeholderFunc()
+	sql, args, _, err := BuildInsertSQL(instance, m.tableName, m.primaryKeyColumn(), ph)
 	if err != nil {
 		return fmt.Errorf("failed to build insert SQL: %w", err)
 	}
@@ -299,7 +309,8 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 	}
 
 	// Build and execute bulk INSERT
-	sql, args, _, err := BuildBulkInsertSQL(instancesInterface, m.tableName, m.primaryKeyColumn())
+	ph := m.placeholderFunc()
+	sql, args, _, err := BuildBulkInsertSQL(instancesInterface, m.tableName, m.primaryKeyColumn(), ph)
 	if err != nil {
 		return fmt.Errorf("failed to build bulk insert SQL: %w", err)
 	}
@@ -352,7 +363,8 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 	}
 
 	pkColumn := m.primaryKeyColumn()
-	sql, args, err := BuildUpdateSQL(instance, m.tableName, pkColumn)
+	ph := m.placeholderFunc()
+	sql, args, err := BuildUpdateSQL(instance, m.tableName, pkColumn, ph)
 	if err != nil {
 		return fmt.Errorf("failed to build update SQL: %w", err)
 	}
@@ -406,7 +418,8 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 	}
 
 	pkColumn := m.primaryKeyColumn()
-	sql, args := BuildDeleteSQL(m.tableName, pkColumn, id)
+	ph := m.placeholderFunc()
+	sql, args := BuildDeleteSQL(m.tableName, pkColumn, id, ph)
 
 	dbtx, err := m.db.dbtx()
 	if err != nil {

@@ -204,14 +204,6 @@ func (qs *BaseQuerySet[T]) newSQLBuilder() *SQLBuilder {
 	return NewSQLBuilder()
 }
 
-// rebindSQL adapts a SQL query for the active database driver (e.g. converting ILIKE to LIKE for SQLite).
-func (qs *BaseQuerySet[T]) rebindSQL(query string) string {
-	if r, ok := qs.db.(interface{ RebindPlaceholders(string) string }); ok && r != nil {
-		return r.RebindPlaceholders(query)
-	}
-	return query
-}
-
 // clone creates a deep copy
 func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 	clone := &BaseQuerySet[T]{
@@ -588,7 +580,7 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	sql := strings.Join(parts, " ")
 	args := builder.Args()
 
-	return qs.rebindSQL(sql), args, nil
+	return sql, args, nil
 }
 
 // mergeJoins merges whereJoins and orderJoins without duplicating identical joins.
@@ -1443,7 +1435,7 @@ func (qs *BaseQuerySet[T]) buildCountOrExistsSQL(isExists bool) (string, []inter
 			parts = qs.appendWhereAndJoinParts(parts, whereJoins, whereClause)
 		}
 		parts = append(parts, "LIMIT 1")
-		return qs.rebindSQL(strings.Join(parts, " ")), builder.Args(), nil
+		return strings.Join(parts, " "), builder.Args(), nil
 	}
 
 	var parts []string
@@ -1460,7 +1452,7 @@ func (qs *BaseQuerySet[T]) buildCountOrExistsSQL(isExists bool) (string, []inter
 		}
 		parts = qs.appendWhereAndJoinParts([]string{selectClause}, whereJoins, whereClause)
 	}
-	return qs.rebindSQL(strings.Join(parts, " ")), builder.Args(), nil
+	return strings.Join(parts, " "), builder.Args(), nil
 }
 
 func (qs *BaseQuerySet[T]) appendWhereAndJoinParts(parts []string, whereJoins []string, whereClause string) []string {
@@ -1636,7 +1628,7 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 	}
 
 	// Execute
-	result, err := db.ExecContext(ctx, qs.rebindSQL(updateSQL), allArgs...)
+	result, err := db.ExecContext(ctx, updateSQL, allArgs...)
 	if err != nil {
 		return 0, fmt.Errorf("update query failed: %w", err)
 	}
@@ -1706,7 +1698,7 @@ func (qs *BaseQuerySet[T]) Delete(ctx context.Context) (int64, error) {
 	args := builder.Args()
 
 	// Execute
-	result, err := db.ExecContext(ctx, qs.rebindSQL(deleteSQL), args...)
+	result, err := db.ExecContext(ctx, deleteSQL, args...)
 	if err != nil {
 		return 0, fmt.Errorf("delete query failed: %w", err)
 	}

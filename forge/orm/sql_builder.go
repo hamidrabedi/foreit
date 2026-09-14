@@ -16,24 +16,59 @@ type SQLBuilder struct {
 	paramIndex   int
 	args         []interface{}
 	dialect      dialect.Dialect
+	placeholder  func(int) string
 	joinResolver JoinResolver
+}
+
+func defaultPlaceholder(position int) string {
+	return fmt.Sprintf("$%d", position)
 }
 
 // NewSQLBuilder creates a new SQL builder
 func NewSQLBuilder() *SQLBuilder {
 	return &SQLBuilder{
-		paramIndex: 1,
-		args:       []interface{}{},
+		paramIndex:  1,
+		args:        []interface{}{},
+		placeholder: defaultPlaceholder,
 	}
 }
 
 // NewSQLBuilderWithDialect creates a new SQL builder with the specified dialect
 func NewSQLBuilderWithDialect(d dialect.Dialect) *SQLBuilder {
-	return &SQLBuilder{
+	b := &SQLBuilder{
 		paramIndex: 1,
 		args:       []interface{}{},
 		dialect:    d,
 	}
+	if d != nil {
+		b.placeholder = d.Placeholder
+	} else {
+		b.placeholder = defaultPlaceholder
+	}
+	return b
+}
+
+// Placeholder returns the placeholder for the given position
+func (b *SQLBuilder) Placeholder(position int) string {
+	if b != nil && b.placeholder != nil {
+		return b.placeholder(position)
+	}
+	return defaultPlaceholder(position)
+}
+
+// SetPlaceholder sets a custom placeholder function
+func (b *SQLBuilder) SetPlaceholder(fn func(int) string) {
+	if b != nil {
+		b.placeholder = fn
+	}
+}
+
+// CaseInsensitiveLike returns a case-insensitive LIKE comparison expression.
+func (b *SQLBuilder) CaseInsensitiveLike(field, placeholder string) string {
+	if b != nil && b.dialect != nil {
+		return b.dialect.CaseInsensitiveLike(field, placeholder)
+	}
+	return fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", field, placeholder)
 }
 
 // SetJoinResolver sets an optional join resolver for resolving relation paths.
@@ -87,7 +122,7 @@ func EscapeIdentifierList(identifiers []string) []string {
 
 // AddArg adds an argument and returns a placeholder
 func (b *SQLBuilder) AddArg(value interface{}) string {
-	placeholder := fmt.Sprintf("$%d", b.paramIndex)
+	placeholder := b.Placeholder(b.paramIndex)
 	b.args = append(b.args, value)
 	b.paramIndex++
 	return placeholder
@@ -138,10 +173,11 @@ func (b *SQLBuilder) BuildWhere(conditions []QueryExpr, excludes []QueryExpr) (s
 	var whereParts []string
 	var allArgs []interface{}
 	paramIndex := b.paramIndex
+	ph := b.Placeholder
 
 	// Add conditions
 	for _, cond := range conditions {
-		sql, condArgs, nextIndex := cond.ToSQL(paramIndex)
+		sql, condArgs, nextIndex := cond.ToSQL(paramIndex, ph)
 		whereParts = append(whereParts, sql)
 		allArgs = append(allArgs, condArgs...)
 		paramIndex = nextIndex
@@ -149,7 +185,7 @@ func (b *SQLBuilder) BuildWhere(conditions []QueryExpr, excludes []QueryExpr) (s
 
 	// Add excludes with NOT
 	for _, exclude := range excludes {
-		sql, excludeArgs, nextIndex := exclude.ToSQL(paramIndex)
+		sql, excludeArgs, nextIndex := exclude.ToSQL(paramIndex, ph)
 		whereParts = append(whereParts, "NOT ("+sql+")")
 		allArgs = append(allArgs, excludeArgs...)
 		paramIndex = nextIndex
@@ -223,7 +259,7 @@ func (b *SQLBuilder) BuildUpdate(table string, fields map[string]interface{}) (s
 
 	for field, value := range fields {
 		escapedField := EscapeIdentifier(field)
-		placeholder := fmt.Sprintf("$%d", paramIndex)
+		placeholder := b.Placeholder(paramIndex)
 		setParts = append(setParts, escapedField+" = "+placeholder)
 		updateArgs = append(updateArgs, value)
 		b.args = append(b.args, value)
@@ -250,7 +286,7 @@ func (b *SQLBuilder) BuildInsert(table string, fields map[string]interface{}) (s
 	for field, value := range fields {
 		escapedField := EscapeIdentifier(field)
 		fieldNames = append(fieldNames, escapedField)
-		placeholder := fmt.Sprintf("$%d", paramIndex)
+		placeholder := b.Placeholder(paramIndex)
 		placeholders = append(placeholders, placeholder)
 		b.args = append(b.args, value)
 		paramIndex++

@@ -106,9 +106,13 @@ func ValidateInstance(instance interface{}) error {
 }
 
 // BuildInsertSQL builds an INSERT SQL statement from a model instance
-func BuildInsertSQL(instance interface{}, tableName string, pkColumn string) (sql string, values []interface{}, columns []string, err error) {
+func BuildInsertSQL(instance interface{}, tableName string, pkColumn string, placeholder ...func(int) string) (sql string, values []interface{}, columns []string, err error) {
 	if pkColumn == "" {
 		pkColumn = "id"
+	}
+	ph := defaultPlaceholder
+	if len(placeholder) > 0 && placeholder[0] != nil {
+		ph = placeholder[0]
 	}
 
 	instanceValue := reflect.ValueOf(instance)
@@ -152,7 +156,7 @@ func BuildInsertSQL(instance interface{}, tableName string, pkColumn string) (sq
 				columnName = schemaField.Name
 			}
 			insertColumns = append(insertColumns, columnName)
-			insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", columnIndex))
+			insertPlaceholders = append(insertPlaceholders, ph(columnIndex))
 			insertValues = append(insertValues, fieldValue)
 			columnIndex++
 		}
@@ -182,7 +186,7 @@ func BuildInsertSQL(instance interface{}, tableName string, pkColumn string) (sq
 				continue
 			}
 			insertColumns = append(insertColumns, col)
-			insertPlaceholders = append(insertPlaceholders, fmt.Sprintf("$%d", columnIndex))
+			insertPlaceholders = append(insertPlaceholders, ph(columnIndex))
 			insertValues = append(insertValues, val.Interface())
 			columnIndex++
 		}
@@ -316,7 +320,12 @@ func isZeroValue(v reflect.Value) bool {
 }
 
 // BuildUpdateSQL builds an UPDATE SQL statement from a model instance
-func BuildUpdateSQL(instance interface{}, tableName, idField string) (string, []interface{}, error) {
+func BuildUpdateSQL(instance interface{}, tableName, idField string, placeholder ...func(int) string) (string, []interface{}, error) {
+	ph := defaultPlaceholder
+	if len(placeholder) > 0 && placeholder[0] != nil {
+		ph = placeholder[0]
+	}
+
 	instanceValue := reflect.ValueOf(instance)
 	if instanceValue.Kind() == reflect.Ptr {
 		instanceValue = instanceValue.Elem()
@@ -370,7 +379,7 @@ func BuildUpdateSQL(instance interface{}, tableName, idField string) (string, []
 		}
 
 		// Include field in UPDATE
-		setParts = append(setParts, fmt.Sprintf("%s = $%d", EscapeIdentifier(columnName), paramIndex))
+		setParts = append(setParts, fmt.Sprintf("%s = %s", EscapeIdentifier(columnName), ph(paramIndex)))
 		values = append(values, fieldValue)
 		paramIndex++
 	}
@@ -386,50 +395,24 @@ func BuildUpdateSQL(instance interface{}, tableName, idField string) (string, []
 	// Add ID to the end for WHERE clause
 	values = append(values, idValue)
 	sql := fmt.Sprintf(
-		"UPDATE %s SET %s WHERE %s = $%d",
+		"UPDATE %s SET %s WHERE %s = %s",
 		EscapeIdentifier(tableName),
 		strings.Join(setParts, ", "),
 		EscapeIdentifier(idField),
-		paramIndex,
+		ph(paramIndex),
 	)
 
 	return sql, values, nil
 }
 
 // BuildDeleteSQL builds a DELETE SQL statement
-func BuildDeleteSQL(tableName, idField string, idValue interface{}) (string, []interface{}) {
-	sql := fmt.Sprintf("DELETE FROM %s WHERE %s = $1", EscapeIdentifier(tableName), EscapeIdentifier(idField))
+func BuildDeleteSQL(tableName, idField string, idValue interface{}, placeholder ...func(int) string) (string, []interface{}) {
+	ph := defaultPlaceholder
+	if len(placeholder) > 0 && placeholder[0] != nil {
+		ph = placeholder[0]
+	}
+	sql := fmt.Sprintf("DELETE FROM %s WHERE %s = %s", EscapeIdentifier(tableName), EscapeIdentifier(idField), ph(1))
 	return sql, []interface{}{idValue}
-}
-
-func rebindSQLForDialect(query string, d dialect.Dialect) string {
-	if d == nil || (d.Name() != "sqlite" && d.Name() != "sqlite3" && d.Placeholder(1) != "?") {
-		return query
-	}
-	var b strings.Builder
-	b.Grow(len(query) + 16)
-	i := 0
-	for i < len(query) {
-		if query[i] == '$' && i+1 < len(query) && query[i+1] >= '0' && query[i+1] <= '9' {
-			b.WriteByte('?')
-			i++
-			for i < len(query) && query[i] >= '0' && query[i] <= '9' {
-				b.WriteByte(query[i])
-				i++
-			}
-			continue
-		}
-		b.WriteByte(query[i])
-		i++
-	}
-	return b.String()
-}
-
-func rebindQuery(query string, dbtx DBTX, d dialect.Dialect) string {
-	if r, ok := dbtx.(interface{ RebindPlaceholders(string) string }); ok && r != nil {
-		return r.RebindPlaceholders(query)
-	}
-	return rebindSQLForDialect(query, d)
 }
 
 // ExecuteInsert executes an INSERT statement and returns the generated ID.
@@ -439,7 +422,7 @@ func ExecuteInsert(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string
 	}
 
 	var id int64
-	err := dbtx.QueryRowContext(ctx, rebindQuery(sql, dbtx, d), args...).Scan(&id)
+	err := dbtx.QueryRowContext(ctx, sql, args...).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert failed: %w", err)
 	}
@@ -448,17 +431,21 @@ func ExecuteInsert(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string
 }
 
 // BuildBulkInsertSQL builds a bulk INSERT SQL statement for multiple instances
-func BuildBulkInsertSQL(instances []interface{}, tableName string, pkColumn string) (sql string, values []interface{}, columns []string, err error) {
+func BuildBulkInsertSQL(instances []interface{}, tableName string, pkColumn string, placeholder ...func(int) string) (sql string, values []interface{}, columns []string, err error) {
 	if len(instances) == 0 {
 		return "", nil, nil, fmt.Errorf("no instances to insert")
 	}
 	if pkColumn == "" {
 		pkColumn = "id"
 	}
+	ph := defaultPlaceholder
+	if len(placeholder) > 0 && placeholder[0] != nil {
+		ph = placeholder[0]
+	}
 
 	// Use first instance to determine columns
 	firstInstance := instances[0]
-	_, _, columns, err = BuildInsertSQL(firstInstance, tableName, pkColumn)
+	_, _, columns, err = BuildInsertSQL(firstInstance, tableName, pkColumn, ph)
 	if err != nil {
 		return "", nil, nil, fmt.Errorf("failed to build insert SQL for first instance: %w", err)
 	}
@@ -474,7 +461,7 @@ func BuildBulkInsertSQL(instances []interface{}, tableName string, pkColumn stri
 
 	for _, instance := range instances {
 		// Get values for this instance
-		_, instanceValues, instanceColumns, err := BuildInsertSQL(instance, tableName, pkColumn)
+		_, instanceValues, instanceColumns, err := BuildInsertSQL(instance, tableName, pkColumn, ph)
 		if err != nil {
 			return "", nil, nil, fmt.Errorf("failed to build insert SQL for instance: %w", err)
 		}
@@ -488,7 +475,7 @@ func BuildBulkInsertSQL(instances []interface{}, tableName string, pkColumn stri
 		// Build placeholders for this row
 		var placeholders []string
 		for range instanceValues {
-			placeholders = append(placeholders, fmt.Sprintf("$%d", paramIndex))
+			placeholders = append(placeholders, ph(paramIndex))
 			paramIndex++
 		}
 		valueClauses = append(valueClauses, "("+strings.Join(placeholders, ", ")+")")
@@ -518,7 +505,7 @@ func ExecuteBulkInsert(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql st
 		return nil, fmt.Errorf("database execution handle is nil")
 	}
 
-	rows, err := dbtx.QueryContext(ctx, rebindQuery(sql, dbtx, d), args...)
+	rows, err := dbtx.QueryContext(ctx, sql, args...)
 	if err != nil {
 		return nil, fmt.Errorf("bulk insert failed: %w", err)
 	}
@@ -546,7 +533,7 @@ func ExecuteUpdate(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string
 		return 0, fmt.Errorf("database execution handle is nil")
 	}
 
-	result, err := dbtx.ExecContext(ctx, rebindQuery(sql, dbtx, d), args...)
+	result, err := dbtx.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return 0, fmt.Errorf("update failed: %w", err)
 	}
@@ -565,7 +552,7 @@ func ExecuteDelete(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string
 		return 0, fmt.Errorf("database execution handle is nil")
 	}
 
-	result, err := dbtx.ExecContext(ctx, rebindQuery(sql, dbtx, d), args...)
+	result, err := dbtx.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return 0, fmt.Errorf("delete failed: %w", err)
 	}

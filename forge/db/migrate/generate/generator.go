@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	codegen "github.com/forgego/forge/codegen"
+	"github.com/forgego/forge/config"
 	"github.com/forgego/forge/db/migrate/core"
 	"github.com/forgego/forge/db/migrate/sql"
 	"github.com/forgego/forge/db/migrate/state"
@@ -43,7 +44,13 @@ func NewMigrationGenerator(
 }
 
 // NewMigrationGeneratorWithDefaults creates a new migration generator with default dependencies
-func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string, driver core.Driver) (*MigrationGenerator, error) {
+func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string) (*MigrationGenerator, error) {
+	driver := core.Driver(config.NewConfig().GetDriver())
+	return NewMigrationGeneratorForDriver(modelsDir, migrationsDir, driver)
+}
+
+// NewMigrationGeneratorForDriver creates a new migration generator with default dependencies for the given driver
+func NewMigrationGeneratorForDriver(modelsDir, migrationsDir string, driver core.Driver) (*MigrationGenerator, error) {
 	// Create dependencies
 	detector := NewDetector()
 	sqlBuilder, err := sql.NewSQLBuilder(driver)

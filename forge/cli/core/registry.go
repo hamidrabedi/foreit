@@ -109,7 +109,7 @@ func (r *Registry) BuildRootCommand() *cobra.Command {
 		if cobraCmd != nil {
 			// Wrap RunE to use our Execute method
 			cobraCmd.RunE = func(c *cobra.Command, args []string) error {
-				ctx := NewContext(cfg)
+				ctx := NewContextWithConfig(cfg)
 				ctx.Cmd = c
 				// Try to create logger if needed
 				if ctx.Config != nil {
@@ -132,7 +132,7 @@ func (r *Registry) BuildRootCommand() *cobra.Command {
 			// Wrap RunE for the group command itself (if it has one)
 			if groupCmd.RunE != nil {
 				groupCmd.RunE = func(c *cobra.Command, args []string) error {
-					ctx := NewContext(cfg)
+					ctx := NewContextWithConfig(cfg)
 					ctx.Cmd = c
 					if ctx.Config != nil {
 						logger, err := createLogger(ctx.Config)
@@ -149,7 +149,7 @@ func (r *Registry) BuildRootCommand() *cobra.Command {
 				subCobraCmd := subCmd.Definition()
 				if subCobraCmd != nil {
 					subCobraCmd.RunE = func(c *cobra.Command, args []string) error {
-						ctx := NewContext(cfg)
+						ctx := NewContextWithConfig(cfg)
 						ctx.Cmd = c
 						if ctx.Config != nil {
 							logger, err := createLogger(ctx.Config)

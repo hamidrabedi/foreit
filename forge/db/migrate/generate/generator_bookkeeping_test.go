@@ -40,7 +40,7 @@ func (Item) Meta() schema.Meta {
 	modelFile := filepath.Join(modelsDir, "item.go")
 	require.NoError(t, os.WriteFile(modelFile, []byte(modelSrc), 0644))
 
-	gen, err := NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir, core.DriverSQLite)
+	gen, err := NewMigrationGeneratorForDriver(modelsDir, migrationsDir, core.DriverSQLite)
 	require.NoError(t, err)
 
 	err = gen.GenerateMigrations("create_items")

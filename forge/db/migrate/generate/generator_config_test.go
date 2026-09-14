@@ -3,6 +3,7 @@ package generate
 import (
 	"testing"
 
+	"github.com/forgego/forge/config"
 	"github.com/forgego/forge/db/migrate/core"
 	"github.com/forgego/forge/db/migrate/sql"
 	"github.com/forgego/forge/db/migrate/state"
@@ -20,16 +21,32 @@ func TestNewMigrationGeneratorPreservesCallerDriver(t *testing.T) {
 	require.Equal(t, driver, gen.driver)
 }
 
-func TestNewMigrationGeneratorWithDefaultsUsesCallerDriver(t *testing.T) {
-	gen, err := NewMigrationGeneratorWithDefaults("models", "migrations", core.DriverSQLite)
+func TestNewMigrationGeneratorForDriverUsesCallerDriver(t *testing.T) {
+	gen, err := NewMigrationGeneratorForDriver("models", "migrations", core.DriverSQLite)
 
 	require.NoError(t, err)
 	require.Equal(t, core.DriverSQLite, gen.driver)
 }
 
-func TestNewMigrationGeneratorWithDefaultsRejectsUnsupportedCallerDriver(t *testing.T) {
-	gen, err := NewMigrationGeneratorWithDefaults("models", "migrations", core.Driver("unsupported"))
+func TestNewMigrationGeneratorForDriverRejectsUnsupportedCallerDriver(t *testing.T) {
+	gen, err := NewMigrationGeneratorForDriver("models", "migrations", core.Driver("unsupported"))
 
 	require.Nil(t, gen)
 	require.ErrorContains(t, err, "unsupported database driver: unsupported")
+}
+
+func TestNewMigrationGeneratorWithDefaults_MatchesDefaultDriver(t *testing.T) {
+	modelsDir := t.TempDir()
+	migrationsDir := t.TempDir()
+
+	gen, err := NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir)
+	require.NoError(t, err)
+	require.NotNil(t, gen)
+
+	defaultDriver := core.Driver(config.NewConfig().GetDriver())
+	driverGen, err := NewMigrationGeneratorForDriver(modelsDir, migrationsDir, defaultDriver)
+	require.NoError(t, err)
+	require.NotNil(t, driverGen)
+
+	require.Equal(t, driverGen.driver, gen.driver)
 }

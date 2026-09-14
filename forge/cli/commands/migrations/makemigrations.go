@@ -112,7 +112,7 @@ func (c *MakeMigrationsCommand) Execute(ctx *core.Context, args []string) error 
 			modelsDir = "./models"
 		}
 
-		gen, err := migrate.NewGenerator(modelsDir, migrationsDir, migratecore.Driver(ctx.Config.GetDriver()))
+		gen, err := migrate.NewGeneratorForDriver(modelsDir, migrationsDir, migratecore.Driver(ctx.Config.GetDriver()))
 		if err != nil {
 			return fmt.Errorf("failed to create migration generator: %w", err)
 		}

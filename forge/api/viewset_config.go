@@ -22,6 +22,7 @@ type ViewSetConfig struct {
 	Authentication []authentication.Authentication
 	Permissions    []permissions.Permission
 	Throttles      []throttling.Throttle
+	ErrorWriter    func(http.ResponseWriter, *http.Request, error)
 
 	// Internal viewset created lazily
 	viewSet *ConfigurableViewSet
@@ -45,6 +46,7 @@ func NewConfigurableViewSet(config *ViewSetConfig) *ConfigurableViewSet {
 	base.Authentication = config.Authentication
 	base.Permissions = config.Permissions
 	base.Throttles = config.Throttles
+	base.ErrorWriter = config.ErrorWriter
 
 	return &ConfigurableViewSet{
 		BaseViewSet: base,

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/forgego/forge/api/authentication"
+	"github.com/forgego/forge/api/docs"
 	apierrors "github.com/forgego/forge/api/errors"
 	"github.com/forgego/forge/api/exceptions"
 	"github.com/forgego/forge/api/permissions"
@@ -61,6 +63,7 @@ type BaseViewSet struct {
 	Authentication []authentication.Authentication
 	Permissions    []permissions.Permission
 	Throttles      []throttling.Throttle
+	ErrorWriter    func(http.ResponseWriter, *http.Request, error)
 
 	actionMu sync.RWMutex
 	action   string
@@ -171,6 +174,10 @@ func (vs *BaseViewSet) checkRequest(w http.ResponseWriter, r *http.Request, acti
 }
 
 func (vs *BaseViewSet) handleException(w http.ResponseWriter, r *http.Request, err error) {
+	if vs.ErrorWriter != nil {
+		vs.ErrorWriter(w, r, err)
+		return
+	}
 	apierrors.WriteError(w, r, err)
 }
 
@@ -653,11 +660,37 @@ type customRoute struct {
 	handler http.HandlerFunc
 }
 
+// ActionConfig describes an extra endpoint on a registered resource.
+type ActionConfig struct {
+	Methods []string // e.g. http.MethodPost; defaults to GET
+	Detail  bool     // true: /{resource}/{id}/{path}; false: /{resource}/{path}
+	URLPath string   // defaults to the action name
+}
+
+type actionRoute struct {
+	resource string
+	name     string
+	cfg      ActionConfig
+	handler  http.HandlerFunc
+}
+
+func isValidHTTPMethod(method string) bool {
+	switch method {
+	case http.MethodGet, http.MethodHead, http.MethodPost,
+		http.MethodPut, http.MethodPatch, http.MethodDelete,
+		http.MethodConnect, http.MethodOptions, http.MethodTrace:
+		return true
+	default:
+		return false
+	}
+}
+
 // Router is a router for viewsets (DRF-like)
 type Router struct {
 	prefix       string
 	routes       map[string]ViewSet
 	customRoutes []customRoute
+	actions      []actionRoute
 }
 
 // NewRouter creates a new API router
@@ -666,12 +699,35 @@ func NewRouter(prefix string) *Router {
 		prefix:       prefix,
 		routes:       make(map[string]ViewSet),
 		customRoutes: make([]customRoute, 0),
+		actions:      make([]actionRoute, 0),
 	}
 }
 
 // Register registers a viewset with a resource name
 func (r *Router) Register(resource string, vs ViewSet) {
 	r.routes[resource] = vs
+}
+
+// Action registers an extra endpoint on a resource.
+func (r *Router) Action(resource, name string, cfg ActionConfig, handler http.HandlerFunc) {
+	if len(cfg.Methods) == 0 {
+		cfg.Methods = []string{http.MethodGet}
+	} else {
+		for _, method := range cfg.Methods {
+			if !isValidHTTPMethod(method) {
+				panic(fmt.Sprintf("unknown HTTP method: %s", method))
+			}
+		}
+	}
+	if cfg.URLPath == "" {
+		cfg.URLPath = name
+	}
+	r.actions = append(r.actions, actionRoute{
+		resource: resource,
+		name:     name,
+		cfg:      cfg,
+		handler:  handler,
+	})
 }
 
 // Get registers a custom GET route on the API router
@@ -701,25 +757,44 @@ func (r *Router) Handle(method, path string, handler http.HandlerFunc) {
 	})
 }
 
+func (r *Router) registerResourceRoutes(router *forgehttp.Router, resource string, vs ViewSet) {
+	path := r.prefix + "/" + resource
+	router.Route(path, func(sub *forgehttp.Router) {
+		sub.Get("/", vs.List)
+		sub.Post("/", vs.Create)
+		sub.Get("/{id}", vs.Retrieve)
+		sub.Put("/{id}", vs.Update)
+		sub.Patch("/{id}", vs.PartialUpdate)
+		sub.Delete("/{id}", vs.Destroy)
+		sub.Options("/", func(w http.ResponseWriter, r *http.Request) {
+			docs.OptionsHandler(w, r, vs, nil)
+		})
+	})
+}
+
+func (r *Router) registerActions(router *forgehttp.Router) {
+	cleanPrefix := strings.TrimSuffix(r.prefix, "/")
+	for _, act := range r.actions {
+		cleanResource := strings.Trim(act.resource, "/")
+		cleanActionPath := strings.Trim(act.cfg.URLPath, "/")
+		var fullPath string
+		if act.cfg.Detail {
+			fullPath = cleanPrefix + "/" + cleanResource + "/{id}/" + cleanActionPath
+		} else {
+			fullPath = cleanPrefix + "/" + cleanResource + "/" + cleanActionPath
+		}
+		for _, method := range act.cfg.Methods {
+			router.Method(method, fullPath, act.handler)
+		}
+	}
+}
+
 // RegisterRoutes registers all routes on a chi router
 func (r *Router) RegisterRoutes(router *forgehttp.Router) {
 	for resource, vs := range r.routes {
-		path := r.prefix + "/" + resource
-
-		// List and Create
-		router.Route(path, func(sub *forgehttp.Router) {
-			sub.Get("/", vs.List)
-			sub.Post("/", vs.Create)
-
-			// Retrieve, Update, PartialUpdate, Destroy
-			sub.Get("/{id}", vs.Retrieve)
-			sub.Put("/{id}", vs.Update)
-			sub.Patch("/{id}", vs.PartialUpdate)
-			sub.Delete("/{id}", vs.Destroy)
-		})
+		r.registerResourceRoutes(router, resource, vs)
 	}
-
-	// Register custom routes
+	r.registerActions(router)
 	for _, cr := range r.customRoutes {
 		cleanPath := "/" + strings.TrimPrefix(cr.path, "/")
 		fullPath := r.prefix + cleanPath

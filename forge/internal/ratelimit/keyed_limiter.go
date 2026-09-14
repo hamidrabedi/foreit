@@ -54,6 +54,11 @@ func (l *KeyedLimiter) Reserve(key string) (bool, time.Duration) {
 	return false, retryAfter
 }
 
+// Allow reports whether an event may happen at the current time for key and the retry duration if denied.
+func (l *KeyedLimiter) Allow(key string) (bool, time.Duration) {
+	return l.Reserve(key)
+}
+
 func (l *KeyedLimiter) getLimiter(key string) *rate.Limiter {
 	now := time.Now().UnixNano()
 	l.mu.RLock()

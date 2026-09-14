@@ -234,8 +234,7 @@ func (ms *ModelSchema) buildRelationInfo(rel schema.Relation) RelationInfo {
 		relInfo.FKColumn, relInfo.FKStructField = resolveRelationFK(ms, &relInfo)
 	case schema.RelationManyToMany:
 		relInfo.Type = RelationManyToMany
-		targetSchema, _ := GetModelSchemaByName(rel.To)
-		relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, targetSchema, ms.TableName, rel.To)
+		relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, nil, ms.TableName, rel.To)
 	}
 
 	return relInfo

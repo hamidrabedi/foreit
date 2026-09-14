@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -285,4 +286,117 @@ func TestSelectRelated_UnmatchedFK_ReturnsRowsAndLogsWarningOnce(t *testing.T) {
 	assert.Contains(t, logOutput, "model=TestModelUnmatchedSource")
 	assert.Contains(t, logOutput, "relation=UnmatchedRel")
 	assert.Contains(t, logOutput, "expected_column=unmatched_rel_id")
+}
+
+// Author and Book define mutually related many-to-many models.
+type Author struct {
+	schema.BaseSchema
+	ID    int64   `db:"id"`
+	Name  string  `db:"name"`
+	Books []*Book `db:"books"`
+}
+
+func (Author) Meta() schema.Meta {
+	return schema.Meta{TableName: "authors"}
+}
+
+func (Author) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("name"),
+	}
+}
+
+func (Author) Relations() []schema.Relation {
+	return []schema.Relation{
+		schema.ManyToManyField("Books", "Book", schema.Through("author_books")),
+	}
+}
+
+type Book struct {
+	schema.BaseSchema
+	ID      int64     `db:"id"`
+	Title   string    `db:"title"`
+	Authors []*Author `db:"authors"`
+}
+
+func (Book) Meta() schema.Meta {
+	return schema.Meta{TableName: "books"}
+}
+
+func (Book) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("title"),
+	}
+}
+
+func (Book) Relations() []schema.Relation {
+	return []schema.Relation{
+		schema.ManyToManyField("Authors", "Author", schema.Through("author_books")),
+	}
+}
+
+func TestBuildModelSchema_MutuallyRelatedManyToMany(t *testing.T) {
+	// Isolate and reset registry state and schema cache for test models.
+	schemaMu.Lock()
+	delete(schemaCache, reflect.TypeOf(Author{}))
+	delete(schemaCache, reflect.TypeOf(Book{}))
+	schemaMu.Unlock()
+
+	schemaNameMu.Lock()
+	delete(schemaNameRegistry, "Author")
+	delete(schemaNameRegistry, "Book")
+	schemaNameMu.Unlock()
+
+	t.Cleanup(func() {
+		schemaMu.Lock()
+		delete(schemaCache, reflect.TypeOf(Author{}))
+		delete(schemaCache, reflect.TypeOf(Book{}))
+		schemaMu.Unlock()
+
+		schemaNameMu.Lock()
+		delete(schemaNameRegistry, "Author")
+		delete(schemaNameRegistry, "Book")
+		schemaNameMu.Unlock()
+	})
+
+	RegisterModelType("Author", reflect.TypeOf(Author{}))
+	RegisterModelType("Book", reflect.TypeOf(Book{}))
+
+	authorSchema, err := GetModelSchema[Author]()
+	require.NoError(t, err)
+	require.NotNil(t, authorSchema)
+
+	bookSchema, err := GetModelSchema[Book]()
+	require.NoError(t, err)
+	require.NotNil(t, bookSchema)
+
+	require.Len(t, authorSchema.Relations, 1)
+	assert.Equal(t, "author_id", authorSchema.Relations[0].ThroughSourceColumn)
+	assert.Equal(t, "book_id", authorSchema.Relations[0].ThroughTargetColumn)
+
+	require.Len(t, bookSchema.Relations, 1)
+	assert.Equal(t, "book_id", bookSchema.Relations[0].ThroughSourceColumn)
+	assert.Equal(t, "author_id", bookSchema.Relations[0].ThroughTargetColumn)
+
+	// Also verify direct BuildModelSchema calls on uncached instances.
+	schemaMu.Lock()
+	delete(schemaCache, reflect.TypeOf(Author{}))
+	delete(schemaCache, reflect.TypeOf(Book{}))
+	schemaMu.Unlock()
+
+	authorMS, err := BuildModelSchema(Author{})
+	require.NoError(t, err)
+	require.NotNil(t, authorMS)
+	require.Len(t, authorMS.Relations, 1)
+	assert.Equal(t, "author_id", authorMS.Relations[0].ThroughSourceColumn)
+	assert.Equal(t, "book_id", authorMS.Relations[0].ThroughTargetColumn)
+
+	bookMS, err := BuildModelSchema(Book{})
+	require.NoError(t, err)
+	require.NotNil(t, bookMS)
+	require.Len(t, bookMS.Relations, 1)
+	assert.Equal(t, "book_id", bookMS.Relations[0].ThroughSourceColumn)
+	assert.Equal(t, "author_id", bookMS.Relations[0].ThroughTargetColumn)
 }

@@ -268,3 +268,8 @@ func (w *errorResponseWriter) handlePanic(rec interface{}) {
 	}
 	w.handler.HandlePanic(w, w.request, rec)
 }
+
+// WriteError writes an error as an RFC 7807 problem response.
+func WriteError(w http.ResponseWriter, r *http.Request, err error) {
+	NewHandler(DefaultHandlerConfig()).HandleError(w, r, err)
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/forgego/forge/api/authentication"
+	apierrors "github.com/forgego/forge/api/errors"
 	"github.com/forgego/forge/api/exceptions"
 	"github.com/forgego/forge/api/permissions"
 	"github.com/forgego/forge/api/throttling"
@@ -170,7 +171,7 @@ func (vs *BaseViewSet) checkRequest(w http.ResponseWriter, r *http.Request, acti
 }
 
 func (vs *BaseViewSet) handleException(w http.ResponseWriter, r *http.Request, err error) {
-	exceptions.HandleExceptionHTTP(w, r, err, nil)
+	apierrors.WriteError(w, r, err)
 }
 
 func (vs *BaseViewSet) allowObject(w http.ResponseWriter, r *http.Request, object interface{}) bool {

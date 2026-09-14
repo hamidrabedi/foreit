@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,15 @@ type TestModel struct {
 // TestSerializer is a test serializer
 type TestSerializer struct {
 	*BaseSerializer
+}
+
+type invalidSerializer struct {
+	*BaseSerializer
+}
+
+func (s *invalidSerializer) Validate() error {
+	s.AddError("name", "Name is required")
+	return errors.New("validation failed")
 }
 
 func NewTestSerializer() Serializer {
@@ -52,20 +62,12 @@ func TestBaseSerializer_Validate_Valid(t *testing.T) {
 }
 
 func TestBaseSerializer_Validate_Invalid(t *testing.T) {
-	t.Skip("known bug: BaseSerializer.Validate always returns nil and does not validate required or empty fields")
-
-	serializer := NewTestSerializer()
-	testSerializer := serializer.(*TestSerializer)
-
-	// Set invalid data (missing required fields)
-	data := map[string]interface{}{
-		"name": "", // Empty name
-	}
-	testSerializer.BaseSerializer.SetData(data)
+	serializer := &invalidSerializer{BaseSerializer: NewBaseSerializer(map[string]interface{}{})}
 
 	err := serializer.Validate()
 	require.Error(t, err)
 	assert.False(t, serializer.IsValid())
+	assert.Equal(t, map[string][]string{"name": {"Name is required"}}, serializer.Errors())
 }
 
 func TestBaseSerializer_ReadOnlyFields(t *testing.T) {

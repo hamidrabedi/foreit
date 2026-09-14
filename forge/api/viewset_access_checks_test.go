@@ -136,7 +136,7 @@ func TestBaseViewSetPermissionDenial(t *testing.T) {
 		response := serveAccessCheckRequest(viewSet, http.MethodGet, "/api/items/")
 
 		assert.Equal(t, http.StatusForbidden, response.Code)
-		assert.JSONEq(t, `{"error":true,"code":"permission_denied","message":"access denied"}`, response.Body.String())
+		assert.JSONEq(t, `{"type":"https://api.example.com/problems/authorization-error","title":"Permission Denied","status":403,"detail":"access denied","instance":"/api/items/","code":"PERMISSION_DENIED"}`, response.Body.String())
 	})
 
 	t.Run("retrieve object", func(t *testing.T) {
@@ -146,7 +146,7 @@ func TestBaseViewSetPermissionDenial(t *testing.T) {
 		response := serveAccessCheckRequest(viewSet, http.MethodGet, "/api/items/1")
 
 		assert.Equal(t, http.StatusForbidden, response.Code)
-		assert.JSONEq(t, `{"error":true,"code":"permission_denied","message":"access denied"}`, response.Body.String())
+		assert.JSONEq(t, `{"type":"https://api.example.com/problems/authorization-error","title":"Permission Denied","status":403,"detail":"access denied","instance":"/api/items/1","code":"PERMISSION_DENIED"}`, response.Body.String())
 	})
 }
 
@@ -157,7 +157,7 @@ func TestBaseViewSetAuthenticationFailure(t *testing.T) {
 	response := serveAccessCheckRequest(viewSet, http.MethodGet, "/api/items/")
 
 	assert.Equal(t, http.StatusUnauthorized, response.Code)
-	assert.JSONEq(t, `{"error":true,"code":"authentication_failed","message":"invalid credentials"}`, response.Body.String())
+	assert.JSONEq(t, `{"type":"https://api.example.com/problems/authentication-error","title":"Authentication Failed","status":401,"detail":"invalid credentials","instance":"/api/items/","code":"AUTHENTICATION_FAILED"}`, response.Body.String())
 }
 
 func TestBaseViewSetThrottleDenial(t *testing.T) {
@@ -168,7 +168,7 @@ func TestBaseViewSetThrottleDenial(t *testing.T) {
 
 	assert.Equal(t, http.StatusTooManyRequests, response.Code)
 	assert.Equal(t, "7", response.Header().Get("Retry-After"))
-	assert.JSONEq(t, `{"error":true,"code":"throttled","message":"Request was throttled"}`, response.Body.String())
+	assert.JSONEq(t, `{"type":"https://api.example.com/problems/rate-limit-error","title":"Rate Limit Exceeded","status":429,"detail":"Request was throttled","instance":"/api/items/","code":"RATE_LIMIT_EXCEEDED","meta":{"retry_after_seconds":7}}`, response.Body.String())
 }
 
 func TestBaseViewSetWithoutAccessClassesKeepsListResponse(t *testing.T) {

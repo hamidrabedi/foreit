@@ -65,6 +65,43 @@ Only code that was unreachable, a no-op pretending to work, or harmful. No worki
 | #230 | `db/migrate/execute`: `checksum.go`, `executor.go`, `rollback.go` and the executor-only integration test | identical copy of `verify` checksum; `Executor`/`RollbackManager` had no caller outside their own test |
 | #230 | `tests/helpers` | duplicate of `tests/testhelpers` (importers moved) |
 
+### Corrections after the owner's review (2026-09-14)
+
+The owner asked whether everything removed was really useless. It was not. An independent review of every merged PR, a review of the open branches, and a mechanical diff of all exported functions against master found these mistakes; all are fixed on the open branches before merge:
+
+| Mistake | Where | Fix |
+|---|---|---|
+| `XSS.SanitizeHTMLStrict` / `XSS.SanitizeInput` deleted with the fake regex sanitizer, but they were correct `html.EscapeString` wrappers | #229 (merged) | restored on #230 |
+| Custom viewset actions (list/detail endpoints, any method) and OPTIONS metadata removed with the broken enhanced viewset | #230 | `api.Router.Action` + OPTIONS on the kept router |
+| Pluggable throttle store removed | #230 | `throttling.Store`, `New*RateThrottleWithStore`, `WithStore` |
+| Throttle algorithm silently changed from fixed window ("N per period") to token bucket (up to ~2N in the first window) | #230 | fixed-window counter restored as the default store; semantics test against the old behaviour |
+| Custom exception handling hook deleted instead of fixed (it never took effect) | #230 | `errors.HandlerConfig.CustomMapper`, `errors.NewWriter`, `BaseViewSet.ErrorWriter` |
+| Typed filter builder and relation depth guard deleted as "unreferenced" | #230 | restored unchanged |
+| API default getters and `SetupCompleteAPI` deleted | #230 | restored |
+| Saved filters (`SaveFilter`, `LoadFilter`, `PreviewFilter`, `FilterStorage`) deleted instead of fixing a missing mutex | #230 | restored with a mutex and collision-safe IDs |
+| Filter query planner (`QueryOptimizer.Optimize`) deleted | #230 | restored unchanged |
+| `identity.HashPassword` & co. deleted (public import path) | #230 | restored unchanged |
+| Multi-step rollback lost with `execute.RollbackManager` | #230 | `db.MigrationRunner.RollbackSteps` |
+| `orm.BuildInsertSQL`/`BuildBulkInsertSQL` gained a required parameter | #225 (merged) | original signatures restored; new ones are `...ForPK` (Wave 3 branch) |
+| `cli/core.NewContext`, `migrate.Generate`/`NewGenerator`, `generate.NewMigrationGeneratorWithDefaults`, `orm.Execute*` signatures changed | Wave 3 branch | originals restored; new ones are `NewContextWithConfig`, `...ForDriver`, `Execute*Tx` |
+| Deprecated `FieldExpr`/`QueryExpr` scheduled for deletion although their notice promises removal only in v2.0 | Wave 3 plan | kept; internals use one expression tree through an adapter |
+| `SelectRelated` on an unresolvable relation planned to become an error (breaks code that returns rows today) | Wave 3 plan | keeps returning rows and logs one warning |
+
+Rules added: "nothing calls it" is not a reason to delete a public framework feature; broken features are fixed or flagged, and only harmful, fake or truly duplicate code is removed; merging duplicates must keep the old algorithm's behaviour, verified by a test against the old code; exported signatures stay compatible (new parameters go to new functions).
+
+### Intentional breaking changes still in #230 (migration notes)
+
+| Removed / changed | Why it is not kept | Use instead |
+|---|---|---|
+| `api.EnhancedBaseViewSet`, `EnhancedBaseViewSetIntegrated`, `CreateDefaultViewSet`, `CreateProductionViewSet`, `RegisterAPIWithDefaults`, `CompleteExample` | CRUD actions except List always answered "Manager not found" (`getManagerFromModel` was a stub); the helpers only built that viewset | `api.BaseViewSet` / `api.ViewSetConfig` with `Authentication`, `Permissions`, `Throttles`, `ErrorWriter` |
+| `api.EnhancedRouter`, `ActionRegistry`, `RegisterAction`, `RegisterEnhanced`, `RegisterRoutesEnhanced` | the router only accepted the broken viewset; no faithful alias is possible | `api.Router.Action(resource, name, ActionConfig, handler)`; OPTIONS is served per resource |
+| `api/exceptions.HandleExceptionHTTP`, `ExceptionHandler`, `DefaultExceptionHandler`, `Set/GetExceptionHandler`, `ErrorResponse`, `APIException.ToResponse`; `api.SetExceptionHandler` | a second error writer with its own body format; the global handler was never read; `api/errors` imports `exceptions`, so a wrapper cannot live there | `api/errors.WriteError`, `errors.NewWriter(&HandlerConfig{CustomMapper: ...})`; exception constructors (`exceptions.NewNotFound`, ...) are unchanged |
+| API error body `{error, code, message}` | one format across the framework | RFC 7807 `application/problem+json` |
+| `throttling.NewUserRateThrottle(rate, cache)`, `NewAnonRateThrottle(rate, cache)`, `CacheBackend`, `MemoryCache`, `NewMemoryCache` | second storage abstraction; Go cannot overload the constructor name | `NewUserRateThrottle(rate)` (fixed-window default) or `NewUserRateThrottleWithStore(rate, store)` |
+| `db/migrate/execute.Executor`, `NewExecutor`, `RollbackManager`, `RollbackOptions` | duplicate of `db.MigrationRunner` (same Migrate/MigrateTo/Rollback/RollbackTo/Version/Force) | `db.NewMigrationRunner`, `RollbackSteps(n)` |
+| `filter.FilterCache`, `NewFilterCache` | owner does not want filter caching | none |
+| `filter.DialectAdapter`, `PostgresAdapter`, `SQLiteAdapter`, `MySQLAdapter`, `GetDialectAdapter` | interpolated values into SQL (injection risk); MySQL is not supported | `orm` expressions (feature gap: JSON contains / similarity lookups) |
+
 ## Flagged for the owner (kept: works, but has a problem)
 
 These are live code paths. They are **not** removed. Each needs a decision or a fix PR.

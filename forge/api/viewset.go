@@ -57,13 +57,15 @@ type ManagerInterface interface {
 
 // BaseViewSet provides common viewset functionality
 type BaseViewSet struct {
-	Serializer     func() Serializer
-	Queryset       interface{} // This would be a QuerySet in real implementation
-	Model          interface{}
+	Serializer func() Serializer
+	Queryset   interface{} // This would be a QuerySet in real implementation
+	Model      interface{}
+	// Authentication uses the current defaults when nil; a non-nil empty slice disables authentication.
 	Authentication []authentication.Authentication
-	Permissions    []permissions.Permission
-	Throttles      []throttling.Throttle
-	ErrorWriter    func(http.ResponseWriter, *http.Request, error)
+	// Permissions uses the current defaults when nil; a non-nil empty slice disables permission checks.
+	Permissions []permissions.Permission
+	Throttles   []throttling.Throttle
+	ErrorWriter func(http.ResponseWriter, *http.Request, error)
 
 	actionMu sync.RWMutex
 	action   string
@@ -109,7 +111,11 @@ func (vs *BaseViewSet) SetAction(action string) {
 }
 
 func (vs *BaseViewSet) authenticateRequest(r *http.Request) error {
-	result, err := authentication.AuthenticateRequest(r, vs.Authentication)
+	authClasses := vs.Authentication
+	if authClasses == nil {
+		authClasses = GetDefaultAuthentication()
+	}
+	result, err := authentication.AuthenticateRequest(r, authClasses)
 	if err != nil {
 		return exceptions.NewAuthenticationFailed(err.Error())
 	}
@@ -122,10 +128,14 @@ func (vs *BaseViewSet) authenticateRequest(r *http.Request) error {
 }
 
 func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
-	if permissions.CheckPermissions(r, vs, vs.Permissions) {
+	perms := vs.Permissions
+	if perms == nil {
+		perms = GetDefaultPermissions()
+	}
+	if permissions.CheckPermissions(r, vs, perms) {
 		return nil
 	}
-	for _, permission := range vs.Permissions {
+	for _, permission := range perms {
 		if !permission.HasPermission(r, vs) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
@@ -134,10 +144,14 @@ func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
 }
 
 func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{}) error {
-	if permissions.CheckObjectPermissions(r, vs, object, vs.Permissions) {
+	perms := vs.Permissions
+	if perms == nil {
+		perms = GetDefaultPermissions()
+	}
+	if permissions.CheckObjectPermissions(r, vs, object, perms) {
 		return nil
 	}
-	for _, permission := range vs.Permissions {
+	for _, permission := range perms {
 		if !permission.HasObjectPermission(r, vs, object) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}

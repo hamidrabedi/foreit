@@ -84,14 +84,18 @@ func (w *Writer) WriteAPI(definitions []*ModelDefinition, outputDir string) erro
 	return w.writeTemplate(t, data, filename)
 }
 
-// writeTemplate writes a template to a file atomically
+// writeTemplate writes a template to a file. Replacement is atomic on Unix.
+// On Windows, os.Rename is not guaranteed atomic and may fail while the
+// destination is open elsewhere.
 func (w *Writer) writeTemplate(t *template.Template, data interface{}, filename string) error {
 	dir := filepath.Dir(filename)
 	base := filepath.Base(filename)
 
-	perm := os.FileMode(0o644)
+	var perm os.FileMode
 	if fi, err := os.Stat(filename); err == nil {
 		perm = fi.Mode().Perm()
+	} else {
+		perm = os.FileMode(0o666 &^ processUmask())
 	}
 
 	tmpFile, err := os.CreateTemp(dir, "."+base+".tmp-*")

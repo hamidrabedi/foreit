@@ -94,10 +94,10 @@ func TestWriteTemplate_DefaultPermissionsWhenFileDoesNotExist(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "package test\n", string(content))
 
-	// Verify default 0644 permissions
+	// Verify new-file permissions respect the process umask.
 	fi, err := os.Stat(dest)
 	require.NoError(t, err)
-	assert.Equal(t, os.FileMode(0644), fi.Mode().Perm())
+	assert.Equal(t, os.FileMode(0o666&^processUmask()), fi.Mode().Perm())
 
 	// Verify no temp files left behind
 	matches, err := filepath.Glob(filepath.Join(tmpDir, ".*tmp*"))

@@ -71,6 +71,7 @@ func DefaultPostgresOptsWithTest(testName string) PostgresOpts {
 	}
 
 	opts.DBName = truncateDBName(opts.DBName)
+	applyDatabaseURLToOpts(&opts)
 	return opts
 }
 
@@ -329,8 +330,8 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 	fmt.Printf("[DEBUG] Connecting directly to PostgreSQL at %s:%s\n", host, port)
 
 	// First, connect to default "postgres" database to create the test database if needed
-	defaultDSN := fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
-		user, password, host, port)
+	defaultDSN := testDatabaseURL(fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
+		user, password, host, port))
 
 	defaultDB, err := sql.Open("postgres", defaultDSN)
 	if err != nil {
@@ -395,8 +396,8 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 		}
 
 		// Connect to default DB to drop test DB
-		defaultDSN := fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
-			user, password, host, port)
+		defaultDSN := testDatabaseURL(fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
+			user, password, host, port))
 		defaultDB, err := sql.Open("postgres", defaultDSN)
 		if err != nil {
 			return fmt.Errorf("failed to open default database connection for cleanup: %w", err)

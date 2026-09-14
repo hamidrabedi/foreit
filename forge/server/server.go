@@ -13,6 +13,7 @@ import (
 	"github.com/forgego/forge/config"
 	"github.com/forgego/forge/log"
 	"github.com/gorilla/csrf"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 )
 
@@ -193,10 +194,17 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func ignoreSyncError(err error) error {
-	if errors.Is(err, syscall.EINVAL) {
+	if err == nil {
 		return nil
 	}
-	return err
+	var rest []error
+	for _, part := range multierr.Errors(err) {
+		if errors.Is(part, syscall.EINVAL) {
+			continue
+		}
+		rest = append(rest, part)
+	}
+	return multierr.Combine(rest...)
 }
 
 // ServerInfoHandler returns a handler for server info endpoint

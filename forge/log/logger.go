@@ -12,6 +12,7 @@ import (
 
 	forgeerrors "github.com/forgego/forge/errors"
 	logexporters "github.com/forgego/forge/log/exporters"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -32,7 +33,10 @@ func NewLogger(development bool) (*Logger, error) {
 
 // NewLoggerFromConfig creates a new logger from a configuration
 func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
-	return newLoggerFromConfig(config)
+	if config == nil {
+		return newLoggerFromConfig(nil)
+	}
+	return newLoggerFromConfig(config, config.Hooks...)
 }
 
 func newLoggerFromConfig(config *LoggingConfig, hooks ...Hook) (*Logger, error) {
@@ -246,8 +250,15 @@ func (l *Logger) Close() error {
 }
 
 func ignoreSyncError(err error) error {
-	if errors.Is(err, syscall.EINVAL) {
+	if err == nil {
 		return nil
 	}
-	return err
+	var rest []error
+	for _, part := range multierr.Errors(err) {
+		if errors.Is(part, syscall.EINVAL) {
+			continue
+		}
+		rest = append(rest, part)
+	}
+	return multierr.Combine(rest...)
 }

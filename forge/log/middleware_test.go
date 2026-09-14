@@ -1,7 +1,10 @@
 package log
 
 import (
+	"bufio"
 	"bytes"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,6 +111,14 @@ func TestMiddleware_RedactsQueryInLog(t *testing.T) {
 	assert.NotContains(t, logOutput, "superSecretKey123")
 }
 
+type flusherHijackerRecorder struct {
+	*httptest.ResponseRecorder
+}
+
+func (f *flusherHijackerRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return nil, nil, fmt.Errorf("hijacker not supported: %w", http.ErrNotSupported)
+}
+
 func TestMiddleware_ResponseWriterFlusherAndHijacker(t *testing.T) {
 	logger := NewNopLogger()
 	mw := Middleware(logger)
@@ -135,7 +146,7 @@ func TestMiddleware_ResponseWriterFlusherAndHijacker(t *testing.T) {
 		_, _, rcHijackErr = rc.Hijack()
 	}))
 
-	rec := httptest.NewRecorder()
+	rec := &flusherHijackerRecorder{ResponseRecorder: httptest.NewRecorder()}
 	req := httptest.NewRequest(http.MethodGet, "/stream", nil)
 	handler.ServeHTTP(rec, req)
 

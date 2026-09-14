@@ -51,8 +51,9 @@ func TestConsoleEncoder_Clone(t *testing.T) {
 	// Both parent and child must have the custom one-line format (timestamp LEVEL message\n, no tabs).
 	// Default zap console encoder uses tab characters (\t) and JSON fields.
 	customFormatPattern := regexp.MustCompile(`^\d{2}:\d{2}:\d{2}\.\d{3} INFO hello\n$`)
+	childFormatPattern := regexp.MustCompile(`^\d{2}:\d{2}:\d{2}\.\d{3} INFO hello \| k=v\n$`)
 	assert.Regexp(t, customFormatPattern, parentOutput)
-	assert.Regexp(t, customFormatPattern, childOutput)
+	assert.Regexp(t, childFormatPattern, childOutput)
 	assert.NotContains(t, childOutput, "\t")
 }
 

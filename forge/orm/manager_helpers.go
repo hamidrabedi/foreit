@@ -2,13 +2,11 @@ package orm
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"reflect"
 	"strings"
 
-	"github.com/forgego/forge/db"
-	"github.com/forgego/forge/errors"
+	"github.com/forgego/forge/db/dialect"
 	"github.com/forgego/forge/schema"
 	"github.com/forgego/forge/utils"
 )
@@ -404,15 +402,44 @@ func BuildDeleteSQL(tableName, idField string, idValue interface{}) (string, []i
 	return sql, []interface{}{idValue}
 }
 
-// ExecuteInsert executes an INSERT statement and returns the generated ID
-func ExecuteInsert(ctx context.Context, database *db.DB, sql string, args []interface{}) (int64, error) {
-	sqldb, err := getSQLDB(database)
-	if err != nil {
-		return 0, err
+func rebindSQLForDialect(query string, d dialect.Dialect) string {
+	if d == nil || (d.Name() != "sqlite" && d.Name() != "sqlite3" && d.Placeholder(1) != "?") {
+		return query
+	}
+	var b strings.Builder
+	b.Grow(len(query) + 16)
+	i := 0
+	for i < len(query) {
+		if query[i] == '$' && i+1 < len(query) && query[i+1] >= '0' && query[i+1] <= '9' {
+			b.WriteByte('?')
+			i++
+			for i < len(query) && query[i] >= '0' && query[i] <= '9' {
+				b.WriteByte(query[i])
+				i++
+			}
+			continue
+		}
+		b.WriteByte(query[i])
+		i++
+	}
+	return b.String()
+}
+
+func rebindQuery(query string, dbtx DBTX, d dialect.Dialect) string {
+	if r, ok := dbtx.(interface{ RebindPlaceholders(string) string }); ok && r != nil {
+		return r.RebindPlaceholders(query)
+	}
+	return rebindSQLForDialect(query, d)
+}
+
+// ExecuteInsert executes an INSERT statement and returns the generated ID.
+func ExecuteInsert(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string, args []interface{}) (int64, error) {
+	if dbtx == nil {
+		return 0, fmt.Errorf("database execution handle is nil")
 	}
 
 	var id int64
-	err = sqldb.QueryRowContext(ctx, database.RebindPlaceholders(sql), args...).Scan(&id)
+	err := dbtx.QueryRowContext(ctx, rebindQuery(sql, dbtx, d), args...).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("insert failed: %w", err)
 	}
@@ -485,14 +512,13 @@ func BuildBulkInsertSQL(instances []interface{}, tableName string, pkColumn stri
 	return sql, allValues, columns, nil
 }
 
-// ExecuteBulkInsert executes a bulk INSERT statement and returns all generated IDs
-func ExecuteBulkInsert(ctx context.Context, database *db.DB, sql string, args []interface{}) ([]int64, error) {
-	sqldb, err := getSQLDB(database)
-	if err != nil {
-		return nil, err
+// ExecuteBulkInsert executes a bulk INSERT statement and returns all generated IDs.
+func ExecuteBulkInsert(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string, args []interface{}) ([]int64, error) {
+	if dbtx == nil {
+		return nil, fmt.Errorf("database execution handle is nil")
 	}
 
-	rows, err := sqldb.QueryContext(ctx, database.RebindPlaceholders(sql), args...)
+	rows, err := dbtx.QueryContext(ctx, rebindQuery(sql, dbtx, d), args...)
 	if err != nil {
 		return nil, fmt.Errorf("bulk insert failed: %w", err)
 	}
@@ -514,14 +540,13 @@ func ExecuteBulkInsert(ctx context.Context, database *db.DB, sql string, args []
 	return ids, nil
 }
 
-// ExecuteUpdate executes an UPDATE statement and returns rows affected
-func ExecuteUpdate(ctx context.Context, database *db.DB, sql string, args []interface{}) (int64, error) {
-	sqldb, err := getSQLDB(database)
-	if err != nil {
-		return 0, err
+// ExecuteUpdate executes an UPDATE statement and returns rows affected.
+func ExecuteUpdate(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string, args []interface{}) (int64, error) {
+	if dbtx == nil {
+		return 0, fmt.Errorf("database execution handle is nil")
 	}
 
-	result, err := sqldb.ExecContext(ctx, database.RebindPlaceholders(sql), args...)
+	result, err := dbtx.ExecContext(ctx, rebindQuery(sql, dbtx, d), args...)
 	if err != nil {
 		return 0, fmt.Errorf("update failed: %w", err)
 	}
@@ -534,14 +559,13 @@ func ExecuteUpdate(ctx context.Context, database *db.DB, sql string, args []inte
 	return rowsAffected, nil
 }
 
-// ExecuteDelete executes a DELETE statement and returns rows affected
-func ExecuteDelete(ctx context.Context, database *db.DB, sql string, args []interface{}) (int64, error) {
-	sqldb, err := getSQLDB(database)
-	if err != nil {
-		return 0, err
+// ExecuteDelete executes a DELETE statement and returns rows affected.
+func ExecuteDelete(ctx context.Context, dbtx DBTX, d dialect.Dialect, sql string, args []interface{}) (int64, error) {
+	if dbtx == nil {
+		return 0, fmt.Errorf("database execution handle is nil")
 	}
 
-	result, err := sqldb.ExecContext(ctx, database.RebindPlaceholders(sql), args...)
+	result, err := dbtx.ExecContext(ctx, rebindQuery(sql, dbtx, d), args...)
 	if err != nil {
 		return 0, fmt.Errorf("delete failed: %w", err)
 	}
@@ -552,14 +576,6 @@ func ExecuteDelete(ctx context.Context, database *db.DB, sql string, args []inte
 	}
 
 	return rowsAffected, nil
-}
-
-// getSQLDB extracts *sql.DB from *db.DB
-func getSQLDB(database *db.DB) (*sql.DB, error) {
-	if database == nil {
-		return nil, errors.NewNotImplementedError("database connection not set")
-	}
-	return database.DB, nil
 }
 
 // GetIDValue extracts the ID value from an instance

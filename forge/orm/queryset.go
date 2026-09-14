@@ -177,9 +177,9 @@ func (qs *BaseQuerySet[T]) SetDB(db interface{}) QuerySet[T] {
 }
 
 // getDB retrieves the database connection
-func (qs *BaseQuerySet[T]) getDB(ctx context.Context) (*sql.DB, error) {
+func (qs *BaseQuerySet[T]) getDB(ctx context.Context) (DBTX, error) {
 	if qs.db != nil {
-		return GetSQLDB(qs.db)
+		return GetDBTX(qs.db)
 	}
 	return nil, fmt.Errorf("database connection not set on QuerySet")
 }

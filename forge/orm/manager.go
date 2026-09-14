@@ -6,15 +6,62 @@ import (
 	"reflect"
 
 	"github.com/forgego/forge/db"
+	"github.com/forgego/forge/db/dialect"
 	"github.com/forgego/forge/errors"
 	"github.com/forgego/forge/schema"
 )
+
+// managerConn holds either a *db.DB or a *db.Tx for a Manager.
+type managerConn struct {
+	db *db.DB
+	tx *db.Tx
+}
+
+func (c *managerConn) isSet() bool {
+	return c != nil && (c.db != nil || c.tx != nil)
+}
+
+func (c *managerConn) dbtx() (DBTX, error) {
+	if c == nil {
+		return nil, fmt.Errorf("database connection not set")
+	}
+	if c.tx != nil {
+		return GetDBTX(c.tx)
+	}
+	if c.db != nil {
+		return GetDBTX(c.db)
+	}
+	return nil, fmt.Errorf("database connection not set")
+}
+
+func (c *managerConn) dialect() (dialect.Dialect, error) {
+	if c == nil {
+		return nil, fmt.Errorf("database connection not set")
+	}
+	if c.tx != nil {
+		return GetDialect(c.tx)
+	}
+	if c.db != nil {
+		return GetDialect(c.db)
+	}
+	return nil, fmt.Errorf("database connection not set")
+}
+
+func (c *managerConn) raw() any {
+	if c == nil {
+		return nil
+	}
+	if c.tx != nil {
+		return c.tx
+	}
+	return c.db
+}
 
 // Manager provides type-safe CRUD operations
 type Manager[T any] struct {
 	tableName string
 	schema    *ModelSchema
-	db        *db.DB
+	db        *managerConn
 }
 
 // NewManager creates a new manager
@@ -62,7 +109,18 @@ func NewManagerWithDB[T any](tableName string, db *db.DB) (*Manager[T], error) {
 
 // SetDB sets the database connection
 func (m *Manager[T]) SetDB(database *db.DB) {
-	m.db = database
+	m.db = &managerConn{db: database}
+}
+
+// WithTx returns a copy bound to the transaction.
+func (m *Manager[T]) WithTx(tx *db.Tx) *Manager[T] {
+	clone := *m
+	clone.db = &managerConn{tx: tx}
+	return &clone
+}
+
+func (m *Manager[T]) hasDB() bool {
+	return m != nil && m.db != nil && m.db.isSet()
 }
 
 // FieldAccessor returns a field accessor for type-safe field operations.
@@ -83,8 +141,8 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 		return nil, err
 	}
 
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if m.hasDB() {
+		qs = qs.SetDB(m.db.raw())
 	}
 
 	return qs.Filter(expr), nil
@@ -92,7 +150,7 @@ func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 
 // Get retrieves a single model instance by its primary key ID.
 func (m *Manager[T]) Get(ctx context.Context, id int64) (*T, error) {
-	if m.db == nil {
+	if !m.hasDB() {
 		return nil, errors.NewConfigurationError("database connection not set", "db")
 	}
 
@@ -126,8 +184,8 @@ func (m *Manager[T]) All(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if m.hasDB() {
+		qs = qs.SetDB(m.db.raw())
 	}
 
 	return qs.All(ctx)
@@ -140,8 +198,8 @@ func (m *Manager[T]) Count(ctx context.Context) (int64, error) {
 		return 0, err
 	}
 
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if m.hasDB() {
+		qs = qs.SetDB(m.db.raw())
 	}
 
 	return qs.Count(ctx)
@@ -149,7 +207,7 @@ func (m *Manager[T]) Count(ctx context.Context) (int64, error) {
 
 // Create creates a new model instance
 func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	if !m.hasDB() {
 		return errors.NewConfigurationError("database connection not set", "db")
 	}
 	if m.schema != nil {
@@ -174,7 +232,13 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 		return fmt.Errorf("failed to build insert SQL: %w", err)
 	}
 
-	id, err := ExecuteInsert(ctx, m.db, sql, args)
+	dbtx, err := m.db.dbtx()
+	if err != nil {
+		return fmt.Errorf("failed to get database handle: %w", err)
+	}
+	d, _ := m.db.dialect()
+
+	id, err := ExecuteInsert(ctx, dbtx, d, sql, args)
 	if err != nil {
 		return err
 	}
@@ -189,17 +253,7 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	return m.runHooks(ctx, instance, "AfterSave")
 }
 
-// BulkCreate creates multiple model instances efficiently using a single INSERT statement
-func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
-	if m.db == nil {
-		return errors.NewConfigurationError("database connection not set", "db")
-	}
-
-	if len(instances) == 0 {
-		return nil
-	}
-
-	// Pre-process all instances
+func (m *Manager[T]) prepareBulkInstances(ctx context.Context, instances []*T) error {
 	for _, instance := range instances {
 		if err := m.runHooks(ctx, instance, "BeforeCreate"); err != nil {
 			return err
@@ -210,6 +264,32 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 		if err := m.validate(instance); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (m *Manager[T]) finalizeBulkInstances(ctx context.Context, instances []*T) error {
+	for _, instance := range instances {
+		if err := m.runHooks(ctx, instance, "AfterCreate"); err != nil {
+			return err
+		}
+		if err := m.runHooks(ctx, instance, "AfterSave"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// BulkCreate creates multiple model instances efficiently using a single INSERT statement
+func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
+	if !m.hasDB() {
+		return errors.NewConfigurationError("database connection not set", "db")
+	}
+	if len(instances) == 0 {
+		return nil
+	}
+	if err := m.prepareBulkInstances(ctx, instances); err != nil {
+		return err
 	}
 
 	// Convert []*T to []interface{}
@@ -224,7 +304,13 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 		return fmt.Errorf("failed to build bulk insert SQL: %w", err)
 	}
 
-	ids, err := ExecuteBulkInsert(ctx, m.db, sql, args)
+	dbtx, err := m.db.dbtx()
+	if err != nil {
+		return fmt.Errorf("failed to get database handle: %w", err)
+	}
+	d, _ := m.db.dialect()
+
+	ids, err := ExecuteBulkInsert(ctx, dbtx, d, sql, args)
 	if err != nil {
 		return err
 	}
@@ -238,22 +324,12 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 		}
 	}
 
-	// Post-process all instances
-	for _, instance := range instances {
-		if err := m.runHooks(ctx, instance, "AfterCreate"); err != nil {
-			return err
-		}
-		if err := m.runHooks(ctx, instance, "AfterSave"); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	return m.finalizeBulkInstances(ctx, instances)
 }
 
 // Update updates an existing model instance
 func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	if !m.hasDB() {
 		return errors.NewConfigurationError("database connection not set", "db")
 	}
 
@@ -281,7 +357,13 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 		return fmt.Errorf("failed to build update SQL: %w", err)
 	}
 
-	rowsAffected, err := ExecuteUpdate(ctx, m.db, sql, args)
+	dbtx, err := m.db.dbtx()
+	if err != nil {
+		return fmt.Errorf("failed to get database handle: %w", err)
+	}
+	d, _ := m.db.dialect()
+
+	rowsAffected, err := ExecuteUpdate(ctx, dbtx, d, sql, args)
 	if err != nil {
 		return err
 	}
@@ -307,7 +389,7 @@ func (m *Manager[T]) Save(ctx context.Context, instance *T) error {
 
 // Delete deletes a model instance
 func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
-	if m.db == nil {
+	if !m.hasDB() {
 		return errors.NewConfigurationError("database connection not set", "db")
 	}
 
@@ -326,7 +408,13 @@ func (m *Manager[T]) Delete(ctx context.Context, instance *T) error {
 	pkColumn := m.primaryKeyColumn()
 	sql, args := BuildDeleteSQL(m.tableName, pkColumn, id)
 
-	rowsAffected, err := ExecuteDelete(ctx, m.db, sql, args)
+	dbtx, err := m.db.dbtx()
+	if err != nil {
+		return fmt.Errorf("failed to get database handle: %w", err)
+	}
+	d, _ := m.db.dialect()
+
+	rowsAffected, err := ExecuteDelete(ctx, dbtx, d, sql, args)
 	if err != nil {
 		return err
 	}

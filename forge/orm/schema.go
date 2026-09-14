@@ -48,15 +48,19 @@ type FieldInfo struct {
 
 // RelationInfo contains relation metadata
 type RelationInfo struct {
-	Name        string
-	Type        RelationType
-	TargetModel string
-	TargetField string
-	OnDelete    string
-	OnUpdate    string
-	RelatedName string
-	FieldName   string // The field name on this model
-	Through     string // Through table for ManyToMany
+	Name                string
+	Type                RelationType
+	TargetModel         string
+	TargetField         string
+	OnDelete            string
+	OnUpdate            string
+	RelatedName         string
+	FieldName           string // The field name on this model
+	Through             string // Through table for ManyToMany
+	FKColumn            string // Database foreign key column on this model pointing to target
+	FKStructField       string // Go struct field name corresponding to the foreign key column
+	ThroughSourceColumn string // Source model foreign key column in ManyToMany through table
+	ThroughTargetColumn string // Target model foreign key column in ManyToMany through table
 }
 
 // RelationType represents the type of relation
@@ -193,27 +197,7 @@ func BuildModelSchema(schemaInstance schema.Schema) (*ModelSchema, error) {
 	// Build relations from schema
 	relations := schemaInstance.Relations()
 	for _, rel := range relations {
-		relInfo := RelationInfo{
-			Name:        rel.Name,
-			TargetModel: rel.To,
-			FieldName:   rel.Name, // Use relation name as field name
-			OnDelete:    string(rel.OnDelete),
-			OnUpdate:    string(rel.OnUpdate),
-			RelatedName: rel.RelatedName,
-			Through:     rel.Through,
-		}
-
-		// Determine relation type
-		switch rel.Type {
-		case schema.RelationForeignKey:
-			relInfo.Type = RelationForeignKey
-		case schema.RelationOneToOne:
-			relInfo.Type = RelationOneToOne
-		case schema.RelationManyToMany:
-			relInfo.Type = RelationManyToMany
-		}
-
-		ms.Relations = append(ms.Relations, relInfo)
+		ms.Relations = append(ms.Relations, ms.buildRelationInfo(rel))
 	}
 
 	// Build indexes from meta
@@ -228,6 +212,99 @@ func BuildModelSchema(schemaInstance schema.Schema) (*ModelSchema, error) {
 	}
 
 	return ms, nil
+}
+
+func (ms *ModelSchema) buildRelationInfo(rel schema.Relation) RelationInfo {
+	relInfo := RelationInfo{
+		Name:        rel.Name,
+		TargetModel: rel.To,
+		FieldName:   rel.Name,
+		OnDelete:    string(rel.OnDelete),
+		OnUpdate:    string(rel.OnUpdate),
+		RelatedName: rel.RelatedName,
+		Through:     rel.Through,
+	}
+
+	switch rel.Type {
+	case schema.RelationForeignKey:
+		relInfo.Type = RelationForeignKey
+		relInfo.FKColumn, relInfo.FKStructField = resolveRelationFK(ms, &relInfo)
+	case schema.RelationOneToOne:
+		relInfo.Type = RelationOneToOne
+		relInfo.FKColumn, relInfo.FKStructField = resolveRelationFK(ms, &relInfo)
+	case schema.RelationManyToMany:
+		relInfo.Type = RelationManyToMany
+		targetSchema, _ := GetModelSchemaByName(rel.To)
+		relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, targetSchema, ms.TableName, rel.To)
+	}
+
+	return relInfo
+}
+
+// resolveRelationFK resolves the foreign key DB column and Go struct field name for a relation.
+func resolveRelationFK(schema *ModelSchema, rel *RelationInfo) (string, string) {
+	if schema == nil || rel == nil {
+		return "", ""
+	}
+	if col, structField, ok := matchRelationField(schema, rel); ok {
+		return col, structField
+	}
+	if col, structField, ok := matchRelationGuesses(schema, rel); ok {
+		return col, structField
+	}
+	return "", ""
+}
+
+func matchRelationField(schema *ModelSchema, rel *RelationInfo) (string, string, bool) {
+	for _, f := range schema.Fields {
+		structName := fieldStructName(f)
+		if strings.EqualFold(f.DBColumn, rel.Name) || strings.EqualFold(f.Name, rel.Name) {
+			return f.DBColumn, structName, true
+		}
+		if f.StructFieldName == rel.Name {
+			return f.DBColumn, structName, true
+		}
+		if f.StructFieldName == rel.Name+"ID" {
+			return f.DBColumn, structName, true
+		}
+		if strings.EqualFold(f.DBColumn, rel.Name+"_id") {
+			return f.DBColumn, structName, true
+		}
+		if strings.HasSuffix(f.Name, "ID") && strings.HasPrefix(strings.ToLower(f.Name), strings.ToLower(rel.Name)) {
+			return f.DBColumn, structName, true
+		}
+	}
+	return "", "", false
+}
+
+func matchRelationGuesses(schema *ModelSchema, rel *RelationInfo) (string, string, bool) {
+	guess := strings.ToLower(rel.Name) + "_id"
+	if f := schema.GetField(guess); f != nil {
+		return f.DBColumn, fieldStructName(*f), true
+	}
+
+	if strings.HasSuffix(strings.ToLower(rel.Name), "_id") {
+		if f := schema.GetField(strings.ToLower(rel.Name)); f != nil {
+			return f.DBColumn, fieldStructName(*f), true
+		}
+	}
+
+	guess = strings.ToLower(rel.TargetModel) + "_id"
+	if f := schema.GetField(guess); f != nil {
+		return f.DBColumn, fieldStructName(*f), true
+	}
+
+	return "", "", false
+}
+
+func fieldStructName(f FieldInfo) string {
+	if f.StructFieldName != "" {
+		return f.StructFieldName
+	}
+	if f.Name != "" {
+		return f.Name
+	}
+	return f.DBColumn
 }
 
 // getGoType converts schema.FieldType to reflect.Type

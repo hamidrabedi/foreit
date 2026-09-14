@@ -5,13 +5,16 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	forgeerrors "github.com/forgego/forge/errors"
 	"github.com/forgego/forge/utils"
+	"github.com/iancoleman/strcase"
 )
 
 // QuerySet is the type-safe QuerySet interface
@@ -626,47 +629,20 @@ func (qs *BaseQuerySet[T]) pkSubquery(joins []string, where string) string {
 	return fmt.Sprintf("WHERE %s.%s IN (%s)", table, pk, strings.Join(innerParts, " "))
 }
 
-// fkColumnFor resolves the FK column on schema pointing to rel
+// warnedSelectRelated stores model+relation keys that have already emitted a warning
+// for skipped select_related joins where no foreign key column could be found.
+// A package-level sync.Map cache is used so that applications with repeated queries do not
+// spam logs with duplicate warnings for the same model and relation over the process lifetime.
+var warnedSelectRelated sync.Map
+
+// fkColumnFor resolves the FK column on schema pointing to rel.
+// It returns rel.FKColumn when set; when empty, it falls back to the resolver.
 func fkColumnFor(schema *ModelSchema, rel *RelationInfo) string {
-	if schema == nil || rel == nil {
-		return ""
+	if rel != nil && rel.FKColumn != "" {
+		return rel.FKColumn
 	}
-
-	for _, f := range schema.Fields {
-		if strings.EqualFold(f.DBColumn, rel.Name) || strings.EqualFold(f.Name, rel.Name) {
-			return f.DBColumn
-		}
-		if f.StructFieldName == rel.Name {
-			return f.DBColumn
-		}
-		if f.StructFieldName == rel.Name+"ID" {
-			return f.DBColumn
-		}
-		if strings.EqualFold(f.DBColumn, rel.Name+"_id") {
-			return f.DBColumn
-		}
-		if strings.HasSuffix(f.Name, "ID") && strings.HasPrefix(strings.ToLower(f.Name), strings.ToLower(rel.Name)) {
-			return f.DBColumn
-		}
-	}
-
-	guess := strings.ToLower(rel.Name) + "_id"
-	if f := schema.GetField(guess); f != nil {
-		return f.DBColumn
-	}
-
-	if strings.HasSuffix(strings.ToLower(rel.Name), "_id") {
-		if f := schema.GetField(strings.ToLower(rel.Name)); f != nil {
-			return f.DBColumn
-		}
-	}
-
-	guess = strings.ToLower(rel.TargetModel) + "_id"
-	if f := schema.GetField(guess); f != nil {
-		return f.DBColumn
-	}
-
-	return ""
+	col, _ := resolveRelationFK(schema, rel)
+	return col
 }
 
 // buildJoinClause builds the JOIN clause
@@ -679,47 +655,70 @@ func (qs *BaseQuerySet[T]) buildJoinClause(builder *SQLBuilder) {
 			continue
 		}
 
-		// Resolve path to relation
-		// For MVP, support single level: "User"
 		rel := qs.schema.GetRelation(path)
 		if rel == nil {
 			continue
 		}
 
-		// Get target schema
+		fkColumn := fkColumnFor(qs.schema, rel)
+		if fkColumn == "" {
+			qs.warnSkippedSelectRelated(rel.Name)
+			continue
+		}
+
 		targetSchema, err := GetModelSchemaByName(rel.TargetModel)
 		if err != nil {
 			continue
 		}
 
-		joinTable := EscapeIdentifier(targetSchema.TableName)
-		alias := EscapeIdentifier(rel.Name)
-		mainTable := EscapeIdentifier(qs.table)
-
-		fkColumn := fkColumnFor(qs.schema, rel)
-		if fkColumn == "" {
-			continue // Could not determine join condition
-		}
-
-		targetPk := targetSchema.PrimaryKey
-		if targetPk == "" {
-			targetPk = "id"
-		}
-
-		// JOIN target_table "Alias" ON main_table.fk = "Alias".pk
-		joinSQL := fmt.Sprintf("LEFT OUTER JOIN %s %s ON %s.%s = %s.%s",
-			joinTable, alias,
-			mainTable, EscapeIdentifier(fkColumn),
-			alias, EscapeIdentifier(targetPk))
-
-		qs.joins = append(qs.joins, joinSQL)
-		qs.joinMap[path] = true
-		qs.joinMap[rel.Name] = true
-		qs.joinMap[strings.ToLower(rel.Name)] = true
-		qs.joinMap[rel.TargetModel] = true
-		qs.joinMap[strings.ToLower(rel.TargetModel)] = true
-		qs.joinMap[alias] = true
+		qs.appendJoinClause(path, rel, targetSchema, fkColumn)
 	}
+}
+
+func (qs *BaseQuerySet[T]) warnSkippedSelectRelated(relName string) {
+	modelName := ""
+	if qs.schema != nil {
+		modelName = qs.schema.GetModelName()
+	}
+	if modelName == "" {
+		modelName = qs.table
+	}
+	warnKey := modelName + "." + relName
+	if _, loaded := warnedSelectRelated.LoadOrStore(warnKey, struct{}{}); !loaded {
+		slog.Warn("select_related skipped: no foreign key column",
+			"model", modelName,
+			"relation", relName,
+			"expected_column", strcase.ToSnake(relName)+"_id",
+		)
+	}
+}
+
+func (qs *BaseQuerySet[T]) appendJoinClause(path string, rel *RelationInfo, targetSchema *ModelSchema, fkColumn string) {
+	joinTable := EscapeIdentifier(targetSchema.TableName)
+	alias := EscapeIdentifier(rel.Name)
+	mainTable := EscapeIdentifier(qs.table)
+
+	targetPk := targetSchema.PrimaryKey
+	if targetPk == "" {
+		targetPk = "id"
+	}
+
+	joinSQL := fmt.Sprintf("LEFT OUTER JOIN %s %s ON %s.%s = %s.%s",
+		joinTable, alias,
+		mainTable, EscapeIdentifier(fkColumn),
+		alias, EscapeIdentifier(targetPk))
+
+	qs.joins = append(qs.joins, joinSQL)
+	qs.recordJoinAliases(path, rel, alias)
+}
+
+func (qs *BaseQuerySet[T]) recordJoinAliases(path string, rel *RelationInfo, alias string) {
+	qs.joinMap[path] = true
+	qs.joinMap[rel.Name] = true
+	qs.joinMap[strings.ToLower(rel.Name)] = true
+	qs.joinMap[rel.TargetModel] = true
+	qs.joinMap[strings.ToLower(rel.TargetModel)] = true
+	qs.joinMap[alias] = true
 }
 
 // reverseFKFor resolves the foreign key column on targetSchema pointing back to currentSchema.
@@ -729,6 +728,9 @@ func reverseFKFor(currentSchema, targetSchema *ModelSchema) string {
 	}
 	for _, r := range targetSchema.Relations {
 		if (currentSchema.ModelType != nil && r.TargetModel == currentSchema.ModelType.Name()) || r.TargetModel == currentSchema.TableName {
+			if r.FKColumn != "" {
+				return r.FKColumn
+			}
 			if col := fkColumnFor(targetSchema, &r); col != "" {
 				return col
 			}

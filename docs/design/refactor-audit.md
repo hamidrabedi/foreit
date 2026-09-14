@@ -531,6 +531,18 @@ Re-checked on master (2026-09-14). Package-level state: `registry` (model, plugi
 - **Smaller follow-ups worth doing with the API redesign:** `api/permissions.SAFE_METHODS` and `validate.FieldTags` are exported mutable package variables (and `SAFE_METHODS` breaks the naming rules, §A1c); `api/errors` problem type base URL is set through a setter without synchronization, which is safe only during startup.
 - **Owner decision needed:** whether a v2 API with an explicit application object is on the roadmap.
 
+### Decisions: remaining design items not changed in this refactor (D6, D9, D11, D14)
+
+Re-checked 2026-09-14 against the rules adopted after the owner's review (no removal of working features, no silent behaviour change, exported signatures stay compatible).
+
+| Item | What the audit proposed | Why it is not done now | Recommended path |
+|---|---|---|---|
+| D6 reflection where codegen exists | generate scan/field-access code; dispatch viewsets through interfaces | a code-generation redesign across `orm`, `api` and `codegen` templates; every generated project would change | roadmap item; start with generated scanners behind the existing interfaces, benchmark first |
+| D9 admin list uses `forge/filter` | replace the admin's own `field__lookup` parsing with `forge/filter` | the two parsers accept different lookup sets and error behaviour; swapping changes which admin URLs work. `ListObjects` is now split into named steps (D8), so the lookup step can be swapped behind a semantics test later | write a table test of every lookup the admin accepts today, then port only if `forge/filter` passes it unchanged |
+| D11 shrink the 16-method `Dialect` interface | keep only what PostgreSQL and SQLite need | `Dialect` is exported; removing methods breaks any external implementation. MySQL mentions in docs were already removed | keep the interface; mark unused methods deprecated in a v2 plan |
+| D14 `forge/filter` mostly unconnected | keep a thin query-param parser, delete the rest | the "unconnected" parts are public, working features (saved filters, typed builder, relation depth guard, query planner) that were wrongly deleted once and restored in #230 | keep; wire them into the admin/API list views as a feature decision |
+
+
 **Wave 4: libraries (documented only; owner decided not to swap libraries during this refactor)**
 22. `log/slog` migration: recommended, not scheduled. Scope when picked up: `forge/log` (1446 lines) wraps zap and exposes zap types (`Logger` embeds `*zap.Logger`, `With(...zapcore.Field)`, `String`/`Int` return `zap.Field`); callers outside the package are `server/server.go`, `server/errors.go`, `api/errors/{handler,builder}.go`, `cli/core/{registry,context}.go` and two tests. Port `log/hooks` to `slog.Handler` middlewares rather than deleting them.
 23. Atlas spike for migration diffing (decision doc before code). Decision below.

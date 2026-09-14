@@ -49,3 +49,10 @@ func (sf *SharedFilter[T]) ApplyToQueryset(ctx context.Context, qs interface{}) 
 
 	return qs, nil
 }
+
+// RBACFilterStorage extends FilterStorage with RBAC
+type RBACFilterStorage interface {
+	FilterStorage
+	CanAccess(userID, filterID string) (bool, error)
+	SetAccess(filterID, userID string, canAccess bool) error
+}

@@ -170,30 +170,28 @@ func (b *SQLBuilder) BuildSelect(table string, fields []string, distinct bool) s
 
 // BuildWhere builds a WHERE clause from conditions
 func (b *SQLBuilder) BuildWhere(conditions []QueryExpr, excludes []QueryExpr) (string, []interface{}) {
+	if b == nil {
+		return "", nil
+	}
+
 	var whereParts []string
 	var allArgs []interface{}
-	paramIndex := b.paramIndex
-	ph := b.Placeholder
 
 	// Add conditions
 	for _, cond := range conditions {
-		sql, condArgs, nextIndex := cond.ToSQL(paramIndex, ph)
+		adapter := newQueryExprAdapter(cond)
+		sql, condArgs, _ := adapter.ToSQL(b)
 		whereParts = append(whereParts, sql)
 		allArgs = append(allArgs, condArgs...)
-		paramIndex = nextIndex
 	}
 
 	// Add excludes with NOT
 	for _, exclude := range excludes {
-		sql, excludeArgs, nextIndex := exclude.ToSQL(paramIndex, ph)
+		adapter := newQueryExprAdapter(exclude)
+		sql, excludeArgs, _ := adapter.ToSQL(b)
 		whereParts = append(whereParts, "NOT ("+sql+")")
 		allArgs = append(allArgs, excludeArgs...)
-		paramIndex = nextIndex
 	}
-
-	// Update builder's param index
-	b.paramIndex = paramIndex
-	b.args = append(b.args, allArgs...)
 
 	if len(whereParts) == 0 {
 		return "", allArgs

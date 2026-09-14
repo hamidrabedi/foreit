@@ -544,6 +544,9 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	var parts []string
 	if whereMulti {
 		selectClause := qs.buildSelectClause(builder, true)
+		if qs.err != nil {
+			return "", nil, qs.err
+		}
 		parts = []string{selectClause, fromClause}
 		if len(qs.joins) > 0 {
 			parts = append(parts, strings.Join(qs.joins, " "))
@@ -555,6 +558,9 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	} else {
 		pathJoins := mergeJoins(whereJoins, orderJoins)
 		selectClause := qs.buildSelectClause(builder, len(pathJoins) > 0)
+		if qs.err != nil {
+			return "", nil, qs.err
+		}
 		parts = []string{selectClause, fromClause}
 		if len(qs.joins) > 0 {
 			parts = append(parts, strings.Join(qs.joins, " "))
@@ -875,13 +881,14 @@ func (qs *BaseQuerySet[T]) buildSelectClause(builder *SQLBuilder, hasPathJoins b
 	// Add annotations to SELECT
 	if len(qs.annotations) > 0 {
 		for _, ann := range qs.annotations {
-			// Build annotation SQL using QueryExpr.ToSQL
-			// QueryExpr uses paramIndex, so we need to use builder's paramIndex
-			annSQL, annArgs, nextIndex := ann.Expr.ToSQL(builder.paramIndex)
-			// Update builder's paramIndex
-			builder.paramIndex = nextIndex
-			// Add args to builder
-			builder.args = append(builder.args, annArgs...)
+			expr := ann.Expression
+			if expr == nil {
+				expr = newQueryExprAdapter(ann.Expr)
+			}
+			annSQL, _, err := expr.ToSQL(builder)
+			if err != nil && qs.err == nil {
+				qs.err = err
+			}
 			alias := EscapeIdentifier(ann.Name)
 			fields = append(fields, fmt.Sprintf("%s AS %s", annSQL, alias))
 		}

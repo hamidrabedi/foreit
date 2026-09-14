@@ -483,7 +483,16 @@ Sized for one delegate task and one PR each. Waves can run 2-3 PRs in parallel i
 18. D3 dialect-owned placeholders (B10, B11 go away).
 19. D4/D5 config loaded once, generated managers fail at init.
 20. D7/D8 split god files and complex functions (pure moves, separate PRs).
-21. D2 `forge.App` instead of globals.
+21. D2 `forge.App` instead of globals. Decision below: not done in this refactor.
+
+### Decision: keep package-level registries for now (no `forge.App` in this refactor)
+
+Re-checked on master (2026-09-14). Package-level state: `registry` (model, plugin, type and extension registries), `admin.DefaultSite`, `admin/core` model and dashboard registries, `cli/core` command registry, `orm` path cache, `api` method cache.
+
+- **No correctness bug found:** each of the nine registries/caches guards its map with a `sync` mutex. The exception handler global (`api/exceptions.globalHandler`) was the only unsynchronized one that mattered, and it is removed in #230.
+- **Why not now:** an explicit `forge.App` (site, registries, DB, config) changes how every user wires an application: `admin.Register`, `DefaultSite`, generated code and the CLI all assume package-level registration. That is a public API redesign with a migration path, not a behaviour-preserving refactor. Config is already loaded once and passed down (D4 in Wave 3), which removes the worst part of the global coupling.
+- **Smaller follow-ups worth doing with the API redesign:** `api/permissions.SAFE_METHODS` and `validate.FieldTags` are exported mutable package variables (and `SAFE_METHODS` breaks the naming rules, §A1c); `api/errors` problem type base URL is set through a setter without synchronization, which is safe only during startup.
+- **Owner decision needed:** whether a v2 API with an explicit application object is on the roadmap.
 
 **Wave 4: libraries (documented only; owner decided not to swap libraries during this refactor)**
 22. `log/slog` migration: recommended, not scheduled. Scope when picked up: `forge/log` (1446 lines) wraps zap and exposes zap types (`Logger` embeds `*zap.Logger`, `With(...zapcore.Field)`, `String`/`Int` return `zap.Field`); callers outside the package are `server/server.go`, `server/errors.go`, `api/errors/{handler,builder}.go`, `cli/core/{registry,context}.go` and two tests. Port `log/hooks` to `slog.Handler` middlewares rather than deleting them.

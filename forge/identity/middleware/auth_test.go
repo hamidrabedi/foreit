@@ -1,10 +1,13 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -332,6 +335,36 @@ func TestAuthenticateRequest_CookiePostRequiresCSRF(t *testing.T) {
 	}
 	if user != nil {
 		t.Fatalf("expected unauthenticated request, got user %+v", user)
+	}
+}
+
+func TestAuthenticateRequest_CookiePostWithoutCSRFLogsWarningOnce(t *testing.T) {
+	var logs bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&logs, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(originalLogger)
+	})
+
+	mw := newSessionAuthMiddleware()
+	for range 2 {
+		req := httptest.NewRequest(http.MethodPost, "https://example.com/protected", nil)
+		req.AddCookie(&http.Cookie{Name: "session_key", Value: "valid-key"})
+
+		user, err := mw.authenticateRequest(req.Context(), req)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if user != nil {
+			t.Fatalf("expected unauthenticated request, got user %+v", user)
+		}
+	}
+
+	if count := strings.Count(logs.String(), "session cookie ignored on unsafe request: CSRF middleware is not mounted on this route"); count != 1 {
+		t.Fatalf("expected one CSRF middleware warning, got %d: %s", count, logs.String())
+	}
+	if !strings.Contains(logs.String(), "method=POST") || !strings.Contains(logs.String(), "path=/protected") {
+		t.Fatalf("expected warning to include request method and path, got: %s", logs.String())
 	}
 }
 

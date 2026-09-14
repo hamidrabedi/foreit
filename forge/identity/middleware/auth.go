@@ -3,8 +3,10 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/forgego/forge/api/core"
 	"github.com/forgego/forge/identity/backends"
@@ -21,6 +23,7 @@ type AuthenticationMiddleware struct {
 	sessionRepo     repository.SessionRepository
 	userRepo        repository.UserRepository
 	permissionSvc   service.PermissionService
+	csrfWarningOnce sync.Once
 }
 
 // NewAuthenticationMiddleware creates a new authentication middleware
@@ -114,6 +117,9 @@ func (m *AuthenticationMiddleware) authenticateRequest(ctx context.Context, r *h
 	}
 
 	if cookieSession && isUnsafeMethod(r.Method) && csrf.Token(r) == "" {
+		m.csrfWarningOnce.Do(func() {
+			slog.Warn("session cookie ignored on unsafe request: CSRF middleware is not mounted on this route", "method", r.Method, "path", r.URL.Path)
+		})
 		return nil, nil
 	}
 

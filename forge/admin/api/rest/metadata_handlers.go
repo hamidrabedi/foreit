@@ -139,92 +139,117 @@ func (r *Router) attachDisplayLabels(ctx context.Context, admin core.AdminInterf
 	if r.registry == nil || response == nil || response.Results == nil {
 		return
 	}
-
 	meta, err := admin.GetMetadata(ctx, user)
 	if err != nil || meta == nil || len(meta.Relations) == 0 {
 		return
 	}
+	rows, ok := displayRows(response.Results)
+	if !ok {
+		return
+	}
+	for _, relation := range meta.Relations {
+		r.attachRelationLabels(ctx, response, rows, relation)
+	}
+}
 
-	resultsBytes, err := json.Marshal(response.Results)
+func displayRows(results interface{}) ([]map[string]interface{}, bool) {
+	data, err := json.Marshal(results)
 	if err != nil {
-		return
+		return nil, false
 	}
-
 	var rows []map[string]interface{}
-	if err := json.Unmarshal(resultsBytes, &rows); err != nil || len(rows) == 0 {
+	if err := json.Unmarshal(data, &rows); err != nil || len(rows) == 0 {
+		return nil, false
+	}
+	return rows, true
+}
+
+func (r *Router) attachRelationLabels(ctx context.Context, response *core.PaginatedResponse, rows []map[string]interface{}, relation core.RelationMetadata) {
+	if !isFKOrOneToOne(relation.Type) {
 		return
 	}
+	ids := collectRelationIDs(rows, relation.Name)
+	if len(ids) == 0 {
+		return
+	}
+	labels := r.loadRelationLabels(ctx, relation.RelatedModel, ids)
+	applyRelationLabels(response, relation.Name, labels)
+}
 
-	for _, rel := range meta.Relations {
-		if !isFKOrOneToOne(rel.Type) {
-			continue
-		}
+func (r *Router) loadRelationLabels(ctx context.Context, relatedModel string, ids []interface{}) map[string]string {
+	related, err := r.registry.Get(relatedModel)
+	if err != nil || related == nil {
+		return nil
+	}
+	resolver, ok := related.(core.LabelResolver)
+	if !ok {
+		return nil
+	}
+	labels, err := resolver.ObjectLabels(ctx, ids)
+	if err != nil || len(labels) == 0 {
+		return nil
+	}
+	return labels
+}
 
-		var ids []interface{}
-		seen := make(map[string]bool)
+func applyRelationLabels(response *core.PaginatedResponse, relationName string, labels map[string]string) {
+	if len(labels) == 0 {
+		return
+	}
+	if response.Display == nil {
+		response.Display = make(map[string]map[string]string)
+	}
+	response.Display[relationName] = labels
+}
 
-		for _, row := range rows {
-			val, exists := row[rel.Name]
-			if !exists || val == nil {
-				val, exists = row[rel.Name+"_id"]
-			}
-			if !exists || val == nil {
-				for k, v := range row {
-					if v != nil && (strings.EqualFold(k, rel.Name) || strings.EqualFold(k, rel.Name+"_id") || strings.EqualFold(k, rel.Name+"id")) {
-						val = v
-						exists = true
-						break
-					}
-				}
-			}
-			if !exists || val == nil {
-				continue
-			}
-
-			if m, ok := val.(map[string]interface{}); ok {
-				if idVal, hasID := m["id"]; hasID && idVal != nil {
-					val = idVal
-				} else if idVal, hasID := m["ID"]; hasID && idVal != nil {
-					val = idVal
-				} else {
-					continue
-				}
-			}
-
-			if f, ok := val.(float64); ok && f == math.Floor(f) && !math.IsNaN(f) && !math.IsInf(f, 0) {
-				val = int64(f)
-			}
-
-			strKey := fmt.Sprint(val)
-			if strKey == "" || seen[strKey] {
-				continue
-			}
-			seen[strKey] = true
-			ids = append(ids, val)
-		}
-
-		if len(ids) == 0 {
-			continue
-		}
-
-		related, err := r.registry.Get(rel.RelatedModel)
-		if err != nil || related == nil {
-			continue
-		}
-
-		resolver, ok := related.(core.LabelResolver)
+func collectRelationIDs(rows []map[string]interface{}, relationName string) []interface{} {
+	ids := make([]interface{}, 0)
+	seen := make(map[string]bool)
+	for _, row := range rows {
+		value, ok := relationValue(row, relationName)
 		if !ok {
 			continue
 		}
-
-		labels, err := resolver.ObjectLabels(ctx, ids)
-		if err != nil || len(labels) == 0 {
+		value, ok = relationID(value)
+		if !ok {
 			continue
 		}
-
-		if response.Display == nil {
-			response.Display = make(map[string]map[string]string)
+		key := fmt.Sprint(value)
+		if key == "" || seen[key] {
+			continue
 		}
-		response.Display[rel.Name] = labels
+		seen[key] = true
+		ids = append(ids, value)
 	}
+	return ids
+}
+
+func relationValue(row map[string]interface{}, relationName string) (interface{}, bool) {
+	for _, key := range []string{relationName, relationName + "_id"} {
+		if value, ok := row[key]; ok && value != nil {
+			return value, true
+		}
+	}
+	for key, value := range row {
+		if value != nil && (strings.EqualFold(key, relationName) || strings.EqualFold(key, relationName+"_id") || strings.EqualFold(key, relationName+"id")) {
+			return value, true
+		}
+	}
+	return nil, false
+}
+
+func relationID(value interface{}) (interface{}, bool) {
+	if object, ok := value.(map[string]interface{}); ok {
+		if id, ok := object["id"]; ok && id != nil {
+			value = id
+		} else if id, ok := object["ID"]; ok && id != nil {
+			value = id
+		} else {
+			return nil, false
+		}
+	}
+	if number, ok := value.(float64); ok && number == math.Floor(number) && !math.IsNaN(number) && !math.IsInf(number, 0) {
+		return int64(number), true
+	}
+	return value, true
 }

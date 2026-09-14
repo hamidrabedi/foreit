@@ -443,7 +443,7 @@ func ExecuteInsert(ctx context.Context, database *db.DB, sql string, args []inte
 	if database == nil || database.DB == nil {
 		return 0, fmt.Errorf("database connection not set")
 	}
-	return ExecuteInsertTx(ctx, database.DB, database.Dialect(), sql, args)
+	return ExecuteInsertTx(ctx, database.DB, database.Dialect(), database.RebindPlaceholders(sql), args)
 }
 
 // BuildBulkInsertSQL builds a bulk INSERT SQL statement for multiple instances using default primary key column "id"
@@ -555,7 +555,7 @@ func ExecuteBulkInsert(ctx context.Context, database *db.DB, sql string, args []
 	if database == nil || database.DB == nil {
 		return nil, fmt.Errorf("database connection not set")
 	}
-	return ExecuteBulkInsertTx(ctx, database.DB, database.Dialect(), sql, args)
+	return ExecuteBulkInsertTx(ctx, database.DB, database.Dialect(), database.RebindPlaceholders(sql), args)
 }
 
 // ExecuteUpdateTx executes an UPDATE statement using the provided DBTX and dialect, returning rows affected.
@@ -582,7 +582,7 @@ func ExecuteUpdate(ctx context.Context, database *db.DB, sql string, args []inte
 	if database == nil || database.DB == nil {
 		return 0, fmt.Errorf("database connection not set")
 	}
-	return ExecuteUpdateTx(ctx, database.DB, database.Dialect(), sql, args)
+	return ExecuteUpdateTx(ctx, database.DB, database.Dialect(), database.RebindPlaceholders(sql), args)
 }
 
 // ExecuteDeleteTx executes a DELETE statement using the provided DBTX and dialect, returning rows affected.
@@ -609,7 +609,7 @@ func ExecuteDelete(ctx context.Context, database *db.DB, sql string, args []inte
 	if database == nil || database.DB == nil {
 		return 0, fmt.Errorf("database connection not set")
 	}
-	return ExecuteDeleteTx(ctx, database.DB, database.Dialect(), sql, args)
+	return ExecuteDeleteTx(ctx, database.DB, database.Dialect(), database.RebindPlaceholders(sql), args)
 }
 
 // GetIDValue extracts the ID value from an instance

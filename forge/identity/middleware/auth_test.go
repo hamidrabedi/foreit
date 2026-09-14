@@ -433,3 +433,36 @@ func newSessionAuthMiddleware() *AuthenticationMiddleware {
 		}},
 	)
 }
+
+func TestSanitizeLogValue(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "plain string",
+			input: "/api/v1/resource",
+			want:  "/api/v1/resource",
+		},
+		{
+			name:  "string with \r\n",
+			input: "/api/v1/resource\r\nmalicious-log-entry",
+			want:  "/api/v1/resourcemalicious-log-entry",
+		},
+		{
+			name:  "string with only \n",
+			input: "/api/v1/resource\nmalicious-log-entry",
+			want:  "/api/v1/resourcemalicious-log-entry",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeLogValue(tt.input)
+			if got != tt.want {
+				t.Fatalf("sanitizeLogValue(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}

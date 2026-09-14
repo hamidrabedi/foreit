@@ -118,7 +118,7 @@ func (m *AuthenticationMiddleware) authenticateRequest(ctx context.Context, r *h
 
 	if cookieSession && isUnsafeMethod(r.Method) && csrf.Token(r) == "" {
 		m.csrfWarningOnce.Do(func() {
-			slog.Warn("session cookie ignored on unsafe request: CSRF middleware is not mounted on this route", "method", r.Method, "path", r.URL.Path)
+			slog.Warn("session cookie ignored on unsafe request: CSRF middleware is not mounted on this route", "method", r.Method, "path", sanitizeLogValue(r.URL.Path))
 		})
 		return nil, nil
 	}
@@ -135,6 +135,10 @@ func (m *AuthenticationMiddleware) authenticateRequest(ctx context.Context, r *h
 	}
 
 	return nil, nil
+}
+
+func sanitizeLogValue(s string) string {
+	return strings.NewReplacer("\r", "", "\n", "").Replace(s)
 }
 
 func isUnsafeMethod(method string) bool {

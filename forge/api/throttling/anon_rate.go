@@ -13,16 +13,21 @@ type AnonRateThrottle struct {
 	Rate     string
 	Scope    string
 	store    Store
-	limiter  *internalratelimit.KeyedLimiter
 	parseErr error
 }
 
 // NewAnonRateThrottle creates a new anonymous rate throttle.
 func NewAnonRateThrottle(rate string) *AnonRateThrottle {
 	limit, window, err := parseRate(rate)
+	var store Store
+	if err == nil {
+		store = internalratelimit.NewFixedWindowCounter(limit, window)
+	}
 	return &AnonRateThrottle{
-		Rate: rate, Scope: "anon", parseErr: err,
-		limiter: newKeyedLimiter(limit, window, err),
+		Rate:     rate,
+		Scope:    "anon",
+		store:    store,
+		parseErr: err,
 	}
 }
 
@@ -44,28 +49,17 @@ func (t *AnonRateThrottle) AllowRequest(r *http.Request, view interface{}) (bool
 	if t.parseErr != nil {
 		return true, 0, t.parseErr
 	}
-	key := "throttle_anon_" + t.GetScope(r, view)
-	if t.store != nil {
-		allowed, retryAfter := t.store.Allow(key)
-		return allowed, retryAfter, nil
-	}
-	if t.limiter == nil {
+	if t.store == nil {
 		return true, 0, nil
 	}
-	allowed, retryAfter := t.limiter.Reserve(key)
+	key := "throttle_anon_" + t.GetScope(r, view)
+	allowed, retryAfter := t.store.Allow(key)
 	return allowed, retryAfter, nil
 }
 
 // GetScope returns the client IP address for anonymous users.
 func (t *AnonRateThrottle) GetScope(r *http.Request, view interface{}) string {
 	return getClientIP(r)
-}
-
-func newKeyedLimiter(limit int, window time.Duration, err error) *internalratelimit.KeyedLimiter {
-	if err != nil {
-		return nil
-	}
-	return internalratelimit.NewKeyedLimiter(limit, window)
 }
 
 func getClientIP(r *http.Request) string {

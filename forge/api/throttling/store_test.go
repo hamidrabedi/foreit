@@ -93,10 +93,9 @@ func TestAnonRateThrottle_WithStore_DeniesAfterNCalls(t *testing.T) {
 	assert.Equal(t, "throttle_anon_192.0.2.55", store.receivedKeys[0])
 }
 
-func TestDefaultConstructors_AllowBurstThenDeny(t *testing.T) {
-	// User throttle default constructor allows burst then denies
+func TestDefaultConstructors_AllowLimitThenDeny(t *testing.T) {
+	// User throttle default constructor allows limit then denies
 	userThrottle := NewUserRateThrottle("2/minute")
-	defer userThrottle.limiter.Close()
 
 	userReq := httptest.NewRequest(http.MethodGet, "/test", nil)
 	authentication.SetUserOnRequest(userReq, &mockAuthUser{ID: "burst-user"})
@@ -111,9 +110,8 @@ func TestDefaultConstructors_AllowBurstThenDeny(t *testing.T) {
 	require.True(t, ok)
 	assert.Positive(t, throttled.WaitDuration)
 
-	// Anon throttle default constructor allows burst then denies
+	// Anon throttle default constructor allows limit then denies
 	anonThrottle := NewAnonRateThrottle("2/minute")
-	defer anonThrottle.limiter.Close()
 
 	anonReq := httptest.NewRequest(http.MethodGet, "/test", nil)
 	anonReq.RemoteAddr = "192.0.2.88:1234"

@@ -15,16 +15,21 @@ type UserRateThrottle struct {
 	Rate     string
 	Scope    string
 	store    Store
-	limiter  *internalratelimit.KeyedLimiter
 	parseErr error
 }
 
 // NewUserRateThrottle creates a new user rate throttle.
 func NewUserRateThrottle(rate string) *UserRateThrottle {
 	limit, window, err := parseRate(rate)
+	var store Store
+	if err == nil {
+		store = internalratelimit.NewFixedWindowCounter(limit, window)
+	}
 	return &UserRateThrottle{
-		Rate: rate, Scope: "user", parseErr: err,
-		limiter: newKeyedLimiter(limit, window, err),
+		Rate:     rate,
+		Scope:    "user",
+		store:    store,
+		parseErr: err,
 	}
 }
 
@@ -46,15 +51,11 @@ func (t *UserRateThrottle) AllowRequest(r *http.Request, view interface{}) (bool
 	if t.parseErr != nil {
 		return true, 0, t.parseErr
 	}
-	key := "throttle_user_" + t.GetScope(r, view)
-	if t.store != nil {
-		allowed, retryAfter := t.store.Allow(key)
-		return allowed, retryAfter, nil
-	}
-	if t.limiter == nil {
+	if t.store == nil {
 		return true, 0, nil
 	}
-	allowed, retryAfter := t.limiter.Reserve(key)
+	key := "throttle_user_" + t.GetScope(r, view)
+	allowed, retryAfter := t.store.Allow(key)
 	return allowed, retryAfter, nil
 }
 

@@ -1,6 +1,7 @@
 package throttling
 
 import (
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -19,9 +20,8 @@ func TestParseRate(t *testing.T) {
 	assert.Equal(t, time.Hour, window)
 }
 
-func TestAnonRateThrottle_AllowsBurstThenReturnsRetry(t *testing.T) {
+func TestAnonRateThrottle_AllowsLimitThenReturnsRetry(t *testing.T) {
 	throttle := NewAnonRateThrottle("3/minute")
-	defer throttle.limiter.Close()
 	request := httptest.NewRequest("GET", "/test", nil)
 	request.RemoteAddr = "192.0.2.1:1234"
 	for i := 0; i < 3; i++ {
@@ -39,8 +39,6 @@ func TestAnonRateThrottle_AllowsBurstThenReturnsRetry(t *testing.T) {
 func TestUserAndAnonymousThrottleKeysAreSeparate(t *testing.T) {
 	anon := NewAnonRateThrottle("1/minute")
 	user := NewUserRateThrottle("1/minute")
-	defer anon.limiter.Close()
-	defer user.limiter.Close()
 	request := httptest.NewRequest("GET", "/test", nil)
 	request.RemoteAddr = "192.0.2.1:1234"
 	allowed, _, err := anon.AllowRequest(request, nil)
@@ -54,7 +52,6 @@ func TestUserAndAnonymousThrottleKeysAreSeparate(t *testing.T) {
 
 func TestUserRateThrottleFallsBackToClientIP(t *testing.T) {
 	throttle := NewUserRateThrottle("1/minute")
-	defer throttle.limiter.Close()
 	request := httptest.NewRequest("GET", "/test", nil)
 	allowed, _, err := throttle.AllowRequest(request, nil)
 	require.NoError(t, err)
@@ -67,11 +64,30 @@ func TestUserRateThrottleFallsBackToClientIP(t *testing.T) {
 
 func TestCheckThrottlesReturnsWaitDuration(t *testing.T) {
 	throttle := NewAnonRateThrottle("1/minute")
-	defer throttle.limiter.Close()
 	request := httptest.NewRequest("GET", "/test", nil)
 	require.NoError(t, CheckThrottles(request, nil, []Throttle{throttle}))
 	err := CheckThrottles(request, nil, []Throttle{throttle})
 	throttled, ok := err.(*ThrottledError)
 	require.True(t, ok)
 	assert.Positive(t, throttled.WaitDuration)
+}
+
+func TestUserRateThrottle_AtTwoPerMinute_AllowsTwoThenReturnsThrottledError(t *testing.T) {
+	throttle := NewUserRateThrottle("2/minute")
+	request := httptest.NewRequest(http.MethodGet, "/test", nil)
+	authentication.SetUserOnRequest(request, &mockAuthUser{ID: "user-2-per-minute"})
+
+	// First 2 calls allowed
+	for i := 0; i < 2; i++ {
+		err := CheckThrottles(request, nil, []Throttle{throttle})
+		require.NoError(t, err)
+	}
+
+	// 3rd call denied with ThrottledError and WaitDuration > 0
+	err := CheckThrottles(request, nil, []Throttle{throttle})
+	require.Error(t, err)
+	throttledErr, ok := err.(*ThrottledError)
+	require.True(t, ok)
+	assert.Greater(t, throttledErr.WaitDuration, time.Duration(0))
+	assert.LessOrEqual(t, throttledErr.WaitDuration, time.Minute)
 }

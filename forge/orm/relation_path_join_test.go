@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/forgego/forge/db"
@@ -383,4 +384,56 @@ func TestRelationPathJoin_ToManyFilter_CombinedWithToOneOrderBy(t *testing.T) {
 		OrderBy("company__name").(*BaseQuerySet[TestCustomer]).buildSQL()
 	require.NoError(t, err)
 	assert.Equal(t, `SELECT "customers".* FROM "customers" LEFT JOIN "companies" AS "company" ON "company"."id" = "customers"."company_id" WHERE "customers"."id" IN (SELECT "customers"."id" FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "orders"."total" > ?) ORDER BY "company"."name" ASC`, sql)
+}
+
+func TestRelationPathJoin_AnnotationOnRelatedField_RegistersJoin(t *testing.T) {
+	database := setupRelationTestDB(t)
+	defer database.Close()
+	seedRelationTestData(t, database)
+
+	qs, err := NewQuerySet[TestOrder]("orders")
+	require.NoError(t, err)
+	qs = qs.SetDB(database)
+
+	nameField := NewField[string]("customer__name", "orders")
+	ann := NewExpressionAnnotation("customer_name", nameField)
+	qs = qs.Annotate(ann)
+
+	base := qs.(*BaseQuerySet[TestOrder])
+	sql, args, err := base.buildSQL()
+	require.NoError(t, err)
+	assert.Contains(t, sql, `LEFT JOIN "customers" AS "customer" ON "customer"."id" = "orders"."customer_id"`)
+
+	rows, err := database.Query(sql, args...)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	type result struct {
+		id           int64
+		total        float64
+		customerID   int64
+		customerName string
+	}
+	var results []result
+	for rows.Next() {
+		var r result
+		err := rows.Scan(&r.id, &r.total, &r.customerID, &r.customerName)
+		require.NoError(t, err)
+		results = append(results, r)
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, results, 3)
+	assert.Equal(t, "Acme", results[0].customerName)
+	assert.Equal(t, "Acme", results[1].customerName)
+	assert.Equal(t, "Bob", results[2].customerName)
+
+	// Verify no duplicate joins when both annotation and filter reference customer__name
+	qs2, err := NewQuerySet[TestOrder]("orders")
+	require.NoError(t, err)
+	qs2 = qs2.SetDB(database)
+	qs2 = qs2.Annotate(NewExpressionAnnotation("customer_name", NewField[string]("customer__name", "orders")))
+	qs2 = qs2.Filter(F("customer__name").Eq("Acme"))
+	sql2, _, err := qs2.(*BaseQuerySet[TestOrder]).buildSQL()
+	require.NoError(t, err)
+	assert.Equal(t, 1, strings.Count(sql2, `LEFT JOIN "customers"`))
 }

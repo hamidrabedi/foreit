@@ -121,3 +121,41 @@ func TestSQLiteDialect_BuilderEmitsQuestionMarkPlaceholders(t *testing.T) {
 	assert.Equal(t, "?", p1)
 	assert.Equal(t, "?", p2)
 }
+
+func TestRawExpression_BackslashDoesNotEscapeClosingQuote(t *testing.T) {
+	t.Run("SQLite builder maps placeholder after backslash literal", func(t *testing.T) {
+		builder := NewSQLBuilderWithDialect(dialect.NewSQLiteDialect())
+		raw := &RawExpression{
+			SQL:  `note = 'foo\' AND id = $1`,
+			Args: []interface{}{42},
+		}
+		sql, args, err := raw.ToSQL(builder)
+		require.NoError(t, err)
+		assert.Equal(t, `note = 'foo\' AND id = ?`, sql)
+		assert.Equal(t, []interface{}{42}, args)
+	})
+
+	t.Run("PostgreSQL builder maps placeholder after backslash literal", func(t *testing.T) {
+		builder := NewSQLBuilderWithDialect(dialect.NewPostgreSQLDialect())
+		raw := &RawExpression{
+			SQL:  `note = 'foo\' AND id = $1`,
+			Args: []interface{}{42},
+		}
+		sql, args, err := raw.ToSQL(builder)
+		require.NoError(t, err)
+		assert.Equal(t, `note = 'foo\' AND id = $1`, sql)
+		assert.Equal(t, []interface{}{42}, args)
+	})
+
+	t.Run("doubled quote literal still works", func(t *testing.T) {
+		builder := NewSQLBuilderWithDialect(dialect.NewSQLiteDialect())
+		raw := &RawExpression{
+			SQL:  `note = 'foo''bar' AND id = $1`,
+			Args: []interface{}{42},
+		}
+		sql, args, err := raw.ToSQL(builder)
+		require.NoError(t, err)
+		assert.Equal(t, `note = 'foo''bar' AND id = ?`, sql)
+		assert.Equal(t, []interface{}{42}, args)
+	})
+}

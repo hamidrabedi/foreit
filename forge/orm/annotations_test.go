@@ -2,9 +2,12 @@ package orm
 
 import (
 	"fmt"
+	"path/filepath"
 	"testing"
 
+	"github.com/forgego/forge/db"
 	"github.com/forgego/forge/db/dialect"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -133,5 +136,100 @@ func TestSQLBuilder_BuildWhere_AdapterEquivalence(t *testing.T) {
 		where, args := b.BuildWhere(conditions, excludes)
 		assert.Equal(t, `WHERE price > ? AND available = ? AND NOT (deleted = ?)`, where)
 		assert.Equal(t, []interface{}{10.0, true, true}, args)
+	})
+}
+
+func TestAnnotation_ArgOrder_MatchesPlaceholderOrder(t *testing.T) {
+	t.Run("SQLite query binds annotation and filter args in placeholder text order", func(t *testing.T) {
+		dbPath := filepath.Join(t.TempDir(), "arg_order_test.sqlite")
+		database, err := db.NewDB(dbPath)
+		require.NoError(t, err)
+		defer database.Close()
+
+		_, err = database.Exec(`
+			CREATE TABLE test_table (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				email TEXT,
+				price REAL DEFAULT 0.0,
+				available BOOLEAN DEFAULT 1
+			);
+			INSERT INTO test_table (name, price) VALUES ('Low', 0.5);
+			INSERT INTO test_table (name, price) VALUES ('Mid', 2.0);
+			INSERT INTO test_table (name, price) VALUES ('High', 4.0);
+		`)
+		require.NoError(t, err)
+
+		priceField := NewField[float64]("price", "test_table")
+		// Filter price > 1.0 (WHERE clause: arg should be 1.0)
+		filterExpr := priceField.Gt(1.0)
+		// Annotation price > 3.0 (SELECT clause: arg should be 3.0)
+		ann := NewExpressionAnnotation("threshold_flag", priceField.Gt(3.0))
+
+		qs, err := NewQuerySet[testModel]("test_table")
+		require.NoError(t, err)
+		qs = qs.SetDB(database).Filter(filterExpr).Annotate(ann).OrderBy("id")
+
+		base := qs.(*BaseQuerySet[testModel])
+		sql, args, err := base.buildSQL()
+		require.NoError(t, err)
+
+		// Annotation placeholder appears before WHERE placeholder in SQL text,
+		// so args[0] must be 3.0 and args[1] must be 1.0 for positional '?' binding.
+		assert.Contains(t, sql, `"price" > ? AS "threshold_flag"`)
+		assert.Contains(t, sql, `WHERE "test_table"."price" > ?`)
+		assert.Equal(t, []interface{}{3.0, 1.0}, args)
+
+		rows, err := database.Query(sql, args...)
+		require.NoError(t, err)
+		defer rows.Close()
+
+		type rowResult struct {
+			id            int64
+			name          string
+			email         *string
+			price         float64
+			available     bool
+			thresholdFlag int
+		}
+		var results []rowResult
+		for rows.Next() {
+			var r rowResult
+			err := rows.Scan(&r.id, &r.name, &r.email, &r.price, &r.available, &r.thresholdFlag)
+			require.NoError(t, err)
+			results = append(results, r)
+		}
+		require.NoError(t, rows.Err())
+		require.Len(t, results, 2)
+
+		// Mid (2.0): > 1.0 is true, > 3.0 is false (0)
+		assert.Equal(t, "Mid", results[0].name)
+		assert.Equal(t, 0, results[0].thresholdFlag)
+
+		// High (4.0): > 1.0 is true, > 3.0 is true (1)
+		assert.Equal(t, "High", results[1].name)
+		assert.Equal(t, 1, results[1].thresholdFlag)
+	})
+
+	t.Run("PostgreSQL-dialect builder assertion that $N numbering matches argument order", func(t *testing.T) {
+		priceField := NewField[float64]("price", "test_table")
+		filterExpr := priceField.Gt(1.0)
+		ann := NewExpressionAnnotation("threshold_flag", priceField.Gt(3.0))
+
+		qs, err := NewQuerySet[testModel]("test_table")
+		require.NoError(t, err)
+		qs = qs.Filter(filterExpr).Annotate(ann)
+
+		base := qs.(*BaseQuerySet[testModel])
+		// Without a database set, buildSQL uses NewSQLBuilder() which defaults to $1, $2 (PositionalStyle)
+		sql, args, err := base.buildSQL()
+		require.NoError(t, err)
+
+		// $1 is in SELECT, $2 is in WHERE
+		assert.Contains(t, sql, `"price" > $1 AS "threshold_flag"`)
+		assert.Contains(t, sql, `WHERE "test_table"."price" > $2`)
+		require.Len(t, args, 2)
+		assert.Equal(t, 3.0, args[0])
+		assert.Equal(t, 1.0, args[1])
 	})
 }

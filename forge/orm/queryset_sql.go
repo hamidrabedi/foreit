@@ -5,12 +5,51 @@ import (
 	"strings"
 )
 
+// hasAnyPathJoins checks if any path joins exist across annotations, where conditions, or order by.
+func (qs *BaseQuerySet[T]) hasAnyPathJoins() bool {
+	if len(qs.annotations) == 0 && len(qs.conditions) == 0 && len(qs.excludes) == 0 && len(qs.orderBy) == 0 {
+		return false
+	}
+	probeBuilder := qs.newSQLBuilder()
+	var joins []string
+	seen := make(map[string]bool)
+	var multi bool
+	probeBuilder.SetJoinResolver(qs.createJoinResolver(&joins, seen, &multi))
+
+	for _, ann := range qs.annotations {
+		expr := ann.Expression
+		if expr == nil {
+			expr = newQueryExprAdapter(ann.Expr)
+		}
+		if expr != nil {
+			_, _, _ = expr.ToSQL(probeBuilder)
+		}
+	}
+	_, _, _ = qs.buildWhereClause(probeBuilder)
+	_, _ = qs.buildOrderByClause(probeBuilder)
+
+	return len(joins) > 0 || multi
+}
+
 // buildSQL builds the SQL query
 func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	builder := qs.newSQLBuilder()
 
 	// Build select_related JOINs first (populates qs.joins and qs.joinMap)
 	qs.buildJoinClause(builder)
+
+	hasPathJoins := qs.hasAnyPathJoins()
+
+	// Build SELECT clause first so annotation arguments are added in text order
+	var annotationJoins []string
+	annotationSeen := make(map[string]bool)
+	var annotationMulti bool
+	builder.SetJoinResolver(qs.createJoinResolver(&annotationJoins, annotationSeen, &annotationMulti))
+
+	selectClause := qs.buildSelectClause(builder, hasPathJoins)
+	if qs.err != nil {
+		return "", nil, qs.err
+	}
 
 	// Build WHERE clause with resolver W
 	var whereJoins []string
@@ -40,24 +79,17 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 
 	var parts []string
 	if whereMulti {
-		selectClause := qs.buildSelectClause(builder, true)
-		if qs.err != nil {
-			return "", nil, qs.err
-		}
 		parts = []string{selectClause, fromClause}
 		if len(qs.joins) > 0 {
 			parts = append(parts, strings.Join(qs.joins, " "))
 		}
-		if len(orderJoins) > 0 {
-			parts = append(parts, strings.Join(orderJoins, " "))
+		outerJoins := mergeJoins(annotationJoins, orderJoins)
+		if len(outerJoins) > 0 {
+			parts = append(parts, strings.Join(outerJoins, " "))
 		}
 		parts = append(parts, qs.pkSubquery(whereJoins, whereClause))
 	} else {
-		pathJoins := mergeJoins(whereJoins, orderJoins)
-		selectClause := qs.buildSelectClause(builder, len(pathJoins) > 0)
-		if qs.err != nil {
-			return "", nil, qs.err
-		}
+		pathJoins := mergeJoins(annotationJoins, whereJoins, orderJoins)
 		parts = []string{selectClause, fromClause}
 		if len(qs.joins) > 0 {
 			parts = append(parts, strings.Join(qs.joins, " "))
@@ -86,20 +118,16 @@ func (qs *BaseQuerySet[T]) buildSQL() (string, []interface{}, error) {
 	return sql, args, nil
 }
 
-// mergeJoins merges whereJoins and orderJoins without duplicating identical joins.
-func mergeJoins(whereJoins, orderJoins []string) []string {
+// mergeJoins merges join lists without duplicating identical joins.
+func mergeJoins(joinLists ...[]string) []string {
 	var merged []string
-	seen := make(map[string]bool, len(whereJoins)+len(orderJoins))
-	for _, j := range whereJoins {
-		if !seen[j] {
-			seen[j] = true
-			merged = append(merged, j)
-		}
-	}
-	for _, j := range orderJoins {
-		if !seen[j] {
-			seen[j] = true
-			merged = append(merged, j)
+	seen := make(map[string]bool)
+	for _, list := range joinLists {
+		for _, j := range list {
+			if !seen[j] {
+				seen[j] = true
+				merged = append(merged, j)
+			}
 		}
 	}
 	return merged

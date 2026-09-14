@@ -4,6 +4,7 @@ package migrate
 
 import (
 	"github.com/forgego/forge/codegen"
+	"github.com/forgego/forge/db/migrate/core"
 	"github.com/forgego/forge/db/migrate/generate"
 	"github.com/forgego/forge/db/migrate/sql"
 	"github.com/forgego/forge/db/migrate/state"
@@ -15,8 +16,8 @@ import (
 // Example:
 //
 //	err := migrate.Generate("add_user_table", "./models", "./migrations")
-func Generate(name, modelsDir, migrationsDir string) error {
-	gen, err := generate.NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir)
+func Generate(name, modelsDir, migrationsDir string, driver core.Driver) error {
+	gen, err := generate.NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir, driver)
 	if err != nil {
 		return err
 	}
@@ -125,8 +126,8 @@ func (g *SQLGenerator) GenerateDownSQL(changes []Change) (string, error) {
 //		return err
 //	}
 //	err = gen.GenerateMigrations("add_user_table")
-func NewGenerator(modelsDir, migrationsDir string) (*Generator, error) {
-	gen, err := generate.NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir)
+func NewGenerator(modelsDir, migrationsDir string, driver core.Driver) (*Generator, error) {
+	gen, err := generate.NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir, driver)
 	if err != nil {
 		return nil, err
 	}

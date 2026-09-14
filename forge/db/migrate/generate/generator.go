@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	codegen "github.com/forgego/forge/codegen"
-	"github.com/forgego/forge/config"
 	"github.com/forgego/forge/db/migrate/core"
 	"github.com/forgego/forge/db/migrate/sql"
 	"github.com/forgego/forge/db/migrate/state"
@@ -28,14 +27,11 @@ type MigrationGenerator struct {
 // NewMigrationGenerator creates a new migration generator with dependency injection
 func NewMigrationGenerator(
 	modelsDir, migrationsDir string,
+	driver core.Driver,
 	detector ChangeDetector,
 	sqlBuilder sql.SQLBuilder,
 	stateManager state.StateManager,
 ) (*MigrationGenerator, error) {
-	cfg := config.NewConfig()
-	driverName := cfg.GetDriver()
-	driver := core.Driver(driverName)
-
 	return &MigrationGenerator{
 		modelsDir:     modelsDir,
 		migrationsDir: migrationsDir,
@@ -47,11 +43,7 @@ func NewMigrationGenerator(
 }
 
 // NewMigrationGeneratorWithDefaults creates a new migration generator with default dependencies
-func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string) (*MigrationGenerator, error) {
-	cfg := config.NewConfig()
-	driverName := cfg.GetDriver()
-	driver := core.Driver(driverName)
-
+func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string, driver core.Driver) (*MigrationGenerator, error) {
 	// Create dependencies
 	detector := NewDetector()
 	sqlBuilder, err := sql.NewSQLBuilder(driver)
@@ -62,7 +54,7 @@ func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string) (*Migrat
 	// This ensures incremental migrations work correctly
 	stateManager := state.NewFileStateLoader(migrationsDir)
 
-	return NewMigrationGenerator(modelsDir, migrationsDir, detector, sqlBuilder, stateManager)
+	return NewMigrationGenerator(modelsDir, migrationsDir, driver, detector, sqlBuilder, stateManager)
 }
 
 // GenerateMigrations generates migration files from model definitions

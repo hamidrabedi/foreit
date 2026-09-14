@@ -34,6 +34,16 @@ func NewManager[T any](tableName string) (*Manager[T], error) {
 	}, nil
 }
 
+// MustNewManager creates a manager or panics when the model schema is invalid.
+func MustNewManager[T any](tableName string) *Manager[T] {
+	manager, err := NewManager[T](tableName)
+	if err != nil {
+		modelType := reflect.TypeOf((*T)(nil)).Elem()
+		panic(fmt.Errorf("failed to create manager for %s: %w", modelType, err))
+	}
+	return manager
+}
+
 // NewManagerWithDB creates a new manager with a database connection.
 // Returns a ConfigurationError if the database connection is nil.
 func NewManagerWithDB[T any](tableName string, db *db.DB) (*Manager[T], error) {

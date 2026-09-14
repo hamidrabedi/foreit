@@ -36,9 +36,9 @@ Every item below was re-verified on current master before its task prompt was wr
 | #226 | Naming: ticket-named tests | A1c #8 | `w0_*_test.go` and `TestW0_*` renamed after behaviour; `orm/w0_orm_test.go` split in three; no logic changed | merged |
 | #227 | W0-7c Down SQL for drops | B32 | `DropTable`/`DropColumn` carry previous definitions; down SQL re-creates them (PostgreSQL and SQLite) instead of aborting generation | merged |
 | #228 | Wave 1a: unreachable packages | §4 | removed `cli/internal`, `filter/widgets`, `db/migrate/dependencies` (see removal log) | merged |
-| #229 | Wave 0 remaining bugs | B7, B13, B16, B21, B22, B24, B26, B27, B28, B39, B40 | multipart boundary; ordering/search filters; negotiation without renderers; superuser password without echo; admin history race; regex sanitizer and SQL blacklist removed; staff/superuser admin login via `identity` (env pair as fallback); quoted write identifiers; `Exists` with LIMIT 1; M2M through columns `<model>_id` | in review |
-| (branch) `refactor/wave1-dead-code-and-tests` | Waves 1-2 | §4, §5, §7, B8, B14, B30, B36 | tests: 4 tautological tests removed, 15 skips removed, missing assertions added; in progress: dead filter/migrate code, registry plugin stubs, `forge test`, viewset merge, API error format merge, rate-limit store merge, checksum/test-helper/settings/user-not-found duplicates | in progress |
-| (branch) `refactor/wave3-design` | Wave 3 | D4, D5 | in progress: config loaded once, generated managers fail at init | in progress |
+| #229 | Wave 0 remaining bugs | B7, B13, B16, B21, B22, B24, B26, B27, B28, B39, B40 | multipart boundary; ordering/search filters; negotiation without renderers; superuser password without echo; admin history race; regex sanitizer and SQL blacklist removed; staff/superuser admin login via `identity` (env pair as fallback); quoted write identifiers; `Exists` with LIMIT 1; M2M through columns `<model>_id` | merged |
+| #230 | Waves 1-2: dead code, tests, duplicates | §4, §5, §7, B8, B14, B30, B36 | tests: 4 tautological removed, 15 skips removed, missing assertions; one viewset (`BaseViewSet` + auth/permission/throttle classes); unreferenced filter code removed; registry admin/API plugins fail loudly; `forge test` runs `go test`; one rate-limit store (`internal/ratelimit`); one API error format (RFC 7807, **response body change**); checksum, test helpers, settings durations, `ErrUserNotFound` merged; CI misspell fixed | in review |
+| (branch) `refactor/wave3-design` | Wave 3 | D4, D5, D12, B29 | done: config loaded once in the CLI, `orm.MustNewManager` in generated code; in progress: ORM transactions (`Manager.WithTx`), cookie session auth requires CSRF | in progress |
 
 ## Removal log
 
@@ -55,7 +55,15 @@ Only code that was unreachable, a no-op pretending to work, or harmful. No worki
 | #228 | `filter/widgets` (autosuggest, SQL preview) | no importers; rendered unescaped values into HTML and `<script>` (XSS, B14) |
 | #228 | `db/migrate/dependencies` (`Resolver`) | no importers; duplicate of `generate.DependencyDetector`, which the generator uses |
 | #229 | `server`: `XSS.SanitizeHTML`, `SanitizeHTMLStrict`, `SanitizeInput`, `HTMLPolicy`, `DefaultHTMLPolicy`, `SQLInjection.ValidateInput`, `EnsureParameterized` | regex sanitizer bypassable (`<img onerror=... src=x>`), keyword blacklist is not a defence; no callers (B27) |
-| wave1 branch | tests `TestPostgreSQLDialect_ImplementsDialect`, `TestSQLiteDialect_ImplementsDialect` (now compile-time assertions), `TestOptionType`, `TestTypeAliases` | only checked that code compiles |
+| #230 | tests `TestPostgreSQLDialect_ImplementsDialect`, `TestSQLiteDialect_ImplementsDialect` (now compile-time assertions), `TestOptionType`, `TestTypeAliases` | only checked that code compiles |
+| #230 | `api`: `EnhancedBaseViewSet`, `EnhancedBaseViewSetIntegrated`, `EnhancedRouter`/`ActionRegistry`, `integration.go` helpers, `CreateDefaultViewSet`, `getManagerFromModel` | duplicate CRUD stack whose actions except List always answered "Manager not found"; checks moved to `BaseViewSet` |
+| #230 | `filter`: `dialect.go`, `cache.go`, `relations.go`, `typed_filter.go`, `optimizer.go` (+ `FilterSet` wiring), `persistence.go` | unreferenced; JSON path interpolated into SQL (B14), map without a mutex (B8) |
+| #230 | `identity/password.go` | re-export shim of `identity/utils`, no users |
+| #230 | `registry`: `applyAdminExtensions`, `applyAPIExtensions` | empty placeholders; registration now returns NotImplemented |
+| #230 | `api/throttling/cache.go` (`CacheBackend`, `MemoryCache`) | second rate-limit algorithm; throttles use the shared `internal/ratelimit` store |
+| #230 | `api/exceptions`: `HandleExceptionHTTP`, `ExceptionHandler`, `DefaultExceptionHandler`, `SetExceptionHandler`/`GetExceptionHandler`, `ErrorResponse`; `api.SetExceptionHandler` | second error writer; the global handler was stored but never read |
+| #230 | `db/migrate/execute`: `checksum.go`, `executor.go`, `rollback.go` and the executor-only integration test | identical copy of `verify` checksum; `Executor`/`RollbackManager` had no caller outside their own test |
+| #230 | `tests/helpers` | duplicate of `tests/testhelpers` (importers moved) |
 
 ## Flagged for the owner (kept: works, but has a problem)
 
@@ -89,9 +97,9 @@ Wave 0 (critical bugs) is complete: #217-#228 merged, the rest in #229. From now
 
 Still open from the bug list: B10/B11 (placeholder rewriting, fixed by D3 in Wave 3) and B29 (cookie session auth relies on CSRF middleware being mounted; document or enforce).
 
-1. Waves 1-2 (branch `refactor/wave1-dead-code-and-tests`, one PR): dead filter/migrate code; registry plugin stubs fail loudly; `forge test` runs `go test`; one viewset; one API error format (RFC 7807 via `api/errors`; `SetExceptionHandler` was a no-op); one rate-limit store; checksum, test helpers, settings durations (B36) and "user not found" deduplicated. Function-level pruning inside live packages only where `deadcode -test` and grep of cli templates/docs-site agree, since plain `deadcode ./...` on a library reports public API as dead.
+1. Waves 1-2: done in #230 (see status and removal log). Function-level pruning inside `schema`/`registry`/`validate` was dropped: nearly everything `deadcode -test` lists there is the public model/validation DSL that user code calls.
    Decision: §5 proposed keeping the enhanced viewset. Re-checking showed generated code, CLI scaffolds and examples all use `BaseViewSet`, and every enhanced CRUD action except List answered "Manager not found" (`getManagerFromModel` is a stub). So `BaseViewSet` is kept and gains the authentication/permission/throttle classes.
-2. Wave 3 (branch `refactor/wave3-design`, one PR): D4/D5 in progress, then D12 transactions, D3 dialect placeholders, D13 one expression tree, D1 relation metadata, D7/D8 god-file splits, D2 `forge.App`.
+2. Wave 3 (branch `refactor/wave3-design`, one PR): D4/D5 done; D12 transactions and B29 in progress; then D3 dialect placeholders (fixes B10/B11), D13 one expression tree, D1 relation metadata, D7/D8 god-file splits, D2 `forge.App`.
 3. Wave 4 (library swaps): **documented only, not scheduled** (owner, 2026-09-14). Recommendations per swap are in §8; nothing in Waves 1-3 adds or replaces a library. Merging duplicate code onto a dependency the repo already uses (API throttles onto the existing `x/time/rate` store) is a duplicate merge, not a swap.
 4. Stale comment at `db/migrate/generate/generator.go` (~230) still mentions `schema_migrations`; remove with the next generate change.
 

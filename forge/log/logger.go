@@ -2,8 +2,12 @@
 package log
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"sync"
+	"syscall"
 	"time"
 
 	forgeerrors "github.com/forgego/forge/errors"
@@ -15,7 +19,8 @@ import (
 // Logger wraps zap.Logger with enhanced functionality
 type Logger struct {
 	*zap.Logger
-	config *LoggingConfig
+	config    *LoggingConfig
+	resources *loggerResources
 }
 
 // NewLogger creates a new logger with framework defaults
@@ -27,6 +32,10 @@ func NewLogger(development bool) (*Logger, error) {
 
 // NewLoggerFromConfig creates a new logger from a configuration
 func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
+	return newLoggerFromConfig(config)
+}
+
+func newLoggerFromConfig(config *LoggingConfig, hooks ...Hook) (*Logger, error) {
 	if config == nil {
 		config = DefaultLoggingConfig(false)
 	}
@@ -38,6 +47,7 @@ func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
 
 	// Build cores for each output
 	cores := make([]zapcore.Core, 0)
+	closers := make([]io.Closer, 0)
 	development := isDevelopmentMode(config)
 
 	for _, output := range config.Outputs {
@@ -61,7 +71,9 @@ func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
 		case OutputConsole:
 			core = createConsoleCore(encoder, level)
 		case OutputFile:
-			core = createFileCore(encoder, level, output.File)
+			var closer io.Closer
+			core, closer = createFileCore(encoder, level, output.File)
+			closers = append(closers, closer)
 		case OutputRemote:
 			return nil, forgeerrors.NewNotImplementedError("log remote output")
 		default:
@@ -91,6 +103,14 @@ func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
 		)
 	}
 
+	if len(hooks) > 0 {
+		registry := NewHookRegistry()
+		for _, hook := range hooks {
+			registry.AddHook(hook)
+		}
+		combinedCore = NewHookCore(combinedCore, registry)
+	}
+
 	// Create logger
 	zapLogger := zap.New(
 		combinedCore,
@@ -99,8 +119,9 @@ func NewLoggerFromConfig(config *LoggingConfig) (*Logger, error) {
 	)
 
 	return &Logger{
-		Logger: zapLogger,
-		config: config,
+		Logger:    zapLogger,
+		config:    config,
+		resources: &loggerResources{closers: closers},
 	}, nil
 }
 
@@ -111,7 +132,7 @@ func createConsoleCore(encoder zapcore.Encoder, level zapcore.Level) zapcore.Cor
 }
 
 // createFileCore creates a file core with rotation
-func createFileCore(encoder zapcore.Encoder, level zapcore.Level, fileConfig FileOutputConfig) zapcore.Core {
+func createFileCore(encoder zapcore.Encoder, level zapcore.Level, fileConfig FileOutputConfig) (zapcore.Core, io.Closer) {
 	fileExp := logexporters.NewFileExporter(logexporters.FileConfig{
 		Path:       fileConfig.Path,
 		MaxSize:    fileConfig.Rotation.MaxSize,
@@ -120,7 +141,7 @@ func createFileCore(encoder zapcore.Encoder, level zapcore.Level, fileConfig Fil
 		Compress:   fileConfig.Rotation.Compress,
 	}, level)
 	writer := fileExp.GetWriter()
-	return zapcore.NewCore(encoder, writer, level)
+	return zapcore.NewCore(encoder, writer, level), fileExp
 }
 
 // getStacktraceLevel returns the stacktrace level based on configuration
@@ -153,8 +174,9 @@ func isDevelopmentMode(config *LoggingConfig) bool {
 // NewNopLogger creates a no-op logger for testing
 func NewNopLogger() *Logger {
 	return &Logger{
-		Logger: zap.NewNop(),
-		config: DefaultLoggingConfig(false),
+		Logger:    zap.NewNop(),
+		config:    DefaultLoggingConfig(false),
+		resources: &loggerResources{},
 	}
 }
 
@@ -176,8 +198,9 @@ func Error(err error) zap.Field {
 // With creates a child logger with fields
 func (l *Logger) With(fields ...zapcore.Field) *Logger {
 	return &Logger{
-		Logger: l.Logger.With(fields...),
-		config: l.config,
+		Logger:    l.Logger.With(fields...),
+		config:    l.config,
+		resources: l.resources,
 	}
 }
 
@@ -198,4 +221,33 @@ func (l *Logger) GetConfig() *LoggingConfig {
 // Sync flushes any buffered log entries
 func (l *Logger) Sync() error {
 	return l.Logger.Sync()
+}
+
+type loggerResources struct {
+	closers []io.Closer
+	once    sync.Once
+	err     error
+}
+
+// Close flushes and closes outputs opened by the logger.
+func (l *Logger) Close() error {
+	if l.resources == nil {
+		return ignoreSyncError(l.Logger.Sync())
+	}
+	l.resources.once.Do(func() {
+		l.resources.err = ignoreSyncError(l.Logger.Sync())
+		for _, closer := range l.resources.closers {
+			if err := closer.Close(); err != nil && l.resources.err == nil {
+				l.resources.err = fmt.Errorf("close log output: %w", err)
+			}
+		}
+	})
+	return l.resources.err
+}
+
+func ignoreSyncError(err error) error {
+	if errors.Is(err, syscall.EINVAL) {
+		return nil
+	}
+	return err
 }

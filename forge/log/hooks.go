@@ -55,6 +55,22 @@ func NewHookCore(core zapcore.Core, registry *HookRegistry) *HookCore {
 	}
 }
 
+// Check determines whether the entry should be logged
+func (c *HookCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	if c.Enabled(entry.Level) {
+		return ce.AddCore(entry, c)
+	}
+	return ce
+}
+
+// With adds structured context to the Core
+func (c *HookCore) With(fields []zapcore.Field) zapcore.Core {
+	return &HookCore{
+		Core:     c.Core.With(fields),
+		registry: c.registry,
+	}
+}
+
 // Write processes hooks before writing
 func (c *HookCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	entry, fields, shouldLog := c.registry.ProcessHooks(entry, fields)

@@ -39,6 +39,17 @@ func NewConsoleEncoder(config DevelopmentConfig) *ConsoleEncoder {
 	}
 }
 
+// Clone creates a copy of the console encoder
+func (e *ConsoleEncoder) Clone() zapcore.Encoder {
+	return &ConsoleEncoder{
+		Encoder:    e.Encoder.Clone(),
+		colored:    e.colored,
+		oneLine:    e.oneLine,
+		caller:     e.caller,
+		stacktrace: e.stacktrace,
+	}
+}
+
 // EncodeEntry encodes a log entry
 func (e *ConsoleEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
 	if e.oneLine {
@@ -198,6 +209,15 @@ func NewProductionEncoder(config ProductionConfig) *ProductionEncoder {
 		Encoder:    baseEncoder,
 		caller:     config.Caller,
 		stacktrace: config.Stacktrace,
+	}
+}
+
+// Clone creates a copy of the production encoder
+func (e *ProductionEncoder) Clone() zapcore.Encoder {
+	return &ProductionEncoder{
+		Encoder:    e.Encoder.Clone(),
+		caller:     e.caller,
+		stacktrace: e.stacktrace,
 	}
 }
 

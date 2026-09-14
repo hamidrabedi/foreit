@@ -8,6 +8,7 @@ import (
 // Builder provides a fluent interface for building loggers
 type Builder struct {
 	config *LoggingConfig
+	hooks  []Hook
 }
 
 // NewBuilder creates a new logger builder
@@ -122,9 +123,15 @@ func (b *Builder) Sampling(initial, thereafter int) *Builder {
 	return b
 }
 
+// Hooks adds hooks to the builder
+func (b *Builder) Hooks(hooks ...Hook) *Builder {
+	b.hooks = append(b.hooks, hooks...)
+	return b
+}
+
 // Build creates the logger from the builder configuration
 func (b *Builder) Build() (*Logger, error) {
-	return NewLoggerFromConfig(b.config)
+	return newLoggerFromConfig(b.config, b.hooks...)
 }
 
 // MustBuild creates the logger and panics on error

@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/forgego/forge/config"
@@ -181,7 +183,20 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	return s.Server.Shutdown(shutdownCtx)
+	err := s.Server.Shutdown(shutdownCtx)
+	if s.logger != nil {
+		if syncErr := ignoreSyncError(s.logger.Sync()); syncErr != nil && err == nil {
+			err = syncErr
+		}
+	}
+	return err
+}
+
+func ignoreSyncError(err error) error {
+	if errors.Is(err, syscall.EINVAL) {
+		return nil
+	}
+	return err
 }
 
 // ServerInfoHandler returns a handler for server info endpoint

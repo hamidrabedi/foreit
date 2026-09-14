@@ -133,3 +133,6 @@ helper-projects/
 forge/admin/ui/web/test-results/
 forge/admin/ui/web/playwright-report/
 forge/admin/ui/web/.vitest/
+
+# Local assistant instructions (not part of the project)
+CLAUDE.md

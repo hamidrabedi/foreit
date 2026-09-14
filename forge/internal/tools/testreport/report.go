@@ -28,6 +28,29 @@ type event struct {
 
 type counts struct{ passed, failed, skipped, packageFailed int }
 
+type testID struct {
+	pkg  string
+	test string
+}
+
+type section struct {
+	header string
+	lines  []string
+}
+
+func splitLines(s string) []string {
+	if s == "" {
+		return nil
+	}
+	s = strings.TrimSuffix(s, "\r\n")
+	s = strings.TrimSuffix(s, "\n")
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		lines[i] = strings.TrimSuffix(line, "\r")
+	}
+	return lines
+}
+
 func run(r io.Reader, w io.Writer, opts options) (exitCode int, err error) {
 	var required []*regexp.Regexp
 	for _, pattern := range opts.requireNoSkip {
@@ -39,6 +62,16 @@ func run(r io.Reader, w io.Writer, opts options) (exitCode int, err error) {
 	}
 	packages := make(map[string]*counts)
 	var forbidden []string
+
+	testOutputs := make(map[testID]*strings.Builder)
+	packageOutputs := make(map[string]*strings.Builder)
+
+	var failedTests []testID
+	failedSeen := make(map[testID]bool)
+
+	var requiredSkips []testID
+	skipSeen := make(map[testID]bool)
+
 	reader := bufio.NewReader(r)
 	for lineNo := 1; ; lineNo++ {
 		line, readErr := reader.ReadString('\n')
@@ -58,6 +91,26 @@ func run(r io.Reader, w io.Writer, opts options) (exitCode int, err error) {
 				c = &counts{}
 				packages[e.Package] = c
 			}
+
+			if e.Action == "output" {
+				if e.Test != "" {
+					id := testID{pkg: e.Package, test: e.Test}
+					b := testOutputs[id]
+					if b == nil {
+						b = &strings.Builder{}
+						testOutputs[id] = b
+					}
+					b.WriteString(e.Output)
+				} else {
+					b := packageOutputs[e.Package]
+					if b == nil {
+						b = &strings.Builder{}
+						packageOutputs[e.Package] = b
+					}
+					b.WriteString(e.Output)
+				}
+			}
+
 			if e.Test == "" {
 				if e.Action == "fail" {
 					c.packageFailed++
@@ -70,12 +123,22 @@ func run(r io.Reader, w io.Writer, opts options) (exitCode int, err error) {
 				case "fail":
 					c.failed++
 					exitCode = 1
+					id := testID{pkg: e.Package, test: e.Test}
+					if !failedSeen[id] {
+						failedSeen[id] = true
+						failedTests = append(failedTests, id)
+					}
 				case "skip":
 					c.skipped++
 					for _, re := range required {
 						if re.MatchString(e.Package) {
 							forbidden = append(forbidden, e.Package+" "+e.Test)
 							exitCode = 1
+							id := testID{pkg: e.Package, test: e.Test}
+							if !skipSeen[id] {
+								skipSeen[id] = true
+								requiredSkips = append(requiredSkips, id)
+							}
 							break
 						}
 					}
@@ -114,6 +177,84 @@ func run(r io.Reader, w io.Writer, opts options) (exitCode int, err error) {
 	for _, test := range forbidden {
 		fmt.Fprintf(&report, "REQUIRED TEST SKIPPED: %s\n", test)
 	}
+
+	var sections []section
+
+	sort.Slice(failedTests, func(i, j int) bool {
+		if failedTests[i].pkg != failedTests[j].pkg {
+			return failedTests[i].pkg < failedTests[j].pkg
+		}
+		return failedTests[i].test < failedTests[j].test
+	})
+	for _, id := range failedTests {
+		var raw string
+		if b := testOutputs[id]; b != nil {
+			raw = b.String()
+		}
+		sections = append(sections, section{
+			header: fmt.Sprintf("=== FAIL %s %s", id.pkg, id.test),
+			lines:  splitLines(raw),
+		})
+	}
+
+	for _, name := range names {
+		c := packages[name]
+		if c.packageFailed > 0 && c.failed == 0 {
+			var raw string
+			if b := packageOutputs[name]; b != nil {
+				raw = b.String()
+			}
+			sections = append(sections, section{
+				header: fmt.Sprintf("=== PACKAGE FAIL %s", name),
+				lines:  splitLines(raw),
+			})
+		}
+	}
+
+	sort.Slice(requiredSkips, func(i, j int) bool {
+		if requiredSkips[i].pkg != requiredSkips[j].pkg {
+			return requiredSkips[i].pkg < requiredSkips[j].pkg
+		}
+		return requiredSkips[i].test < requiredSkips[j].test
+	})
+	for _, id := range requiredSkips {
+		var raw string
+		if b := testOutputs[id]; b != nil {
+			raw = b.String()
+		}
+		sections = append(sections, section{
+			header: fmt.Sprintf("=== REQUIRED SKIP %s %s", id.pkg, id.test),
+			lines:  splitLines(raw),
+		})
+	}
+
+	const maxSections = 50
+	const maxLines = 60
+
+	toPrint := sections
+	var omittedSections int
+	if len(toPrint) > maxSections {
+		omittedSections = len(toPrint) - maxSections
+		toPrint = toPrint[:maxSections]
+	}
+
+	for _, sec := range toPrint {
+		fmt.Fprintln(&report, sec.header)
+		lines := sec.lines
+		if len(lines) > maxLines {
+			omitted := len(lines) - maxLines
+			fmt.Fprintf(&report, "... %d earlier lines omitted\n", omitted)
+			lines = lines[len(lines)-maxLines:]
+		}
+		for _, line := range lines {
+			fmt.Fprintln(&report, line)
+		}
+	}
+
+	if omittedSections > 0 {
+		fmt.Fprintf(&report, "... %d more failures omitted\n", omittedSections)
+	}
+
 	if opts.out != "" {
 		if err := os.WriteFile(opts.out, report.Bytes(), 0o644); err != nil {
 			return 2, fmt.Errorf("write report: %w", err)

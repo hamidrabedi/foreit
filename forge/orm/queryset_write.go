@@ -95,7 +95,9 @@ func (qs *BaseQuerySet[T]) Update(ctx context.Context, updates UpdateMap) (int64
 	allArgs := builder.Args()
 
 	// Build SQL
-	updateSQL := fmt.Sprintf("UPDATE %s SET %s", EscapeIdentifier(qs.table), strings.Join(setParts, ", ")) // nosemgrep: go.lang.security.audit.database.string-formatted-query -- table name escaped with EscapeIdentifier; values are bound parameters
+	// Table name is quoted with EscapeIdentifier; values are bound parameters.
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query, go.lang.security.audit.database.string-formatted-query
+	updateSQL := fmt.Sprintf("UPDATE %s SET %s", EscapeIdentifier(qs.table), strings.Join(setParts, ", "))
 	if whereClause != "" {
 		updateSQL += " " + whereClause
 	}
@@ -163,7 +165,9 @@ func (qs *BaseQuerySet[T]) Delete(ctx context.Context) (int64, error) {
 	}
 
 	// Build SQL
-	deleteSQL := fmt.Sprintf("DELETE FROM %s", EscapeIdentifier(qs.table)) // nosemgrep: go.lang.security.audit.database.string-formatted-query -- table name escaped with EscapeIdentifier; values are bound parameters
+	// Table name is quoted with EscapeIdentifier; values are bound parameters.
+	// nosemgrep: go.lang.security.audit.database.string-formatted-query.string-formatted-query, go.lang.security.audit.database.string-formatted-query
+	deleteSQL := fmt.Sprintf("DELETE FROM %s", EscapeIdentifier(qs.table))
 	if whereClause != "" {
 		deleteSQL += " " + whereClause
 	}

@@ -59,6 +59,11 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 		outputDir = modelsDir
 	}
 
+	generateAPI, err := ctx.Cmd.Flags().GetBool("api")
+	if err != nil {
+		return fmt.Errorf("failed to get api flag: %w", err)
+	}
+
 	// If scanning "app/" directory, look for submodules
 	if modelsDir == "app" || strings.HasSuffix(modelsDir, "/app") {
 		fmt.Printf("Scanning apps in %s...\n", modelsDir)
@@ -82,7 +87,7 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 					}
 
 					fmt.Printf("  Generating for %s...\n", entry.Name())
-					gen := codegen.NewGenerator(appPath, targetOutput)
+					gen := codegen.NewGenerator(appPath, targetOutput).SetGenerateAPI(generateAPI)
 					if err := gen.Generate(); err != nil {
 						return fmt.Errorf("generation failed for %s: %w", entry.Name(), err)
 					}
@@ -103,7 +108,7 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 	}
 
 	// Create generator and run for single directory
-	gen := codegen.NewGenerator(modelsDir, outputDir)
+	gen := codegen.NewGenerator(modelsDir, outputDir).SetGenerateAPI(generateAPI)
 	if err := gen.Generate(); err != nil {
 		return fmt.Errorf("generation failed: %w", err)
 	}

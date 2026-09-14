@@ -84,17 +84,50 @@ func (w *Writer) WriteAPI(definitions []*ModelDefinition, outputDir string) erro
 	return w.writeTemplate(t, data, filename)
 }
 
-// writeTemplate writes a template to a file
+// writeTemplate writes a template to a file atomically
 func (w *Writer) writeTemplate(t *template.Template, data interface{}, filename string) error {
-	file, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create file %s: %w", filename, err)
-	}
-	defer file.Close()
+	dir := filepath.Dir(filename)
+	base := filepath.Base(filename)
 
-	if err := t.Execute(file, data); err != nil {
+	perm := os.FileMode(0o644)
+	if fi, err := os.Stat(filename); err == nil {
+		perm = fi.Mode().Perm()
+	}
+
+	tmpFile, err := os.CreateTemp(dir, "."+base+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+
+	keepTemp := false
+	defer func() {
+		if !keepTemp {
+			_ = tmpFile.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmpFile.Chmod(perm); err != nil {
+		return fmt.Errorf("failed to set permissions on temp file: %w", err)
+	}
+
+	if err := t.Execute(tmpFile, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
 	}
 
+	if err := tmpFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync temp file: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, filename); err != nil {
+		return fmt.Errorf("failed to rename temp file to %s: %w", filename, err)
+	}
+
+	keepTemp = true
 	return nil
 }

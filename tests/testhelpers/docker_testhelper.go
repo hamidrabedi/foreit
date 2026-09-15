@@ -36,42 +36,30 @@ type PostgresOpts struct {
 // When FORGE_TEST_DATABASE_URL query parameters are present in opts.RawQuery, they are preserved.
 // Otherwise, it defaults to sslmode=disable.
 func (opts PostgresOpts) DSN() string {
-	host := opts.Host
-	if host == "" {
-		host = "127.0.0.1"
-	}
-	port := opts.Port
-	if port == "" {
-		port = "5432"
-	}
-	user := opts.User
-	if user == "" {
-		user = "postgres"
-	}
-	password := opts.Password
-	if password == "" {
-		if envPass := os.Getenv("POSTGRES_PASSWORD"); envPass != "" {
-			password = envPass
-		} else {
-			password = "123"
-		}
-	}
-	dbName := opts.DBName
-	if dbName == "" {
-		dbName = "testdb"
-	}
-	dbName = strings.ToLower(dbName)
-	dbName = truncateDBName(dbName)
-
+	applyPostgresPrecedence(&opts)
 	query := "sslmode=disable"
 	if opts.RawQuery != "" {
 		query = opts.RawQuery
 	}
-	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?%s", user, password, host, port, dbName, query)
+	if opts.User != "" {
+		if opts.Password != "" {
+			return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?%s",
+				opts.User, opts.Password, opts.Host, opts.Port, opts.DBName, query)
+		}
+		return fmt.Sprintf("postgres://%s@%s:%s/%s?%s",
+			opts.User, opts.Host, opts.Port, opts.DBName, query)
+	}
+	return fmt.Sprintf("postgres://%s:%s/%s?%s",
+		opts.Host, opts.Port, opts.DBName, query)
 }
 
 // DeriveDSN returns the connection string derived from opts, preserving any query parameters.
 func DeriveDSN(opts PostgresOpts) string {
+	return opts.DSN()
+}
+
+// DirectPostgresDSN returns the PostgreSQL connection string for direct postgres connection, applying precedence rules.
+func DirectPostgresDSN(opts PostgresOpts) string {
 	return opts.DSN()
 }
 
@@ -163,6 +151,7 @@ func GetDockerEndpoint() string {
 // StartPostgresContainer starts an ephemeral Postgres container using Dockertest
 // Or connects directly to an existing database if UseDirect is true
 func StartPostgresContainer(ctx context.Context, opts PostgresOpts) (*sql.DB, string, func() error, error) {
+	applyPostgresPrecedence(&opts)
 	// If UseDirect is true, connect directly to existing database
 	if opts.UseDirect {
 		return startDirectPostgresConnection(ctx, opts)
@@ -277,8 +266,9 @@ func StartPostgresContainer(ctx context.Context, opts PostgresOpts) (*sql.DB, st
 		fmt.Printf("[DEBUG] Local Docker - using port: %s\n", port)
 	}
 
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		opts.User, opts.Password, host, port, opts.DBName)
+	opts.Host = host
+	opts.Port = port
+	dsn := opts.DSN()
 	fmt.Printf("[DEBUG] DSN: postgres://%s:***@%s:%s/%s?sslmode=disable\n", opts.User, host, port, opts.DBName)
 
 	cleanup := func() error {
@@ -344,38 +334,16 @@ func StartSQLiteMemory(dsn string) (*sql.DB, error) {
 
 // startDirectPostgresConnection connects directly to an existing PostgreSQL database
 func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql.DB, string, func() error, error) {
+	applyPostgresPrecedence(&opts)
+
 	host := opts.Host
-	if host == "" {
-		host = "127.0.0.1"
-	}
 	port := opts.Port
-	if port == "" {
-		port = "5432"
-	}
-	user := opts.User
-	if user == "" {
-		user = "postgres"
-	}
-	password := opts.Password
-	if password == "" {
-		if envPass := os.Getenv("POSTGRES_PASSWORD"); envPass != "" {
-			password = envPass
-		} else {
-			password = "123"
-		}
-	}
 	dbName := opts.DBName
-	if dbName == "" {
-		dbName = "testdb"
-	}
-	dbName = strings.ToLower(dbName)
-	dbName = truncateDBName(dbName)
 
 	fmt.Printf("[DEBUG] Connecting directly to PostgreSQL at %s:%s\n", host, port)
 
 	// First, connect to default "postgres" database to create the test database if needed
-	defaultDSN := testDatabaseURL(fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
-		user, password, host, port))
+	defaultDSN := defaultAdminDSN(opts)
 
 	defaultDB, err := sql.Open("postgres", defaultDSN)
 	if err != nil {
@@ -439,8 +407,7 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 		}
 
 		// Connect to default DB to drop test DB
-		defaultDSN := testDatabaseURL(fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
-			user, password, host, port))
+		defaultDSN := defaultAdminDSN(opts)
 		defaultDB, err := sql.Open("postgres", defaultDSN)
 		if err != nil {
 			return fmt.Errorf("failed to open default database connection for cleanup: %w", err)

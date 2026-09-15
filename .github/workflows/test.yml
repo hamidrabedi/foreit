@@ -297,6 +297,10 @@ jobs:
     env:
       FORGE_REQUIRE_DB: '1'
       FORGE_TEST_DATABASE_URL: ${{ inputs.no_db && 'postgres://x@127.0.0.1:1/x' || 'postgres://forge_test:forge_test@localhost:5432/forge_test?sslmode=disable' }}
+      POSTGRES_USER: ${{ inputs.no_db && '' || 'forge_test' }}
+      POSTGRES_PASSWORD: ${{ inputs.no_db && '' || 'forge_test' }}
+      POSTGRES_HOST: ${{ inputs.no_db && '' || 'localhost' }}
+      POSTGRES_PORT: ${{ inputs.no_db && '' || '5432' }}
     services:
       postgres:
         image: postgres:15

@@ -123,6 +123,33 @@ go test ./... -coverprofile=coverage.out
 go tool cover -html=coverage.out
 ```
 
+## Release test gate
+
+The release test gate validates that all database integration tests run and pass without being skipped. This gate is executed in CI by the `release-gate` job in `.github/workflows/test.yml`.
+
+### Environment Variables
+
+- `FORGE_REQUIRE_DB=1`: Ensures that an unavailable database causes tests to fail (`t.Fatalf`) instead of skipping (`t.Skipf`).
+- `FORGE_TEST_DATABASE_URL`: Overrides the target PostgreSQL connection URL (e.g. `postgres://user:password@localhost:5432/dbname?sslmode=disable`). Any query parameters (such as `sslmode` or connection timeouts) are preserved across test databases derived by test helpers.
+
+### Running with the Reporter
+
+To summarize test output and enforce that required packages have no skipped tests, build the reporter once from `forge/` and pipe each module's `go test -json` into that binary:
+
+```bash
+# Build the reporter once from forge/:
+cd forge && go build -o /tmp/testreport ./internal/tools/testreport
+
+# From the forge module:
+go test -json ./... | /tmp/testreport --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+
+# From the tests module:
+cd ../tests
+go test -json ./... | /tmp/testreport --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+```
+
+The `--require-no-skip` flag takes a regular expression matching package paths whose tests must not be skipped. If any matching test is skipped, the reporter prints an error summary and exits with code 1.
+
 ## Prerequisites
 
 - **PostgreSQL**: Running on `localhost:5432`

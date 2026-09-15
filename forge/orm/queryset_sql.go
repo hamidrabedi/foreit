@@ -371,6 +371,43 @@ func (qs *BaseQuerySet[T]) buildCountSQL() (string, []interface{}, error) {
 	return qs.buildCountOrExistsSQL(false)
 }
 
+// buildAggregateSQL builds an ungrouped aggregate query using the same join and
+// WHERE construction as Count. aggregates must have been validated first.
+func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (string, []interface{}, error) {
+	builder := qs.newSQLBuilder()
+	qs.buildJoinClause(builder)
+
+	var whereJoins []string
+	whereSeen := make(map[string]bool)
+	var whereMulti bool
+	builder.SetJoinResolver(qs.createJoinResolver(&whereJoins, whereSeen, &whereMulti))
+
+	selects := make([]string, 0, len(aggregates))
+	for _, aggregate := range aggregates {
+		column := aggregate.column
+		if aggregate.countStar {
+			column = "*"
+		} else if strings.Contains(aggregate.field, "__") {
+			var err error
+			column, err = builder.resolveColumn(aggregate.field)
+			if err != nil {
+				return "", nil, err
+			}
+		} else {
+			column = EscapeIdentifier(qs.table) + "." + column
+		}
+		selects = append(selects, fmt.Sprintf("%s(%s)", aggregate.function, column))
+	}
+
+	whereClause, _, err := qs.buildWhereClause(builder)
+	if err != nil {
+		return "", nil, err
+	}
+	parts := []string{fmt.Sprintf("SELECT %s FROM %s", strings.Join(selects, ", "), EscapeIdentifier(qs.table))}
+	parts = qs.appendWhereAndJoinParts(parts, whereJoins, whereClause)
+	return strings.Join(parts, " "), builder.Args(), nil
+}
+
 // BuildExistsSQL builds the SQL query and arguments for Exists
 func (qs *BaseQuerySet[T]) BuildExistsSQL() (string, []interface{}, error) {
 	return qs.buildCountOrExistsSQL(true)

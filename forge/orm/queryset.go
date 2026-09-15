@@ -119,26 +119,27 @@ func NewOrderField(field string, ascending bool) OrderField {
 
 // BaseQuerySet is the implementation
 type BaseQuerySet[T any] struct {
-	table           string
-	schema          *ModelSchema
-	conditions      []Expression
-	excludes        []Expression
-	orderBy         []OrderField
-	limitVal        *int
-	offsetVal       *int
-	distinctFields  []string
-	selectFields    []string
-	onlyFields      []string
-	deferFields     []string
-	selectRelated   []string
-	prefetchRelated []string
-	preloaded       map[string]bool // Track which relations are preloaded (N+1 prevention)
-	joins           []string
-	joinMap         map[string]bool
-	aggregates      []Aggregate
-	annotations     []AnnotationExpr // Using existing AnnotationExpr type
-	db              interface{}      // *db.DB
-	err             error            // Deferred error from Filter/Exclude validation (checked at execution time)
+	table            string
+	schema           *ModelSchema
+	conditions       []Expression
+	excludes         []Expression
+	orderBy          []OrderField
+	limitVal         *int
+	offsetVal        *int
+	distinctFields   []string
+	selectFields     []string
+	onlyFields       []string
+	deferFields      []string
+	selectRelated    []string
+	prefetchRelated  []string
+	preloaded        map[string]bool // Track which relations are preloaded (N+1 prevention)
+	joins            []string
+	joinMap          map[string]bool
+	aggregates       []Aggregate
+	aggregateChained bool             // Aggregate was called for a row query; AggregateValues may ignore that deferred error.
+	annotations      []AnnotationExpr // Using existing AnnotationExpr type
+	db               interface{}      // *db.DB
+	err              error            // Deferred error from Filter/Exclude validation (checked at execution time)
 }
 
 // NewQuerySet creates a new QuerySet
@@ -201,26 +202,27 @@ func (qs *BaseQuerySet[T]) newSQLBuilder() *SQLBuilder {
 // clone creates a deep copy
 func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 	clone := &BaseQuerySet[T]{
-		table:           qs.table,
-		schema:          qs.schema,
-		conditions:      append([]Expression{}, qs.conditions...),
-		excludes:        append([]Expression{}, qs.excludes...),
-		orderBy:         append([]OrderField{}, qs.orderBy...),
-		limitVal:        qs.limitVal,
-		offsetVal:       qs.offsetVal,
-		distinctFields:  append([]string{}, qs.distinctFields...),
-		selectFields:    append([]string{}, qs.selectFields...),
-		onlyFields:      append([]string{}, qs.onlyFields...),
-		deferFields:     append([]string{}, qs.deferFields...),
-		selectRelated:   append([]string{}, qs.selectRelated...),
-		prefetchRelated: append([]string{}, qs.prefetchRelated...),
-		preloaded:       make(map[string]bool),
-		joins:           append([]string{}, qs.joins...),
-		joinMap:         make(map[string]bool),
-		aggregates:      append([]Aggregate{}, qs.aggregates...),
-		annotations:     append([]AnnotationExpr{}, qs.annotations...),
-		db:              qs.db,
-		err:             qs.err,
+		table:            qs.table,
+		schema:           qs.schema,
+		conditions:       append([]Expression{}, qs.conditions...),
+		excludes:         append([]Expression{}, qs.excludes...),
+		orderBy:          append([]OrderField{}, qs.orderBy...),
+		limitVal:         qs.limitVal,
+		offsetVal:        qs.offsetVal,
+		distinctFields:   append([]string{}, qs.distinctFields...),
+		selectFields:     append([]string{}, qs.selectFields...),
+		onlyFields:       append([]string{}, qs.onlyFields...),
+		deferFields:      append([]string{}, qs.deferFields...),
+		selectRelated:    append([]string{}, qs.selectRelated...),
+		prefetchRelated:  append([]string{}, qs.prefetchRelated...),
+		preloaded:        make(map[string]bool),
+		joins:            append([]string{}, qs.joins...),
+		joinMap:          make(map[string]bool),
+		aggregates:       append([]Aggregate{}, qs.aggregates...),
+		aggregateChained: qs.aggregateChained,
+		annotations:      append([]AnnotationExpr{}, qs.annotations...),
+		db:               qs.db,
+		err:              qs.err,
 	}
 	// Copy preloaded map
 	for k, v := range qs.preloaded {
@@ -425,7 +427,8 @@ func (qs *BaseQuerySet[T]) Aggregate(aggs ...Aggregate) QuerySet[T] {
 	clone := qs.clone()
 	clone.aggregates = append(clone.aggregates, aggs...)
 	if clone.err == nil {
-		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Aggregate")
+		clone.aggregateChained = true
+		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Aggregate chained into a row query; use AggregateValues")
 	}
 	return clone
 }

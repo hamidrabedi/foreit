@@ -661,4 +661,8 @@ This table records which configurations are verified for release.
 | Capability | Status | Evidence |
 | --- | --- | --- |
 | SQLite migration apply | unverified | no automated apply test: the migration generator has no driver selection; tests/pkg_migrations skips it |
-
+| Count, Sum, Avg, Min, Max (ungrouped, via `orm.AggregateValues`) | supported on PostgreSQL and SQLite | `forge/orm/aggregates_test.go` |
+| Grouped aggregates, STDDEV/VARIANCE, custom registered aggregates | not implemented | `forge/orm/aggregates_test.go` rejection test |
+| Union, Intersection, Difference | not implemented | `forge/orm/queryset_not_implemented_test.go` |
+| Integer primary keys | supported | `forge/orm/manager.go` |
+| UUID and string primary keys in `Manager.Get` | not supported (`Get` takes `int64`) | no test; `Manager.Get` signature |

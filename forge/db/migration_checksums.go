@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
@@ -16,21 +17,31 @@ import (
 )
 
 // migrationChecksumLockKey identifies Forge's migration-and-checksum critical section.
-// It is distinct from golang-migrate's per-step advisory lock.
+// It serializes Forge MigrationRunner operations only; external golang-migrate tools
+// are not covered. It is distinct from golang-migrate's per-step advisory lock.
 const migrationChecksumLockKey int64 = 0x466f7267654d6967
 
 const postgresMigrationChecksumsDDL = `CREATE TABLE IF NOT EXISTS forge_migration_checksums (version BIGINT PRIMARY KEY, up_sha256 CHAR(64) NOT NULL, down_sha256 CHAR(64), applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`
 const sqliteMigrationChecksumsDDL = `CREATE TABLE IF NOT EXISTS forge_migration_checksums (version INTEGER PRIMARY KEY, up_sha256 TEXT NOT NULL, down_sha256 TEXT, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)`
 
-func (mr *MigrationRunner) withMigrationChecksums(ctx context.Context, run func() error) (err error) {
+type checksumExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+func (mr *MigrationRunner) withMigrationChecksums(ctx context.Context, run func(checksumExecutor) error) (err error) {
+	var executor checksumExecutor = mr.db
 	ddl := sqliteMigrationChecksumsDDL
 	if mr.db.Driver == "postgres" || mr.db.Driver == "postgresql" {
+		if mr.db.Stats().MaxOpenConnections == 1 {
+			return fmt.Errorf("PostgreSQL migrations need at least 2 connections")
+		}
 		ddl = postgresMigrationChecksumsDDL
 		conn, connErr := mr.db.DB.Conn(ctx)
 		if connErr != nil {
 			return connErr
 		}
 		defer conn.Close()
+		executor = conn
 		if _, err = conn.ExecContext(ctx, "SELECT pg_advisory_lock($1)", migrationChecksumLockKey); err != nil {
 			return err
 		}
@@ -46,45 +57,81 @@ func (mr *MigrationRunner) withMigrationChecksums(ctx context.Context, run func(
 		}()
 	}
 	// SQLite serializes writers itself; no additional advisory lock is needed.
-	if _, err := mr.db.ExecContext(ctx, ddl); err != nil {
+	if _, err := executor.ExecContext(ctx, ddl); err != nil {
 		return fmt.Errorf("create migration checksum table: %w", err)
 	}
-	return run()
+	if err := mr.reconcileMigrationChecksums(ctx, executor); err != nil {
+		return err
+	}
+	return run(executor)
 }
 
-func migrationFileChecksums(path string, version uint) (string, *string, error) {
+type migrationFilePair struct{ up, down string }
+type migrationFileIndex map[uint]migrationFilePair
+
+func indexMigrationFiles(path string) (migrationFileIndex, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return "", nil, fmt.Errorf("read migration version %d: %w", version, err)
+		return nil, fmt.Errorf("read migrations: %w", err)
 	}
+	index := make(migrationFileIndex)
 	for _, entry := range entries {
 		name := entry.Name()
 		prefix, _, ok := strings.Cut(name, "_")
-		n, parseErr := strconv.ParseUint(prefix, 10, 64)
-		if entry.IsDir() || !ok || parseErr != nil || n != uint64(version) || !strings.HasSuffix(name, ".up.sql") {
+		n, err := strconv.ParseUint(prefix, 10, strconv.IntSize)
+		if entry.IsDir() || !ok || err != nil {
 			continue
 		}
-		up, err := os.ReadFile(filepath.Join(path, name))
-		if err != nil {
-			return "", nil, fmt.Errorf("read up migration version %d: %w", version, err)
+		pair := index[uint(n)]
+		switch {
+		case strings.HasSuffix(name, ".up.sql"):
+			pair.up = filepath.Join(path, name)
+		case strings.HasSuffix(name, ".down.sql"):
+			pair.down = filepath.Join(path, name)
+		default:
+			continue
 		}
-		upHash := fmt.Sprintf("%x", sha256.Sum256(up))
-		down, err := os.ReadFile(filepath.Join(path, strings.TrimSuffix(name, ".up.sql")+".down.sql"))
-		if errors.Is(err, os.ErrNotExist) {
-			return upHash, nil, nil
-		}
-		if err != nil {
-			return "", nil, fmt.Errorf("read down migration version %d: %w", version, err)
-		}
-		downHash := fmt.Sprintf("%x", sha256.Sum256(down))
-		return upHash, &downHash, nil
+		index[uint(n)] = pair
 	}
-	return "", nil, fmt.Errorf("up migration file for version %d not found", version)
+	return index, nil
 }
 
-func (mr *MigrationRunner) applyChecksumSteps(ctx context.Context, target *uint) error {
+func migrationFileChecksums(path string, version uint) (string, *string, error) {
+	index, err := indexMigrationFiles(path)
+	if err != nil {
+		return "", nil, err
+	}
+	return index.checksums(version)
+}
+
+func (index migrationFileIndex) checksums(version uint) (string, *string, error) {
+	pair := index[version]
+	if pair.up == "" {
+		return "", nil, fmt.Errorf("up migration file for version %d not found", version)
+	}
+	up, err := os.ReadFile(pair.up)
+	if err != nil {
+		return "", nil, fmt.Errorf("read up migration version %d: %w", version, err)
+	}
+	upHash := fmt.Sprintf("%x", sha256.Sum256(up))
+	if pair.down == "" {
+		return upHash, nil, nil
+	}
+	down, err := os.ReadFile(pair.down)
+	if err != nil {
+		return "", nil, fmt.Errorf("read down migration version %d: %w", version, err)
+	}
+	downHash := fmt.Sprintf("%x", sha256.Sum256(down))
+	return upHash, &downHash, nil
+}
+
+func (mr *MigrationRunner) applyChecksumSteps(ctx context.Context, executor checksumExecutor, target *uint) error {
+	index, err := indexMigrationFiles(mr.migrationsPath)
+	if err != nil {
+		return err
+	}
 	if target != nil {
-		if _, _, err := migrationFileChecksums(mr.migrationsPath, *target); err != nil {
+		if _, _, err := index.checksums(*target); err != nil {
 			return err
 		}
 	}
@@ -113,29 +160,35 @@ func (mr *MigrationRunner) applyChecksumSteps(ctx context.Context, target *uint)
 		if err != nil {
 			return err
 		}
-		up, down, err := migrationFileChecksums(mr.migrationsPath, version)
+		up, down, err := index.checksums(version)
 		if err != nil {
 			return err
 		}
-		_, err = mr.db.ExecContext(ctx, `INSERT INTO forge_migration_checksums (version, up_sha256, down_sha256) VALUES ($1, $2, $3) ON CONFLICT (version) DO UPDATE SET up_sha256 = excluded.up_sha256, down_sha256 = excluded.down_sha256, applied_at = CURRENT_TIMESTAMP`, version, up, down)
+		_, err = executor.ExecContext(ctx, `INSERT INTO forge_migration_checksums (version, up_sha256, down_sha256) VALUES ($1, $2, $3) ON CONFLICT (version) DO UPDATE SET up_sha256 = excluded.up_sha256, down_sha256 = excluded.down_sha256, applied_at = CURRENT_TIMESTAMP`, version, up, down)
 		if err != nil {
 			return fmt.Errorf("record migration version %d: %w", version, err)
 		}
 	}
 }
 
-func (mr *MigrationRunner) rollbackChecksumStep(ctx context.Context) error {
+func (mr *MigrationRunner) rollbackChecksumStep(ctx context.Context, executor checksumExecutor) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := mr.migrate.Steps(-1); err != nil {
-		return err
+	stepErr := mr.migrate.Steps(-1)
+	cleanupErr := mr.reconcileMigrationChecksums(ctx, executor)
+	if cleanupErr != nil {
+		return errors.Join(stepErr, cleanupErr)
 	}
+	return stepErr
+}
+
+func (mr *MigrationRunner) reconcileMigrationChecksums(ctx context.Context, executor checksumExecutor) error {
 	version, _, err := mr.migrate.Version()
 	if err == migrate.ErrNilVersion {
-		_, err = mr.db.ExecContext(ctx, "DELETE FROM forge_migration_checksums")
+		_, err = executor.ExecContext(ctx, "DELETE FROM forge_migration_checksums")
 	} else if err == nil {
-		_, err = mr.db.ExecContext(ctx, "DELETE FROM forge_migration_checksums WHERE version > $1", version)
+		_, err = executor.ExecContext(ctx, "DELETE FROM forge_migration_checksums WHERE version > $1", version)
 	}
 	return err
 }

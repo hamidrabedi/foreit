@@ -38,7 +38,7 @@ func TestMigrationFileChecksums(t *testing.T) {
 	require.ErrorContains(t, err, "version 7")
 }
 
-func TestChecksumBaseline_RecordsEachAppliedVersion(t *testing.T) {
+func TestChecksumBaseline_TwoConnections(t *testing.T) {
 	sqlDB := testutils.SetupTestDB(t)
 	t.Cleanup(func() { _ = sqlDB.Close() })
 	// Use an isolated schema without altering other tests' migration state.
@@ -47,10 +47,10 @@ func TestChecksumBaseline_RecordsEachAppliedVersion(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _, _ = sqlDB.Exec("DROP SCHEMA " + schema + " CASCADE") })
 	// SET is session-local, so initialize every connection used by this runner.
-	sqlDB.SetMaxOpenConns(3)
-	sqlDB.SetMaxIdleConns(3)
-	forConnections := make([]interface{ Close() error }, 0, 3)
-	for i := 0; i < 3; i++ {
+	sqlDB.SetMaxOpenConns(2)
+	sqlDB.SetMaxIdleConns(2)
+	forConnections := make([]interface{ Close() error }, 0, 2)
+	for i := 0; i < 2; i++ {
 		conn, err := sqlDB.Conn(context.Background())
 		require.NoError(t, err)
 		_, err = conn.ExecContext(context.Background(), "SET search_path TO "+schema)
@@ -72,7 +72,8 @@ func TestChecksumBaseline_SQLiteRecordsEachAppliedVersion(t *testing.T) {
 
 func testChecksumBaseline(t *testing.T, database *DB) {
 	t.Helper()
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 	dir := t.TempDir()
 	expected := map[uint]string{}
 	for i := 1; i <= 3; i++ {
@@ -114,4 +115,117 @@ func testChecksumBaseline(t *testing.T, database *DB) {
 	assertRows(3)
 	require.NoError(t, runner.RollbackSteps(ctx, 3))
 	assertRows(0)
+}
+
+func checksumRegressionRunner(t *testing.T) (*DB, *MigrationRunner) {
+	t.Helper()
+	database, err := NewDBWithDriver("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = database.DB.Close() })
+	dir := t.TempDir()
+	for i := 1; i <= 3; i++ {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d_create.up.sql", i)), []byte("SELECT 1;"), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("%d_create_rollback.down.sql", i)), []byte("SELECT 2;"), 0600))
+	}
+	runner, err := NewMigrationRunner(database, dir)
+	require.NoError(t, err)
+	require.NoError(t, runner.Up(context.Background()))
+	return database, runner
+}
+
+func TestChecksumBaseline_DifferentDownStem(t *testing.T) {
+	database, _ := checksumRegressionRunner(t)
+	var down string
+	require.NoError(t, database.QueryRow("SELECT down_sha256 FROM forge_migration_checksums WHERE version = 1").Scan(&down))
+	require.Equal(t, fmt.Sprintf("%x", sha256.Sum256([]byte("SELECT 2;"))), down)
+}
+
+func TestChecksumBaseline_ReconcileLeftover(t *testing.T) {
+	for _, rollback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("rollback=%t", rollback), func(t *testing.T) {
+			database, runner := checksumRegressionRunner(t)
+			_, err := database.Exec("INSERT INTO forge_migration_checksums (version, up_sha256) VALUES (4, 'leftover')")
+			require.NoError(t, err)
+			if rollback {
+				require.NoError(t, runner.Rollback(context.Background()))
+			} else {
+				require.NoError(t, runner.Up(context.Background()))
+			}
+			version, _, err := runner.Version(context.Background())
+			require.NoError(t, err)
+			expected := uint(3)
+			if rollback {
+				expected = 2
+			}
+			require.Equal(t, expected, version)
+			var count int
+			require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums WHERE version > $1", expected).Scan(&count))
+			require.Zero(t, count)
+		})
+	}
+}
+
+func TestForce_ChecksumCleanup(t *testing.T) {
+	database, runner := checksumRegressionRunner(t)
+	require.NoError(t, runner.Force(context.Background(), 1))
+	var versions []uint
+	rows, err := database.Query("SELECT version FROM forge_migration_checksums ORDER BY version")
+	require.NoError(t, err)
+	defer rows.Close()
+	for rows.Next() {
+		var version uint
+		require.NoError(t, rows.Scan(&version))
+		versions = append(versions, version)
+	}
+	require.NoError(t, rows.Err())
+	require.Equal(t, []uint{1}, versions)
+}
+
+func TestChecksumFileIndex_DifferentStems(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{"1_create.up.sql", "1_create_rollback.down.sql", "000002_second.up.sql", "2_remove.down.sql", "42_last.up.sql", "ignore.txt"}
+	for _, name := range names {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte("SELECT 1;"), 0600))
+	}
+	index, err := indexMigrationFiles(dir)
+	require.NoError(t, err)
+	require.Equal(t, migrationFileIndex{
+		1:  {up: filepath.Join(dir, names[0]), down: filepath.Join(dir, names[1])},
+		2:  {up: filepath.Join(dir, names[2]), down: filepath.Join(dir, names[3])},
+		42: {up: filepath.Join(dir, names[4])},
+	}, index)
+	// The index retains paths without requiring another directory scan.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "3_later.up.sql"), []byte("SELECT 1;"), 0600))
+	_, _, err = index.checksums(3)
+	require.ErrorContains(t, err, "version 3 not found")
+}
+
+func TestChecksumBaseline_OneConnectionRejected(t *testing.T) {
+	sqlDB := testutils.SetupTestDB(t)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	sqlDB.SetMaxOpenConns(1)
+	_, err := NewMigrationRunner(&DB{DB: sqlDB, Driver: "postgres"}, t.TempDir())
+	require.ErrorContains(t, err, "at least 2 connections")
+}
+
+func TestChecksumBaseline_RollbackErrorReconciles(t *testing.T) {
+	database, runner := checksumRegressionRunner(t)
+	// A dirty version makes Steps fail before executing SQL.
+	_, err := database.Exec("UPDATE schema_migrations SET version = 1, dirty = 1")
+	require.NoError(t, err)
+	require.Error(t, runner.rollbackChecksumStep(context.Background(), database))
+	var count int
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums WHERE version > 1").Scan(&count))
+	require.Zero(t, count)
+}
+
+func TestChecksumBaseline_EmptyRollbackReconciles(t *testing.T) {
+	database, runner := checksumRegressionRunner(t)
+	require.NoError(t, runner.RollbackSteps(context.Background(), 3))
+	_, err := database.Exec("INSERT INTO forge_migration_checksums (version, up_sha256) VALUES (3, 'leftover')")
+	require.NoError(t, err)
+	require.ErrorContains(t, runner.Rollback(context.Background()), "no migrations")
+	var count int
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
+	require.Zero(t, count)
 }

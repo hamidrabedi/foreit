@@ -70,6 +70,37 @@ func (Product) Hooks() *schema.ModelHooks {
 	require.NoError(t, err)
 	assert.Contains(t, string(apiBytes), "type ProductSerializer struct")
 	assert.Contains(t, string(apiBytes), "type ProductViewSet struct")
+	assert.Contains(t, string(apiBytes), "vs.ExcludeResponseFields = api.NonSerializableFields(&Product{})")
+	assert.Contains(t, string(apiBytes), "vs.ReadOnlyRequestFields = api.NonEditableFields(&Product{})")
 	assert.Contains(t, string(apiBytes), "RegisterProductRoutes(router *forgehttp.Router)")
 	assert.Contains(t, string(apiBytes), "RegisterAPIRoutes(router *forgehttp.Router)")
+}
+
+func TestValidateAPIModels_AllowsIntegerAndImplicitPrimaryKey(t *testing.T) {
+	intPK := &ModelDefinition{
+		Name: "Product",
+		Fields: []FieldDefinition{
+			{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true},
+			{Name: "name", Type: "String", GoType: "string"},
+		},
+	}
+	assert.NoError(t, ValidateAPIModels([]*ModelDefinition{intPK}))
+
+	noPK := &ModelDefinition{
+		Name: "Log",
+		Fields: []FieldDefinition{
+			{Name: "message", Type: "String", GoType: "string"},
+		},
+	}
+	assert.NoError(t, ValidateAPIModels([]*ModelDefinition{noPK}))
+
+	stringPK := &ModelDefinition{
+		Name: "Category",
+		Fields: []FieldDefinition{
+			{Name: "code", Type: "String", GoType: "string", PrimaryKey: true},
+		},
+	}
+	err := ValidateAPIModels([]*ModelDefinition{stringPK})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "non-integer primary key")
 }

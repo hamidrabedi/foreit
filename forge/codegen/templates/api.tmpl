@@ -31,13 +31,16 @@ type {{.Name}}ViewSet struct {
 
 // New{{.Name}}ViewSet creates a new REST ViewSet for {{.Name}}
 func New{{.Name}}ViewSet() *{{.Name}}ViewSet {
-	return &{{.Name}}ViewSet{
+	vs := &{{.Name}}ViewSet{
 		BaseViewSet: api.NewBaseViewSet(
 			New{{.Name}}Serializer,
 			{{.Name}}Objects,
 			&{{.Name}}{},
 		),
 	}
+	vs.ExcludeResponseFields = api.NonSerializableFields(&{{.Name}}{})
+	vs.ReadOnlyRequestFields = api.NonEditableFields(&{{.Name}}{})
+	return vs
 }
 
 // Register{{.Name}}Routes registers the REST API endpoints for {{.Name}} on a router

@@ -134,6 +134,25 @@ func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
 	return m.FieldAccessor()
 }
 
+// QuerySet returns a fresh, unconstrained queryset for the manager's model,
+// carrying over the manager's database connection. It allows view layers to
+// apply Offset/Limit through the queryset instead of loading all rows via the
+// manager's All/Count helpers.
+func (m *Manager[T]) QuerySet() QuerySet[T] {
+	qs, err := NewQuerySet[T](m.tableName)
+	if err != nil {
+		var raw any
+		if m.hasDB() {
+			raw = m.db.raw()
+		}
+		return &BaseQuerySet[T]{table: m.tableName, db: raw, err: err}
+	}
+	if m.hasDB() {
+		qs = qs.SetDB(m.db.raw())
+	}
+	return qs
+}
+
 // Filter returns a QuerySet for filtering
 func (m *Manager[T]) Filter(expr Expression) (QuerySet[T], error) {
 	qs, err := NewQuerySet[T](m.tableName)

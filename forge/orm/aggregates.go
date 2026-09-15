@@ -1,9 +1,164 @@
 package orm
 
 import (
+	"context"
+	"fmt"
+	"strconv"
 	"strings"
 	"sync"
+
+	forgeerrors "github.com/forgego/forge/errors"
 )
+
+// aggregateValuer is deliberately private so AggregateValues does not expand
+// QuerySet's public interface and break external implementations.
+type aggregateValuer interface {
+	aggregateValues(context.Context, ...Aggregate) (map[string]any, error)
+}
+
+type resolvedAggregate struct {
+	name      string
+	function  string
+	field     string
+	column    string
+	countStar bool
+}
+
+// AggregateValues executes ungrouped aggregates for any QuerySet implementation
+// that supports them.
+func AggregateValues[T any](ctx context.Context, qs QuerySet[T], aggs ...Aggregate) (map[string]any, error) {
+	valuer, ok := qs.(aggregateValuer)
+	if !ok {
+		return nil, forgeerrors.NewNotImplementedError("AggregateValues for this QuerySet implementation")
+	}
+	return valuer.aggregateValues(ctx, aggs...)
+}
+
+// AggregateValues executes one ungrouped aggregate query. Ordering, limits,
+// and offsets are intentionally ignored.
+func (qs *BaseQuerySet[T]) AggregateValues(ctx context.Context, aggs ...Aggregate) (map[string]any, error) {
+	return qs.aggregateValues(ctx, aggs...)
+}
+
+func (qs *BaseQuerySet[T]) aggregateValues(ctx context.Context, aggs ...Aggregate) (map[string]any, error) {
+	if qs.err != nil && !qs.aggregateChained {
+		return nil, qs.err
+	}
+	resolved, err := qs.resolveAggregates(aggs)
+	if err != nil {
+		return nil, err
+	}
+	query, args, err := qs.buildAggregateSQL(resolved)
+	if err != nil {
+		return nil, err
+	}
+	database, err := qs.getDB(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]any, len(resolved))
+	destinations := make([]any, len(values))
+	for i := range values {
+		destinations[i] = &values[i]
+	}
+	if err := database.QueryRowContext(ctx, query, args...).Scan(destinations...); err != nil {
+		return nil, fmt.Errorf("aggregate query failed: %w", err)
+	}
+
+	result := make(map[string]any, len(resolved))
+	for i, aggregate := range resolved {
+		value, err := convertAggregateValue(aggregate, values[i])
+		if err != nil {
+			return nil, err
+		}
+		result[aggregate.name] = value
+	}
+	return result, nil
+}
+
+func (qs *BaseQuerySet[T]) resolveAggregates(aggs []Aggregate) ([]resolvedAggregate, error) {
+	if len(aggs) == 0 {
+		return nil, forgeerrors.NewInvalidInputError("aggregates", "at least one aggregate is required")
+	}
+	resolved := make([]resolvedAggregate, 0, len(aggs))
+	names := make(map[string]bool, len(aggs))
+	for _, aggregate := range aggs {
+		function := strings.ToUpper(strings.TrimSpace(aggregate.Func))
+		switch function {
+		case string(AggCount), string(AggSum), string(AggAvg), string(AggMin), string(AggMax):
+		default:
+			return nil, forgeerrors.NewNotImplementedError("aggregate " + aggregate.Func)
+		}
+		name := aggregate.Name
+		if name == "" {
+			name = strings.ToLower(function) + "_" + aggregate.Field
+		}
+		if names[name] {
+			return nil, forgeerrors.NewInvalidInputError("aggregates", "duplicate aggregate name "+name)
+		}
+		names[name] = true
+
+		item := resolvedAggregate{name: name, function: function, field: aggregate.Field}
+		if function == string(AggCount) && (aggregate.Field == "" || aggregate.Field == "*") {
+			item.countStar = true
+		} else {
+			field, _, err := qs.schema.ResolvePath(aggregate.Field)
+			if err != nil {
+				return nil, forgeerrors.NewInvalidInputError(aggregate.Field, "field does not resolve to a model column")
+			}
+			item.column = EscapeIdentifier(field.DBColumn)
+		}
+		resolved = append(resolved, item)
+	}
+	return resolved, nil
+}
+
+func convertAggregateValue(aggregate resolvedAggregate, value any) (any, error) {
+	if aggregate.function == string(AggMin) || aggregate.function == string(AggMax) {
+		if bytes, ok := value.([]byte); ok {
+			return string(bytes), nil
+		}
+		return value, nil
+	}
+	if value == nil {
+		if aggregate.function == string(AggCount) {
+			return int64(0), nil
+		}
+		return nil, nil
+	}
+	var text string
+	switch number := value.(type) {
+	case int64:
+		if aggregate.function == string(AggCount) {
+			return number, nil
+		}
+		return float64(number), nil
+	case float64:
+		if aggregate.function == string(AggCount) {
+			return int64(number), nil
+		}
+		return number, nil
+	case []byte:
+		text = string(number)
+	case string:
+		text = number
+	default:
+		text = fmt.Sprint(value)
+	}
+	if aggregate.function == string(AggCount) {
+		parsed, err := strconv.ParseInt(text, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("aggregate %s: convert COUNT result: %w", aggregate.name, err)
+		}
+		return parsed, nil
+	}
+	parsed, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return nil, fmt.Errorf("aggregate %s: convert numeric result: %w", aggregate.name, err)
+	}
+	return parsed, nil
+}
 
 // Aggregate represents an aggregate function
 type Aggregate struct {

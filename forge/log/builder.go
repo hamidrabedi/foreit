@@ -21,12 +21,14 @@ func NewBuilder() *Builder {
 // Development sets development mode
 func (b *Builder) Development() *Builder {
 	b.config = DefaultLoggingConfig(true)
+	b.config.Hooks = append([]Hook(nil), b.hooks...)
 	return b
 }
 
 // Production sets production mode
 func (b *Builder) Production() *Builder {
 	b.config = DefaultLoggingConfig(false)
+	b.config.Hooks = append([]Hook(nil), b.hooks...)
 	return b
 }
 
@@ -126,6 +128,7 @@ func (b *Builder) Sampling(initial, thereafter int) *Builder {
 // Hooks adds hooks to the builder
 func (b *Builder) Hooks(hooks ...Hook) *Builder {
 	b.hooks = append(b.hooks, hooks...)
+	b.config.Hooks = append(b.config.Hooks, hooks...)
 	return b
 }
 

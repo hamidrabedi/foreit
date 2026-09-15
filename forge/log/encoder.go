@@ -18,6 +18,7 @@ type ConsoleEncoder struct {
 	caller      bool
 	stacktrace  bool
 	addedFields []zapcore.Field
+	namespaces  []string
 }
 
 const traceZapLevel = zapcore.DebugLevel - 1
@@ -51,130 +52,145 @@ func (e *ConsoleEncoder) Clone() zapcore.Encoder {
 		caller:      e.caller,
 		stacktrace:  e.stacktrace,
 		addedFields: addedFields,
+		namespaces:  append([]string(nil), e.namespaces...),
 	}
 }
 
+// addField snapshots the rendered value while binding, before mutable values
+// can change. The embedded encoder maintains its own namespace state.
+func (e *ConsoleEncoder) addField(field zapcore.Field) {
+	if !e.oneLine {
+		return
+	}
+	key := field.Key
+	if len(e.namespaces) > 0 {
+		key = strings.Join(e.namespaces, ".") + "." + key
+	}
+	e.addedFields = append(e.addedFields, zap.String(key, e.formatFieldValue(field)))
+}
+
 func (e *ConsoleEncoder) AddArray(key string, marshaler zapcore.ArrayMarshaler) error {
-	e.addedFields = append(e.addedFields, zap.Array(key, marshaler))
+	e.addField(zap.Array(key, marshaler))
 	return e.Encoder.AddArray(key, marshaler)
 }
 
 func (e *ConsoleEncoder) AddObject(key string, marshaler zapcore.ObjectMarshaler) error {
-	e.addedFields = append(e.addedFields, zap.Object(key, marshaler))
+	e.addField(zap.Object(key, marshaler))
 	return e.Encoder.AddObject(key, marshaler)
 }
 
 func (e *ConsoleEncoder) AddBinary(key string, value []byte) {
-	e.addedFields = append(e.addedFields, zap.Binary(key, value))
+	e.addField(zap.Binary(key, value))
 	e.Encoder.AddBinary(key, value)
 }
 
 func (e *ConsoleEncoder) AddByteString(key string, value []byte) {
-	e.addedFields = append(e.addedFields, zap.ByteString(key, value))
+	e.addField(zap.ByteString(key, value))
 	e.Encoder.AddByteString(key, value)
 }
 
 func (e *ConsoleEncoder) AddBool(key string, value bool) {
-	e.addedFields = append(e.addedFields, zap.Bool(key, value))
+	e.addField(zap.Bool(key, value))
 	e.Encoder.AddBool(key, value)
 }
 
 func (e *ConsoleEncoder) AddComplex128(key string, value complex128) {
-	e.addedFields = append(e.addedFields, zap.Complex128(key, value))
+	e.addField(zap.Complex128(key, value))
 	e.Encoder.AddComplex128(key, value)
 }
 
 func (e *ConsoleEncoder) AddComplex64(key string, value complex64) {
-	e.addedFields = append(e.addedFields, zap.Complex64(key, value))
+	e.addField(zap.Complex64(key, value))
 	e.Encoder.AddComplex64(key, value)
 }
 
 func (e *ConsoleEncoder) AddDuration(key string, value time.Duration) {
-	e.addedFields = append(e.addedFields, zap.Duration(key, value))
+	e.addField(zap.Duration(key, value))
 	e.Encoder.AddDuration(key, value)
 }
 
 func (e *ConsoleEncoder) AddFloat64(key string, value float64) {
-	e.addedFields = append(e.addedFields, zap.Float64(key, value))
+	e.addField(zap.Float64(key, value))
 	e.Encoder.AddFloat64(key, value)
 }
 
 func (e *ConsoleEncoder) AddFloat32(key string, value float32) {
-	e.addedFields = append(e.addedFields, zap.Float32(key, value))
+	e.addField(zap.Float32(key, value))
 	e.Encoder.AddFloat32(key, value)
 }
 
 func (e *ConsoleEncoder) AddInt(key string, value int) {
-	e.addedFields = append(e.addedFields, zap.Int(key, value))
+	e.addField(zap.Int(key, value))
 	e.Encoder.AddInt(key, value)
 }
 
 func (e *ConsoleEncoder) AddInt64(key string, value int64) {
-	e.addedFields = append(e.addedFields, zap.Int64(key, value))
+	e.addField(zap.Int64(key, value))
 	e.Encoder.AddInt64(key, value)
 }
 
 func (e *ConsoleEncoder) AddInt32(key string, value int32) {
-	e.addedFields = append(e.addedFields, zap.Int32(key, value))
+	e.addField(zap.Int32(key, value))
 	e.Encoder.AddInt32(key, value)
 }
 
 func (e *ConsoleEncoder) AddInt16(key string, value int16) {
-	e.addedFields = append(e.addedFields, zap.Int16(key, value))
+	e.addField(zap.Int16(key, value))
 	e.Encoder.AddInt16(key, value)
 }
 
 func (e *ConsoleEncoder) AddInt8(key string, value int8) {
-	e.addedFields = append(e.addedFields, zap.Int8(key, value))
+	e.addField(zap.Int8(key, value))
 	e.Encoder.AddInt8(key, value)
 }
 
 func (e *ConsoleEncoder) AddString(key, value string) {
-	e.addedFields = append(e.addedFields, zap.String(key, value))
+	e.addField(zap.String(key, value))
 	e.Encoder.AddString(key, value)
 }
 
 func (e *ConsoleEncoder) AddTime(key string, value time.Time) {
-	e.addedFields = append(e.addedFields, zap.Time(key, value))
+	e.addField(zap.Time(key, value))
 	e.Encoder.AddTime(key, value)
 }
 
 func (e *ConsoleEncoder) AddUint(key string, value uint) {
-	e.addedFields = append(e.addedFields, zap.Uint(key, value))
+	e.addField(zap.Uint(key, value))
 	e.Encoder.AddUint(key, value)
 }
 
 func (e *ConsoleEncoder) AddUint64(key string, value uint64) {
-	e.addedFields = append(e.addedFields, zap.Uint64(key, value))
+	e.addField(zap.Uint64(key, value))
 	e.Encoder.AddUint64(key, value)
 }
 
 func (e *ConsoleEncoder) AddUint32(key string, value uint32) {
-	e.addedFields = append(e.addedFields, zap.Uint32(key, value))
+	e.addField(zap.Uint32(key, value))
 	e.Encoder.AddUint32(key, value)
 }
 
 func (e *ConsoleEncoder) AddUint16(key string, value uint16) {
-	e.addedFields = append(e.addedFields, zap.Uint16(key, value))
+	e.addField(zap.Uint16(key, value))
 	e.Encoder.AddUint16(key, value)
 }
 
 func (e *ConsoleEncoder) AddUint8(key string, value uint8) {
-	e.addedFields = append(e.addedFields, zap.Uint8(key, value))
+	e.addField(zap.Uint8(key, value))
 	e.Encoder.AddUint8(key, value)
 }
 
 func (e *ConsoleEncoder) AddUintptr(key string, value uintptr) {
-	e.addedFields = append(e.addedFields, zap.Uintptr(key, value))
+	e.addField(zap.Uintptr(key, value))
 	e.Encoder.AddUintptr(key, value)
 }
 
 func (e *ConsoleEncoder) AddReflected(key string, value interface{}) error {
-	e.addedFields = append(e.addedFields, zap.Any(key, value))
+	e.addField(zap.Reflect(key, value))
 	return e.Encoder.AddReflected(key, value)
 }
 
 func (e *ConsoleEncoder) OpenNamespace(key string) {
+	e.namespaces = append(e.namespaces, key)
 	e.Encoder.OpenNamespace(key)
 }
 
@@ -214,19 +230,23 @@ func (e *ConsoleEncoder) encodeOneLine(entry zapcore.Entry, fields []zapcore.Fie
 	// Message
 	buf.AppendString(entry.Message)
 
-	// Combine bound fields from encoder with per-call fields
-	allFields := fields
-	if len(e.addedFields) > 0 {
-		if len(fields) == 0 {
-			allFields = e.addedFields
-		} else {
-			allFields = make([]zapcore.Field, 0, len(e.addedFields)+len(fields))
-			allFields = append(allFields, e.addedFields...)
-			allFields = append(allFields, fields...)
+	// Bound fields are already rendered and qualified. Call fields inherit the
+	// bound namespace; namespaces opened by this entry must not affect siblings.
+	allFields := make([]zapcore.Field, 0, len(e.addedFields)+len(fields))
+	allFields = append(allFields, e.addedFields...)
+	namespaces := append([]string(nil), e.namespaces...)
+	for _, field := range fields {
+		if field.Type == zapcore.NamespaceType {
+			namespaces = append(namespaces, field.Key)
+			continue
 		}
+		key := field.Key
+		if len(namespaces) > 0 {
+			key = strings.Join(namespaces, ".") + "." + key
+		}
+		allFields = append(allFields, zap.String(key, e.formatFieldValue(field)))
 	}
 
-	// Fields
 	if len(allFields) > 0 {
 		buf.AppendString(" | ")
 		for i, field := range allFields {
@@ -235,7 +255,7 @@ func (e *ConsoleEncoder) encodeOneLine(entry zapcore.Entry, fields []zapcore.Fie
 			}
 			buf.AppendString(field.Key)
 			buf.AppendString("=")
-			buf.AppendString(e.formatFieldValue(field))
+			buf.AppendString(field.String)
 		}
 	}
 
@@ -345,12 +365,6 @@ func (e *ProductionEncoder) Clone() zapcore.Encoder {
 
 // EncodeEntry encodes a log entry
 func (e *ProductionEncoder) EncodeEntry(entry zapcore.Entry, fields []zapcore.Field) (*buffer.Buffer, error) {
-	// Add caller if enabled
-	if e.caller && entry.Caller.Defined {
-		caller := fmt.Sprintf("%s:%d", entry.Caller.File, entry.Caller.Line)
-		fields = append(fields, zap.String("caller", caller))
-	}
-
 	// Add stack trace if enabled and present
 	if e.stacktrace && entry.Stack != "" {
 		fields = append(fields, zap.String("stack", entry.Stack))

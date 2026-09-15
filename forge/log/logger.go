@@ -241,8 +241,8 @@ func (l *Logger) Close() error {
 	l.resources.once.Do(func() {
 		l.resources.err = ignoreSyncError(l.Logger.Sync())
 		for _, closer := range l.resources.closers {
-			if err := closer.Close(); err != nil && l.resources.err == nil {
-				l.resources.err = fmt.Errorf("close log output: %w", err)
+			if err := closer.Close(); err != nil {
+				l.resources.err = multierr.Append(l.resources.err, fmt.Errorf("close log output: %w", err))
 			}
 		}
 	})

@@ -128,12 +128,21 @@ func (h *hookedCheckedWrite) Write(entry zapcore.Entry, fields []zapcore.Field) 
 		return nil // Skip logging
 	}
 
-	outFields := fields
+	var outFields []zapcore.Field
 	if len(processedFields) >= len(h.core.bound) {
 		outFields = processedFields[len(h.core.bound):]
 	}
 
-	h.downstream.Entry = entry
-	h.downstream.Write(outFields...)
+	downstream := h.downstream
+	if entry.Level != downstream.Entry.Level {
+		// A changed level can select different outputs. Preserve the original
+		// check otherwise, so samplers only count the entry once.
+		downstream = h.core.Core.Check(entry, nil)
+		if downstream == nil {
+			return nil
+		}
+	}
+	downstream.Entry = entry
+	downstream.Write(outFields...)
 	return nil
 }

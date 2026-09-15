@@ -248,7 +248,7 @@ func (mr *MigrationRunner) validatePendingMigrations(ctx context.Context, curren
 		}
 
 		versionStr := parts[0]
-		version, err := strconv.ParseUint(versionStr, 10, 64)
+		version, err := strconv.ParseUint(versionStr, 10, strconv.IntSize-1)
 		if err != nil || version > math.MaxUint {
 			continue
 		}
@@ -299,7 +299,7 @@ func (mr *MigrationRunner) validatePendingMigrationChecksums(ctx context.Context
 		}
 
 		versionStr := parts[0]
-		version, err := strconv.ParseUint(versionStr, 10, 64)
+		version, err := strconv.ParseUint(versionStr, 10, strconv.IntSize-1)
 		if err != nil || version > math.MaxUint {
 			continue
 		}
@@ -609,8 +609,9 @@ func (mr *MigrationRunner) Force(ctx context.Context, version uint) error {
 	if version > math.MaxInt {
 		return fmt.Errorf("migration version exceeds maximum supported value")
 	}
+	forced := int(version)
 	return mr.withMigrationChecksums(ctx, func(executor checksumExecutor) error {
-		if err := mr.migrate.Force(int(version)); err != nil {
+		if err := mr.migrate.Force(forced); err != nil {
 			return fmt.Errorf("failed to force migration version: %w", err)
 		}
 		return mr.reconcileMigrationChecksums(ctx, executor)

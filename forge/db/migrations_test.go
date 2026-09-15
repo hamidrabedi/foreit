@@ -193,3 +193,15 @@ func TestMigrationRunner_RollbackTo_RejectsUnknownTargetVersion(t *testing.T) {
 	require.False(t, dirty)
 	require.Equal(t, uint(3), v, "version should not change when rollback target is unknown to runner")
 }
+
+func TestMigrationRunner_SkipsVersionAboveMaxInt(t *testing.T) {
+	dir := t.TempDir()
+	// Invalid SQL so the test fails if the file is treated as pending instead of skipped.
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "9223372036854775808_x.up.sql"), []byte("INVALID SQL(((("), 0644))
+
+	runner := &MigrationRunner{migrationsPath: dir}
+	ctx := context.Background()
+
+	require.NoError(t, runner.validatePendingMigrations(ctx, 0))
+	require.NoError(t, runner.validatePendingMigrationChecksums(ctx, 0))
+}

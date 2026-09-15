@@ -98,3 +98,6 @@ func (d *PostgreSQLDialect) CaseInsensitiveLike(column, placeholder string) stri
 
 // Ensure PostgreSQLDialect implements Dialect interface
 var _ Dialect = (*PostgreSQLDialect)(nil)
+
+// Ensure PostgreSQLDialect implements CaseInsensitiveLiker interface
+var _ CaseInsensitiveLiker = (*PostgreSQLDialect)(nil)

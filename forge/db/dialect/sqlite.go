@@ -101,3 +101,6 @@ func (d *SQLiteDialect) CaseInsensitiveLike(column, placeholder string) string {
 
 // Ensure SQLiteDialect implements Dialect interface
 var _ Dialect = (*SQLiteDialect)(nil)
+
+// Ensure SQLiteDialect implements CaseInsensitiveLiker interface
+var _ CaseInsensitiveLiker = (*SQLiteDialect)(nil)

@@ -26,7 +26,20 @@ type MigrationGenerator struct {
 }
 
 // NewMigrationGenerator creates a new migration generator with dependency injection
+// This maintains backward compatibility with the original 5-argument signature
 func NewMigrationGenerator(
+	modelsDir, migrationsDir string,
+	detector ChangeDetector,
+	sqlBuilder sql.SQLBuilder,
+	stateManager state.StateManager,
+) (*MigrationGenerator, error) {
+	// Default driver from config
+	driver := core.Driver(config.NewConfig().GetDriver())
+	return NewMigrationGeneratorWithDriver(modelsDir, migrationsDir, driver, detector, sqlBuilder, stateManager)
+}
+
+// NewMigrationGeneratorWithDriver creates a new migration generator with explicit driver
+func NewMigrationGeneratorWithDriver(
 	modelsDir, migrationsDir string,
 	driver core.Driver,
 	detector ChangeDetector,
@@ -46,7 +59,7 @@ func NewMigrationGenerator(
 // NewMigrationGeneratorWithDefaults creates a new migration generator with default dependencies
 func NewMigrationGeneratorWithDefaults(modelsDir, migrationsDir string) (*MigrationGenerator, error) {
 	driver := core.Driver(config.NewConfig().GetDriver())
-	return NewMigrationGeneratorForDriver(modelsDir, migrationsDir, driver)
+	return NewMigrationGeneratorWithDriver(modelsDir, migrationsDir, driver, nil, nil, nil)
 }
 
 // NewMigrationGeneratorForDriver creates a new migration generator with default dependencies for the given driver
@@ -61,7 +74,7 @@ func NewMigrationGeneratorForDriver(modelsDir, migrationsDir string, driver core
 	// This ensures incremental migrations work correctly
 	stateManager := state.NewFileStateLoader(migrationsDir)
 
-	return NewMigrationGenerator(modelsDir, migrationsDir, driver, detector, sqlBuilder, stateManager)
+	return NewMigrationGeneratorWithDriver(modelsDir, migrationsDir, driver, detector, sqlBuilder, stateManager)
 }
 
 // GenerateMigrations generates migration files from model definitions

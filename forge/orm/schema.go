@@ -80,6 +80,17 @@ type IndexInfo struct {
 	Partial string // Partial index condition
 }
 
+// GetRegisteredTypeName resolves an alias/type name to the actual registered type name
+// Returns the registered name and true if found, otherwise returns the input and false
+func GetRegisteredTypeName(aliasOrTypeName string) (string, bool) {
+	schemaNameMu.RLock()
+	defer schemaNameMu.RUnlock()
+	if typ, ok := schemaNameRegistry[aliasOrTypeName]; ok {
+		return typ.Name(), true
+	}
+	return aliasOrTypeName, false
+}
+
 // GetField retrieves a field by name
 func (ms *ModelSchema) GetField(name string) *FieldInfo {
 	// First try exact match (case-sensitive)
@@ -234,7 +245,14 @@ func (ms *ModelSchema) buildRelationInfo(rel schema.Relation) RelationInfo {
 		relInfo.FKColumn, relInfo.FKStructField = resolveRelationFK(ms, &relInfo)
 	case schema.RelationManyToMany:
 		relInfo.Type = RelationManyToMany
-		relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, nil, ms.TableName, rel.To)
+		// Resolve the target model name through the registry to get the actual type name
+		// This avoids infinite recursion while still getting the correct model name
+		if targetName, ok := GetRegisteredTypeName(rel.To); ok {
+			relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, nil, ms.TableName, targetName)
+		} else {
+			// Fall back to the alias if not registered
+			relInfo.ThroughSourceColumn, relInfo.ThroughTargetColumn = throughColumns(ms, nil, ms.TableName, rel.To)
+		}
 	}
 
 	return relInfo

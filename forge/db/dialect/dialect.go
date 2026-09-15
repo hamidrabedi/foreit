@@ -63,11 +63,6 @@ type Dialect interface {
 	// Most databases use backslash, but some may differ.
 	LikeEscape() string
 
-	// CaseInsensitiveLike returns a case-insensitive LIKE expression.
-	// PostgreSQL: column ILIKE placeholder
-	// SQLite: LOWER(column) LIKE LOWER(placeholder)
-	CaseInsensitiveLike(column, placeholder string) string
-
 	// ConcatOperator returns the string concatenation operator or function.
 	// PostgreSQL: "||" or CONCAT()
 	// SQLite: "||"
@@ -86,6 +81,15 @@ type Dialect interface {
 	// PostgreSQL: "ON CONFLICT (column) DO UPDATE SET ..."
 	// SQLite: "ON CONFLICT (column) DO UPDATE SET ..."
 	OnConflictDoUpdate(column string, updates []string) string
+}
+
+// CaseInsensitiveLiker is an optional interface for dialects that support
+// case-insensitive LIKE expressions natively.
+type CaseInsensitiveLiker interface {
+	// CaseInsensitiveLike returns a case-insensitive LIKE expression.
+	// PostgreSQL: column ILIKE placeholder
+	// SQLite: LOWER(column) LIKE LOWER(placeholder)
+	CaseInsensitiveLike(column, placeholder string) string
 }
 
 // BaseDialect provides common functionality that can be embedded in specific dialects.

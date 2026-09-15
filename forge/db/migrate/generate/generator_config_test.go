@@ -15,7 +15,7 @@ func TestNewMigrationGeneratorPreservesCallerDriver(t *testing.T) {
 	builder, err := sql.NewSQLBuilder(driver)
 	require.NoError(t, err)
 
-	gen, err := NewMigrationGenerator("models", "migrations", driver, NewDetector(), builder, state.NewInMemoryState())
+	gen, err := NewMigrationGeneratorWithDriver("models", "migrations", driver, NewDetector(), builder, state.NewInMemoryState())
 
 	require.NoError(t, err)
 	require.Equal(t, driver, gen.driver)

@@ -66,7 +66,9 @@ func (b *SQLBuilder) SetPlaceholder(fn func(int) string) {
 // CaseInsensitiveLike returns a case-insensitive LIKE comparison expression.
 func (b *SQLBuilder) CaseInsensitiveLike(field, placeholder string) string {
 	if b != nil && b.dialect != nil {
-		return b.dialect.CaseInsensitiveLike(field, placeholder)
+		if ciLiker, ok := b.dialect.(dialect.CaseInsensitiveLiker); ok {
+			return ciLiker.CaseInsensitiveLike(field, placeholder)
+		}
 	}
 	return fmt.Sprintf("LOWER(%s) LIKE LOWER(%s)", field, placeholder)
 }

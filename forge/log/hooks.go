@@ -61,10 +61,11 @@ func (c *HookCore) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore
 	if !c.Enabled(entry.Level) {
 		return ce
 	}
-	if c.Core.Check(entry, nil) == nil {
+	downstream := c.Core.Check(entry, nil)
+	if downstream == nil {
 		return ce
 	}
-	return ce.AddCore(entry, c)
+	return ce.AddCore(entry, &hookedCheckedWrite{core: c, downstream: downstream})
 }
 
 // With adds structured context to the Core
@@ -81,25 +82,58 @@ func (c *HookCore) With(fields []zapcore.Field) zapcore.Core {
 
 // Write processes hooks before writing
 func (c *HookCore) Write(entry zapcore.Entry, fields []zapcore.Field) error {
+	downstream := c.Core.Check(entry, nil)
+	if downstream == nil {
+		return nil
+	}
+	hw := &hookedCheckedWrite{core: c, downstream: downstream}
+	return hw.Write(entry, fields)
+}
+
+type hookedCheckedWrite struct {
+	core       *HookCore
+	downstream *zapcore.CheckedEntry
+}
+
+func (h *hookedCheckedWrite) Enabled(lvl zapcore.Level) bool {
+	return h.core.Enabled(lvl)
+}
+
+func (h *hookedCheckedWrite) With(fields []zapcore.Field) zapcore.Core {
+	return h.core.With(fields)
+}
+
+func (h *hookedCheckedWrite) Check(entry zapcore.Entry, ce *zapcore.CheckedEntry) *zapcore.CheckedEntry {
+	return ce.AddCore(entry, h)
+}
+
+func (h *hookedCheckedWrite) Sync() error {
+	return h.core.Sync()
+}
+
+func (h *hookedCheckedWrite) Write(entry zapcore.Entry, fields []zapcore.Field) error {
 	var allFields []zapcore.Field
-	if len(c.bound) == 0 {
+	if len(h.core.bound) == 0 {
 		allFields = fields
 	} else if len(fields) == 0 {
-		allFields = c.bound
+		allFields = h.core.bound
 	} else {
-		allFields = make([]zapcore.Field, len(c.bound)+len(fields))
-		copy(allFields, c.bound)
-		copy(allFields[len(c.bound):], fields)
+		allFields = make([]zapcore.Field, len(h.core.bound)+len(fields))
+		copy(allFields, h.core.bound)
+		copy(allFields[len(h.core.bound):], fields)
 	}
 
-	entry, processedFields, shouldLog := c.registry.ProcessHooks(entry, allFields)
+	entry, processedFields, shouldLog := h.core.registry.ProcessHooks(entry, allFields)
 	if !shouldLog {
 		return nil // Skip logging
 	}
 
 	outFields := fields
-	if len(processedFields) >= len(c.bound) {
-		outFields = processedFields[len(c.bound):]
+	if len(processedFields) >= len(h.core.bound) {
+		outFields = processedFields[len(h.core.bound):]
 	}
-	return c.Core.Write(entry, outFields)
+
+	h.downstream.Entry = entry
+	h.downstream.Write(outFields...)
+	return nil
 }

@@ -278,52 +278,34 @@ func (e *ConsoleEncoder) formatLevel(level zapcore.Level) string {
 
 // formatFieldValue formats a field value
 func (e *ConsoleEncoder) formatFieldValue(field zapcore.Field) string {
-	switch field.Type {
-	case zapcore.StringType:
-		return field.String
-	case zapcore.Int64Type, zapcore.Int32Type, zapcore.Int16Type, zapcore.Int8Type:
-		return fmt.Sprintf("%d", field.Integer)
-	case zapcore.Uint64Type, zapcore.Uint32Type, zapcore.Uint16Type, zapcore.Uint8Type:
-		return fmt.Sprintf("%d", field.Integer)
-	case zapcore.Float64Type:
-		if field.Interface != nil {
-			if f, ok := field.Interface.(float64); ok {
-				return fmt.Sprintf("%f", f)
-			}
-		}
-		return fmt.Sprintf("%v", field.Interface)
-	case zapcore.Float32Type:
-		if field.Interface != nil {
-			if f, ok := field.Interface.(float32); ok {
-				return fmt.Sprintf("%f", f)
-			}
-		}
-		return fmt.Sprintf("%v", field.Interface)
-	case zapcore.BoolType:
-		return fmt.Sprintf("%t", field.Integer == 1)
-	case zapcore.DurationType:
-		if field.Interface != nil {
-			if d, ok := field.Interface.(time.Duration); ok {
-				return d.String()
-			}
-		}
-		return fmt.Sprintf("%v", field.Interface)
-	case zapcore.TimeType:
-		if field.Interface != nil {
-			if t, ok := field.Interface.(time.Time); ok {
-				return t.Format(time.RFC3339)
-			}
-		}
-		return fmt.Sprintf("%v", field.Interface)
-	case zapcore.ErrorType:
-		if field.Interface != nil {
-			if err, ok := field.Interface.(error); ok {
-				return err.Error()
-			}
+	if field.Type == zapcore.ErrorType {
+		if err, ok := field.Interface.(error); ok && err != nil {
+			return err.Error()
 		}
 		return "nil"
-	default:
+	}
+	enc := zapcore.NewMapObjectEncoder()
+	field.AddTo(enc)
+	val, ok := enc.Fields[field.Key]
+	if !ok {
+		if field.Interface == nil {
+			return "<nil>"
+		}
 		return fmt.Sprintf("%v", field.Interface)
+	}
+	switch v := val.(type) {
+	case time.Time:
+		return v.Format(time.RFC3339)
+	case time.Duration:
+		return v.String()
+	case fmt.Stringer:
+		return v.String()
+	case string:
+		return v
+	case nil:
+		return "<nil>"
+	default:
+		return fmt.Sprintf("%v", v)
 	}
 }
 

@@ -113,3 +113,19 @@ func TestNewLoggerFromConfig_InvokesConfigHooks(t *testing.T) {
 	logger.Info("trigger hook")
 	assert.True(t, invoked, "hook in LoggingConfig.Hooks must be invoked")
 }
+
+func TestHookCore_Check_PerCoreLevelFilteringInTee(t *testing.T) {
+	infoCore, infoLogs := observer.New(zapcore.InfoLevel)
+	errorCore, errorLogs := observer.New(zapcore.ErrorLevel)
+
+	tee := zapcore.NewTee(infoCore, errorCore)
+	registry := NewHookRegistry()
+	registry.AddHook(passThroughHook{})
+	hookCore := NewHookCore(tee, registry)
+	logger := zap.New(hookCore)
+
+	logger.Info("info message")
+
+	assert.Equal(t, 1, infoLogs.Len(), "info entry must reach info core")
+	assert.Equal(t, 0, errorLogs.Len(), "info entry must NOT reach error core")
+}

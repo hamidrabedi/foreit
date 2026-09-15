@@ -176,19 +176,22 @@ func (mr *MigrationRunner) rollbackChecksumStep(ctx context.Context, executor ch
 		return err
 	}
 	stepErr := mr.migrate.Steps(-1)
-	cleanupErr := mr.reconcileMigrationChecksums(ctx, executor)
-	if cleanupErr != nil {
-		return errors.Join(stepErr, cleanupErr)
-	}
-	return stepErr
+	reconcileErr := mr.reconcileMigrationChecksums(ctx, executor)
+	return errors.Join(stepErr, reconcileErr)
 }
 
 func (mr *MigrationRunner) reconcileMigrationChecksums(ctx context.Context, executor checksumExecutor) error {
-	version, _, err := mr.migrate.Version()
+	version, dirty, err := mr.migrate.Version()
 	if err == migrate.ErrNilVersion {
 		_, err = executor.ExecContext(ctx, "DELETE FROM forge_migration_checksums")
-	} else if err == nil {
-		_, err = executor.ExecContext(ctx, "DELETE FROM forge_migration_checksums WHERE version > $1", version)
+		return err
 	}
+	if err != nil {
+		return err
+	}
+	if dirty {
+		return nil
+	}
+	_, err = executor.ExecContext(ctx, "DELETE FROM forge_migration_checksums WHERE version > $1", version)
 	return err
 }

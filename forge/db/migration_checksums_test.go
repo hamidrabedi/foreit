@@ -214,9 +214,85 @@ func TestChecksumBaseline_RollbackErrorReconciles(t *testing.T) {
 	_, err := database.Exec("UPDATE schema_migrations SET version = 1, dirty = 1")
 	require.NoError(t, err)
 	require.Error(t, runner.rollbackChecksumStep(context.Background(), database))
+	// When dirty, reconcileMigrationChecksums skips deleting rows; all 3 versions should remain.
+	var count int
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
+	require.Equal(t, 3, count)
+}
+
+func TestChecksumBaseline_CleanRollbackErrorReconciles(t *testing.T) {
+	database, runner := checksumRegressionRunner(t)
+	// Database is clean at version 1, but checksums have versions 1, 2, 3.
+	_, err := database.Exec("UPDATE schema_migrations SET version = 1, dirty = 0")
+	require.NoError(t, err)
+	// Making version 1's down migration unreadable makes Steps(-1) fail without making state dirty.
+	downFile := filepath.Join(runner.migrationsPath, "1_create_rollback.down.sql")
+	require.NoError(t, os.Chmod(downFile, 0000))
+	t.Cleanup(func() { _ = os.Chmod(downFile, 0600) })
+	err = runner.rollbackChecksumStep(context.Background(), database)
+	require.Error(t, err)
+	// Reconcile must still run and remove rows above the clean version (1).
 	var count int
 	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums WHERE version > 1").Scan(&count))
 	require.Zero(t, count)
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
+	require.Equal(t, 1, count)
+}
+
+func TestChecksumBaseline_DirtyRollbackPreservesChecksums(t *testing.T) {
+	// Regression test for: when a down migration fails, golang-migrate marks
+	// the target version as dirty but the actual schema is still at the higher version.
+	// We must preserve checksums for all versions including the one that failed to roll back.
+	database, err := NewDBWithDriver("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = database.DB.Close() })
+
+	ctx := context.Background()
+	dir := t.TempDir()
+
+	// Create 3 migrations with valid up/down
+	for i := 1; i <= 3; i++ {
+		upSQL := fmt.Sprintf("CREATE TABLE t%d (id INTEGER);\n", i)
+		downSQL := fmt.Sprintf("DROP TABLE t%d;\n", i)
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("%06d_mig.up.sql", i)), []byte(upSQL), 0600))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, fmt.Sprintf("%06d_mig.down.sql", i)), []byte(downSQL), 0600))
+	}
+
+	runner, err := NewMigrationRunner(database, dir)
+	require.NoError(t, err)
+
+	// Apply all 3 migrations
+	require.NoError(t, runner.Up(ctx))
+
+	// Verify all 3 checksums exist
+	var count int
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
+	require.Equal(t, 3, count)
+
+	// Make version 3's down migration invalid
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "000003_mig.down.sql"), []byte("INVALID SQL THAT WILL FAIL;\n"), 0600))
+
+	// Attempt rollback - this should fail because down migration is invalid
+	err = runner.Rollback(ctx)
+	require.Error(t, err)
+
+	// Version should now be 2 with dirty=true (golang-migrate protocol)
+	version, dirty, err := runner.Version(ctx)
+	require.NoError(t, err)
+	require.Equal(t, uint(2), version)
+	require.True(t, dirty)
+
+	// IMPORTANT: Checksums for versions 1, 2, 3 should ALL still exist
+	// because the actual schema is still at version 3 (down migration failed)
+	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
+	require.Equal(t, 3, count, "all checksums should be preserved when rollback fails and state is dirty")
+
+	// Verify each version's checksum is present
+	for v := uint(1); v <= 3; v++ {
+		var upHash string
+		require.NoError(t, database.QueryRow("SELECT up_sha256 FROM forge_migration_checksums WHERE version = ?", v).Scan(&upHash))
+		require.NotEmpty(t, upHash, "checksum for version %d should exist", v)
+	}
 }
 
 func TestChecksumBaseline_EmptyRollbackReconciles(t *testing.T) {

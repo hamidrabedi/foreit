@@ -23,6 +23,7 @@ type MigrationRunner struct {
 	db             *DB
 	migrate        *migrate.Migrate
 	migrationsPath string
+	sourceIndex    migrationFileIndex
 }
 
 // NewMigrationRunner creates a new migration runner (package-level function)
@@ -169,10 +170,16 @@ func NewMigrationRunner(db *DB, migrationsPath string) (*MigrationRunner, error)
 		}
 	}
 
+	sourceIndex, err := indexMigrationFiles(absPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index migration files: %w", err)
+	}
+
 	return &MigrationRunner{
 		db:             db,
 		migrate:        m,
 		migrationsPath: absPath,
+		sourceIndex:    sourceIndex,
 	}, nil
 }
 
@@ -460,10 +467,23 @@ func (mr *MigrationRunner) rollbackToWithChecksums(ctx context.Context, executor
 		return fmt.Errorf("target version %d is greater than or equal to current version %d. Use MigrateTo() to migrate forward", version, currentVersion)
 	}
 
-	// Rollback to target version
-	if _, _, err := migrationFileChecksums(mr.migrationsPath, version); err != nil {
-		return err
+	// Validate target version against runner's source snapshot before stepping
+	index := mr.sourceIndex
+	if index == nil {
+		var err error
+		index, err = indexMigrationFiles(mr.migrationsPath)
+		if err != nil {
+			return err
+		}
 	}
+	if _, ok := index[version]; !ok {
+		return fmt.Errorf("cannot rollback to version %d: target version missing from migration source", version)
+	}
+	if _, _, err := index.checksums(version); err != nil {
+		return fmt.Errorf("cannot rollback to version %d: %w", version, err)
+	}
+
+	// Rollback to target version
 	for currentVersion > version {
 		if err := mr.rollbackChecksumStep(ctx, executor); err != nil {
 			return fmt.Errorf("failed to rollback to version %d: %w", version, err)
@@ -472,6 +492,12 @@ func (mr *MigrationRunner) rollbackToWithChecksums(ctx context.Context, executor
 		if err != nil {
 			return err
 		}
+	}
+	// Guard against overshoot: the runner's golang-migrate source snapshot may not
+	// contain the target version (e.g., file added after runner construction), causing
+	// the loop to exit at a version < target. Require exact match.
+	if currentVersion != version {
+		return fmt.Errorf("rollback ended at version %d, expected target %d — target version missing from migration source", currentVersion, version)
 	}
 	return nil
 }

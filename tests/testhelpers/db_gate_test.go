@@ -1,6 +1,8 @@
 package testhelpers
 
 import (
+	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -209,6 +211,124 @@ func TestPostgresPrecedenceContract(t *testing.T) {
 		}
 		if strings.Contains(dsn, "other") {
 			t.Errorf("expected DSN not to contain POSTGRES_USER 'other', got %q", dsn)
+		}
+	})
+}
+
+func TestPostgresOptsDSN_EscapedCredentialsAndIPv6(t *testing.T) {
+	t.Setenv("FORGE_TEST_DATABASE_URL", "")
+	opts := PostgresOpts{
+		User:     "u@x",
+		Password: "p:ss/word",
+		Host:     "::1",
+		Port:     "5432",
+		DBName:   "testdb",
+	}
+	dsn := opts.DSN()
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatalf("failed to parse DSN %q: %v", dsn, err)
+	}
+	if u.User == nil {
+		t.Fatalf("expected User to be set in parsed DSN %q", dsn)
+	}
+	if got := u.User.Username(); got != "u@x" {
+		t.Errorf("expected username %q, got %q", "u@x", got)
+	}
+	pass, _ := u.User.Password()
+	if pass != "p:ss/word" {
+		t.Errorf("expected password %q, got %q", "p:ss/word", pass)
+	}
+	if got := u.Hostname(); got != "::1" {
+		t.Errorf("expected hostname %q, got %q", "::1", got)
+	}
+	if got := u.Port(); got != "5432" {
+		t.Errorf("expected port %q, got %q", "5432", got)
+	}
+}
+
+type mockTB struct {
+	testing.TB
+	failed   bool
+	skipped  bool
+	fatalMsg string
+	skipMsg  string
+}
+
+func (m *mockTB) Helper() {}
+func (m *mockTB) Fatalf(format string, args ...any) {
+	m.failed = true
+	m.fatalMsg = fmt.Sprintf(format, args...)
+}
+func (m *mockTB) Skipf(format string, args ...any) {
+	m.skipped = true
+	m.skipMsg = fmt.Sprintf(format, args...)
+}
+
+func TestRequirePostgresURL(t *testing.T) {
+	t.Run("prefers FORGE_TEST_DATABASE_URL when both set", func(t *testing.T) {
+		t.Setenv("FORGE_TEST_DATABASE_URL", "postgres://forge-test:5432/db")
+		t.Setenv("DATABASE_URL", "postgres://fallback:5432/db")
+		m := &mockTB{}
+		url := RequirePostgresURL(m)
+		if url != "postgres://forge-test:5432/db" {
+			t.Errorf("expected %q, got %q", "postgres://forge-test:5432/db", url)
+		}
+		if m.failed || m.skipped {
+			t.Errorf("expected not failed or skipped")
+		}
+	})
+
+	t.Run("falls back to DATABASE_URL when FORGE_TEST_DATABASE_URL is unset", func(t *testing.T) {
+		t.Setenv("FORGE_TEST_DATABASE_URL", "")
+		t.Setenv("DATABASE_URL", "postgres://fallback:5432/db")
+		m := &mockTB{}
+		url := RequirePostgresURL(m)
+		if url != "postgres://fallback:5432/db" {
+			t.Errorf("expected %q, got %q", "postgres://fallback:5432/db", url)
+		}
+		if m.failed || m.skipped {
+			t.Errorf("expected not failed or skipped")
+		}
+	})
+
+	t.Run("fails when both unset and FORGE_REQUIRE_DB=1", func(t *testing.T) {
+		t.Setenv("FORGE_TEST_DATABASE_URL", "")
+		t.Setenv("DATABASE_URL", "")
+		t.Setenv("FORGE_REQUIRE_DB", "1")
+		m := &mockTB{}
+		url := RequirePostgresURL(m)
+		if url != "" {
+			t.Errorf("expected empty url, got %q", url)
+		}
+		if !m.failed {
+			t.Errorf("expected m.failed to be true")
+		}
+		if m.skipped {
+			t.Errorf("expected m.skipped to be false")
+		}
+		if !strings.Contains(m.fatalMsg, "FORGE_REQUIRE_DB=1") {
+			t.Errorf("expected fatal message to mention FORGE_REQUIRE_DB=1, got %q", m.fatalMsg)
+		}
+	})
+
+	t.Run("skips when both unset and FORGE_REQUIRE_DB unset", func(t *testing.T) {
+		t.Setenv("FORGE_TEST_DATABASE_URL", "")
+		t.Setenv("DATABASE_URL", "")
+		t.Setenv("FORGE_REQUIRE_DB", "")
+		m := &mockTB{}
+		url := RequirePostgresURL(m)
+		if url != "" {
+			t.Errorf("expected empty url, got %q", url)
+		}
+		if m.failed {
+			t.Errorf("expected m.failed to be false")
+		}
+		if !m.skipped {
+			t.Errorf("expected m.skipped to be true")
+		}
+		if !strings.Contains(m.skipMsg, "FORGE_REQUIRE_DB=1") {
+			t.Errorf("expected skip message to mention FORGE_REQUIRE_DB=1, got %q", m.skipMsg)
 		}
 	})
 }

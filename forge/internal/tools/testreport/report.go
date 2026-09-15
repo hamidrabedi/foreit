@@ -35,12 +35,16 @@ type testID struct {
 	test string
 }
 
-const maxBufferedLines = 60
+const (
+	maxBufferedLines = 60
+	maxPartialBytes  = 64 * 1024
+)
 
 type outputBuffer struct {
-	lines   []string
-	omitted int
-	partial string
+	lines     []string
+	omitted   int
+	partial   string
+	truncated int
 }
 
 func (b *outputBuffer) addLine(line string) {
@@ -61,10 +65,18 @@ func (b *outputBuffer) add(s string) {
 	full := b.partial + s
 	lastNL := strings.LastIndex(full, "\n")
 	if lastNL == -1 {
+		if len(full) > maxPartialBytes {
+			b.truncated += len(full) - maxPartialBytes
+			full = full[len(full)-maxPartialBytes:]
+		}
 		b.partial = full
 		return
 	}
 	b.partial = full[lastNL+1:]
+	if len(b.partial) > maxPartialBytes {
+		b.truncated += len(b.partial) - maxPartialBytes
+		b.partial = b.partial[len(b.partial)-maxPartialBytes:]
+	}
 	for _, line := range strings.Split(full[:lastNL], "\n") {
 		b.addLine(line)
 	}
@@ -75,6 +87,21 @@ func (b *outputBuffer) finish() {
 		b.addLine(b.partial)
 		b.partial = ""
 	}
+}
+
+func (b *outputBuffer) contains(substr string) bool {
+	if b == nil {
+		return false
+	}
+	if strings.Contains(b.partial, substr) {
+		return true
+	}
+	for _, l := range b.lines {
+		if strings.Contains(l, substr) {
+			return true
+		}
+	}
+	return false
 }
 
 type section struct {
@@ -202,20 +229,23 @@ func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
 					delete(col.packageOutputs, e.Package)
 				} else if e.Action == "skip" {
 					c.skipped++
+					noTestFiles := col.packageOutputs[e.Package].contains("[no test files]")
 					isRequired := false
-					for _, re := range required {
-						if re.MatchString(e.Package) {
-							if !isAllowed(e.Package, "") {
-								isRequired = true
-								col.forbidden = append(col.forbidden, e.Package)
-								col.exitCode = 1
-								id := testID{pkg: e.Package, test: ""}
-								if !col.skipSeen[id] {
-									col.skipSeen[id] = true
-									col.requiredSkips = append(col.requiredSkips, id)
+					if !noTestFiles {
+						for _, re := range required {
+							if re.MatchString(e.Package) {
+								if !isAllowed(e.Package, "") {
+									isRequired = true
+									col.forbidden = append(col.forbidden, e.Package)
+									col.exitCode = 1
+									id := testID{pkg: e.Package, test: ""}
+									if !col.skipSeen[id] {
+										col.skipSeen[id] = true
+										col.requiredSkips = append(col.requiredSkips, id)
+									}
 								}
+								break
 							}
-							break
 						}
 					}
 					if !isRequired {

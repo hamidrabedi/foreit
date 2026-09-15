@@ -32,8 +32,31 @@ func skipOrFailNoDB(t testing.TB, format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	if requireDB() {
 		t.Fatalf("%s (FORGE_REQUIRE_DB=1 is set)", msg)
+		return
 	}
 	t.Skipf("%s (set FORGE_REQUIRE_DB=1 to turn into failure)", msg)
+}
+
+// SkipOrFailNoDB calls t.Fatalf if FORGE_REQUIRE_DB=1 is set, or t.Skipf otherwise.
+func SkipOrFailNoDB(t testing.TB, format string, args ...any) {
+	t.Helper()
+	skipOrFailNoDB(t, format, args...)
+}
+
+// RequirePostgresURL returns the PostgreSQL connection URL to use:
+// when FORGE_TEST_DATABASE_URL is set, it returns it;
+// when FORGE_TEST_DATABASE_URL is not set and DATABASE_URL is set, it returns DATABASE_URL;
+// otherwise it calls the testhelpers skip-or-fail helper (which fails if FORGE_REQUIRE_DB=1, skips otherwise).
+func RequirePostgresURL(t testing.TB) string {
+	t.Helper()
+	if u := os.Getenv("FORGE_TEST_DATABASE_URL"); u != "" {
+		return u
+	}
+	if u := os.Getenv("DATABASE_URL"); u != "" {
+		return u
+	}
+	skipOrFailNoDB(t, "Postgres not available")
+	return ""
 }
 
 // applyPostgresPrecedence applies connection options precedence to opts:

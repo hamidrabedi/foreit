@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"regexp"
@@ -43,16 +44,30 @@ func (opts PostgresOpts) DSN() string {
 	if opts.RawQuery != "" {
 		query = opts.RawQuery
 	}
+
+	u := &url.URL{
+		Scheme:   "postgres",
+		RawQuery: query,
+	}
 	if opts.User != "" {
 		if opts.Password != "" {
-			return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?%s",
-				opts.User, opts.Password, opts.Host, opts.Port, opts.DBName, query)
+			u.User = url.UserPassword(opts.User, opts.Password)
+		} else {
+			u.User = url.User(opts.User)
 		}
-		return fmt.Sprintf("postgres://%s@%s:%s/%s?%s",
-			opts.User, opts.Host, opts.Port, opts.DBName, query)
 	}
-	return fmt.Sprintf("postgres://%s:%s/%s?%s",
-		opts.Host, opts.Port, opts.DBName, query)
+	host := strings.Trim(opts.Host, "[]")
+	if opts.Port != "" {
+		u.Host = net.JoinHostPort(host, opts.Port)
+	} else if strings.Contains(host, ":") {
+		u.Host = "[" + host + "]"
+	} else {
+		u.Host = host
+	}
+	if opts.DBName != "" {
+		u.Path = "/" + url.PathEscape(opts.DBName)
+	}
+	return u.String()
 }
 
 // DeriveDSN returns the connection string derived from opts, preserving any query parameters.

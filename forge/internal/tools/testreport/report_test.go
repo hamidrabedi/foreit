@@ -279,6 +279,18 @@ func TestOutputBufferingBounded(t *testing.T) {
 			t.Fatalf("retained lines should appear in report: %q", s)
 		}
 	})
+
+	t.Run("10 MiB output event without newlines keeps at most 64 KiB", func(t *testing.T) {
+		buf := &outputBuffer{}
+		tenMB := strings.Repeat("a", 10*1024*1024)
+		buf.add(tenMB)
+		if len(buf.partial) > 64*1024 {
+			t.Fatalf("expected buf.partial <= 64 KiB, got %d bytes", len(buf.partial))
+		}
+		if buf.truncated != 10*1024*1024-64*1024 {
+			t.Fatalf("expected truncated == %d, got %d", 10*1024*1024-64*1024, buf.truncated)
+		}
+	})
 }
 
 func TestBuildEvents(t *testing.T) {
@@ -346,8 +358,27 @@ func TestPackageLevelSkip(t *testing.T) {
 		}
 	})
 
-	t.Run("required package-level skip fails run", func(t *testing.T) {
+	t.Run("required package-level skip with no test files passes run", func(t *testing.T) {
 		input := `{"Action":"output","Package":"pkg/required","Output":"?   \tpkg/required [no test files]\n"}
+{"Action":"skip","Package":"pkg/required"}
+`
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{requireNoSkip: patterns{"^pkg/required$"}})
+		if code != 0 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 0, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if !strings.Contains(norm, "pkg/required 0 0 1 0") {
+			t.Errorf("expected skipped package count 1 in table, got: %s", s)
+		}
+		if strings.Contains(s, "REQUIRED TEST SKIPPED") {
+			t.Errorf("did not expect required test skipped in report, got: %s", s)
+		}
+	})
+
+	t.Run("real package-level skip in a required package fails run", func(t *testing.T) {
+		input := `{"Action":"output","Package":"pkg/required","Output":"skipping package tests\n"}
 {"Action":"skip","Package":"pkg/required"}
 `
 		var out bytes.Buffer

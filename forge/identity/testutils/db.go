@@ -49,32 +49,8 @@ func createTestDatabase(ctx context.Context, defaultDB *sql.DB) (string, error) 
 
 // SetupTestDB creates a Postgres database for testing
 func SetupTestDB(t *testing.T) *db.DB {
-	// Postgres connection info
-	host := "127.0.0.1"
-	port := "5432"
-	user := "postgres"
-	password := "123"
-
-	if envURL := os.Getenv("FORGE_TEST_DATABASE_URL"); envURL != "" {
-		if u, err := url.Parse(envURL); err == nil {
-			if h := u.Hostname(); h != "" {
-				host = h
-			}
-			if p := u.Port(); p != "" {
-				port = p
-			}
-			if u.User != nil {
-				user = u.User.Username()
-				if pass, ok := u.User.Password(); ok {
-					password = pass
-				}
-			}
-		}
-	}
-
-	// Connect to default DB to create test DB
-	defaultDSN := testDatabaseURL(fmt.Sprintf("postgres://%s:%s@%s:%s/postgres?sslmode=disable",
-		user, password, host, port))
+	// Use the same connection options for administration and the per-test database.
+	defaultDSN := testDatabaseURL("postgres://postgres:123@127.0.0.1:5432/postgres?sslmode=disable")
 	defaultDB, err := sql.Open("postgres", defaultDSN)
 	if err != nil {
 		skipOrFailNoDB(t, "PostgreSQL not available: %v. Skipping identity DB tests.", err)
@@ -91,8 +67,8 @@ func SetupTestDB(t *testing.T) *db.DB {
 	require.NoError(t, err)
 
 	// Connect to test DB
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		user, password, host, port, dbName)
+	dsn, err := databaseDSN(defaultDSN, dbName)
+	require.NoError(t, err)
 	sqlDB, err := sql.Open("postgres", dsn)
 	require.NoError(t, err)
 	if err := sqlDB.Ping(); err != nil {
@@ -225,4 +201,15 @@ func skipOrFailNoDB(t testing.TB, format string, args ...any) {
 		t.Fatalf("%s (FORGE_REQUIRE_DB=1 is set)", msg)
 	}
 	t.Skipf("%s (set FORGE_REQUIRE_DB=1 to turn into failure)", msg)
+}
+
+// databaseDSN changes only the database path, preserving URL credentials and query.
+func databaseDSN(baseURL, dbName string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	u.Path = "/" + dbName
+	u.RawPath = ""
+	return u.String(), nil
 }

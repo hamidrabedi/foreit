@@ -58,3 +58,15 @@ func TestDBGateContract(t *testing.T) {
 		})
 	})
 }
+
+func TestDatabaseDSNPreservesURLQuery(t *testing.T) {
+	t.Setenv("FORGE_TEST_DATABASE_URL", "postgres://url_user:url_password@dbhost:6543/base?sslmode=require&connect_timeout=5")
+	got, err := databaseDSN(testDatabaseURL("unused"), "identity_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "postgres://url_user:url_password@dbhost:6543/identity_test?sslmode=require&connect_timeout=5"
+	if got != want {
+		t.Fatalf("DSN = %q, want %q", got, want)
+	}
+}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -269,7 +271,7 @@ func StartPostgresContainer(ctx context.Context, opts PostgresOpts) (*sql.DB, st
 	opts.Host = host
 	opts.Port = port
 	dsn := opts.DSN()
-	fmt.Printf("[DEBUG] DSN: postgres://%s:***@%s:%s/%s?sslmode=disable\n", opts.User, host, port, opts.DBName)
+	fmt.Printf("[DEBUG] DSN: %s\n", redactDSN(dsn))
 
 	cleanup := func() error {
 		return pool.Purge(resource)
@@ -308,7 +310,7 @@ func StartPostgresContainer(ctx context.Context, opts PostgresOpts) (*sql.DB, st
 			fmt.Printf("[DEBUG] Container Ports: %+v\n", resource.Container.NetworkSettings)
 		}
 		cleanup()
-		return nil, "", nil, fmt.Errorf("could not connect to postgres after %d retries. Last error: %w. DSN: %s. Container may not be ready or port mapping incorrect", maxRetries, lastErr, dsn)
+		return nil, "", nil, fmt.Errorf("could not connect to postgres after %d retries. Last error: %w. DSN: %s. Container may not be ready or port mapping incorrect", maxRetries, lastErr, redactDSN(dsn))
 	}
 
 	return db, dsn, cleanup, nil
@@ -397,7 +399,7 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 
 	if retries >= maxRetries {
 		db.Close()
-		return nil, "", nil, fmt.Errorf("could not connect to postgres after %d retries. Last error: %w. DSN: %s", maxRetries, err, dsn)
+		return nil, "", nil, fmt.Errorf("could not connect to postgres after %d retries. Last error: %w. DSN: %s", maxRetries, err, redactDSN(dsn))
 	}
 
 	cleanup := func() error {
@@ -448,4 +450,25 @@ func WaitForDBReady(ctx context.Context, db *sql.DB, timeout time.Duration) erro
 			}
 		}
 	}
+}
+
+var dsnPassword = regexp.MustCompile(`(?i)(password\s*=\s*)(?:'(?:[^'\\]|\\.)*'|(?:[^\s\\]|\\.)*)`)
+
+// redactDSN masks passwords before connection strings reach logs or errors.
+func redactDSN(dsn string) string {
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "[redacted invalid DSN]"
+		}
+		query := u.Query()
+		for key := range query {
+			if strings.EqualFold(key, "password") {
+				query.Set(key, "xxxxx")
+			}
+		}
+		u.RawQuery = query.Encode()
+		return u.Redacted()
+	}
+	return dsnPassword.ReplaceAllString(dsn, "${1}***")
 }

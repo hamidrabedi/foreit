@@ -39,6 +39,7 @@ func New{{.Name}}ViewSet() *{{.Name}}ViewSet {
 		),
 	}
 	vs.ExcludeResponseFields = api.NonSerializableFields(&{{.Name}}{})
+	vs.ReadOnlyRequestFields = api.NonEditableFields(&{{.Name}}{})
 	return vs
 }
 

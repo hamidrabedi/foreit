@@ -43,6 +43,43 @@ func nonSerializableFromFields(fields []schema.Field) []string {
 	return out
 }
 
+// NonEditableFields returns the names of fields on model whose Editable flag
+// is false (values that must not be written through create or update). Both
+// the field Name and its DB column name are returned when they differ. It
+// returns nil when model does not implement schema.Schema.
+func NonEditableFields(model interface{}) []string {
+	if model == nil {
+		return nil
+	}
+	if s, ok := model.(schema.Schema); ok {
+		return nonEditableFromFields(s.Fields())
+	}
+	// Handle a non-pointer model whose pointer implements schema.Schema.
+	v := reflect.ValueOf(model)
+	if v.IsValid() && v.Kind() != reflect.Ptr {
+		ptr := reflect.New(v.Type())
+		ptr.Elem().Set(v)
+		if s, ok := ptr.Interface().(schema.Schema); ok {
+			return nonEditableFromFields(s.Fields())
+		}
+	}
+	return nil
+}
+
+func nonEditableFromFields(fields []schema.Field) []string {
+	var out []string
+	for _, f := range fields {
+		if f.Editable {
+			continue
+		}
+		out = append(out, f.Name)
+		if f.DBColumn != "" && f.DBColumn != f.Name {
+			out = append(out, f.DBColumn)
+		}
+	}
+	return out
+}
+
 // stripExcludedFields removes ExcludeResponseFields keys from a serialized map.
 func (vs *BaseViewSet) stripExcludedFields(m map[string]interface{}) map[string]interface{} {
 	if m == nil || len(vs.ExcludeResponseFields) == 0 {

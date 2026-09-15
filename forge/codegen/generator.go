@@ -81,6 +81,56 @@ func (g *Generator) generateCombined(definitions []*ModelDefinition) error {
 	return g.writer.WriteCombined(definitions, g.outputDir)
 }
 
+// integerAPIKeyGoTypes are the Go types accepted as generated REST API
+// primary keys. Detail routes address rows by integer IDs.
+var integerAPIKeyGoTypes = map[string]bool{
+	"int":   true,
+	"int8":  true,
+	"int16": true,
+	"int32": true,
+	"int64": true,
+}
+
+// integerAPIKeyFieldTypes are the schema field builder names that map to
+// integer Go types, used as a fallback when GoType is empty.
+var integerAPIKeyFieldTypes = map[string]bool{
+	"Int":        true,
+	"IntField":   true,
+	"Int64":      true,
+	"Int64Field": true,
+	"Int32":      true,
+	"Int32Field": true,
+}
+
+// ValidateAPIModels rejects models whose primary key field is not an integer
+// type, since generated REST APIs currently require an integer primary key
+// (detail routes parse {id} as an integer). Models without an explicit
+// primary key field are unaffected.
+func ValidateAPIModels(definitions []*ModelDefinition) error {
+	for _, def := range definitions {
+		if def == nil {
+			continue
+		}
+		for _, f := range def.Fields {
+			if !f.PrimaryKey {
+				continue
+			}
+			if integerAPIKeyGoTypes[f.GoType] || integerAPIKeyFieldTypes[f.Type] {
+				continue
+			}
+			label := f.Type
+			if label == "" {
+				label = f.GoType
+			}
+			if label == "" {
+				label = "unknown"
+			}
+			return fmt.Errorf("model %s has non-integer primary key field %q (type %s): generated REST APIs currently require an integer primary key (int64/int32/int)", def.Name, f.Name, label)
+		}
+	}
+	return nil
+}
+
 // ModelDefinition represents a parsed model definition
 type ModelDefinition struct {
 	Hooks     HooksDefinition

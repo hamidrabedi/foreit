@@ -2,7 +2,10 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -63,6 +66,8 @@ type BaseViewSet struct {
 	Model      interface{}
 	// ExcludeResponseFields holds response keys removed from serialized output; nil keeps every field.
 	ExcludeResponseFields []string
+	// ReadOnlyRequestFields holds request keys ignored on create and update; nil accepts every field.
+	ReadOnlyRequestFields []string
 	// Authentication uses the current defaults when nil; a non-nil empty slice disables authentication.
 	Authentication []authentication.Authentication
 	// Permissions uses the current defaults when nil; a non-nil empty slice disables permission checks.
@@ -176,6 +181,7 @@ func (vs *BaseViewSet) viewForRequest(r *http.Request) *BaseViewSet {
 		Queryset:              vs.Queryset,
 		Model:                 vs.Model,
 		ExcludeResponseFields: vs.ExcludeResponseFields,
+		ReadOnlyRequestFields: vs.ReadOnlyRequestFields,
 		Authentication:        vs.Authentication,
 		Permissions:           vs.Permissions,
 		Throttles:             vs.Throttles,
@@ -314,7 +320,7 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	if len(results) >= 2 {
 		if !results[1].IsNil() {
 			if err, ok := results[1].Interface().(error); ok {
-				_ = forgehttp.SendError(w, http.StatusInternalServerError, err.Error())
+				vs.handleException(w, r, err)
 				return
 			}
 		}
@@ -363,7 +369,7 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 		// Check for error first
 		if errVal := allResults[1]; !errVal.IsNil() {
 			if err, ok := errVal.Interface().(error); ok {
-				_ = forgehttp.SendError(w, http.StatusInternalServerError, err.Error())
+				vs.handleException(w, r, err)
 				return
 			}
 		}
@@ -418,8 +424,19 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	modelValue := reflect.New(reflect.TypeOf(vs.Model).Elem())
 	instance := modelValue.Interface()
 
+	// Drop read-only request fields (serializer read-only fields and
+	// viewset-level ReadOnlyRequestFields) before populating the model.
+	var ignoredKeys []string
+	ignoredKeys = append(ignoredKeys, vs.ReadOnlyRequestFields...)
+	if ro, ok := serializer.(interface{ ReadOnlyFields() []string }); ok {
+		ignoredKeys = append(ignoredKeys, ro.ReadOnlyFields()...)
+	}
+
 	// Populate instance from data
-	populateFromMap(instance, data)
+	if err := populateFromMap(instance, data, ignoredKeys...); err != nil {
+		vs.handleException(w, r, validationErrorForPopulate(err))
+		return
+	}
 
 	// Get manager and call Create
 	manager := vs.getManager()
@@ -445,8 +462,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 
 	if len(results) > 0 && !results[0].IsNil() {
 		if err, ok := results[0].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusBadRequest, err.Error())
+			vs.handleException(w, r, persistenceException(err))
 			return
 		}
 	}
@@ -510,8 +526,7 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 
 	if !results[1].IsNil() {
 		if err, ok := results[1].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusNotFound, err.Error())
+			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
 			return
 		}
 	}
@@ -593,8 +608,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	if len(getResults) < 2 || !getResults[1].IsNil() {
 		if err, ok := getResults[1].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusNotFound, err.Error())
+			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
 			return
 		}
 	}
@@ -624,9 +638,13 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 	if ro, ok := serializer.(interface{ ReadOnlyFields() []string }); ok {
 		ignoredKeys = append(ignoredKeys, ro.ReadOnlyFields()...)
 	}
+	ignoredKeys = append(ignoredKeys, vs.ReadOnlyRequestFields...)
 
 	// Populate from data, ignoring primary-key fields
-	populateFromMap(instance, data, ignoredKeys...)
+	if err := populateFromMap(instance, data, ignoredKeys...); err != nil {
+		vs.handleException(w, r, validationErrorForPopulate(err))
+		return
+	}
 
 	// Restore primary key from the object loaded via the URL after populating
 	restorePrimaryKey(instance, origPK, id, pkGoName, pkDBName, pkJSONName)
@@ -647,8 +665,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	if len(updateResults) > 0 && !updateResults[0].IsNil() {
 		if err, ok := updateResults[0].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusBadRequest, err.Error())
+			vs.handleException(w, r, persistenceException(err))
 			return
 		}
 	}
@@ -708,8 +725,7 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 
 	if len(getResults) < 2 || !getResults[1].IsNil() {
 		if err, ok := getResults[1].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusNotFound, err.Error())
+			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
 			return
 		}
 	}
@@ -735,8 +751,7 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 
 	if len(deleteResults) > 0 && !deleteResults[0].IsNil() {
 		if err, ok := deleteResults[0].Interface().(error); ok && err != nil {
-			// nolint:errcheck // HTTP response errors can't be handled meaningfully
-			_ = forgehttp.SendError(w, http.StatusBadRequest, err.Error())
+			vs.handleException(w, r, persistenceException(err))
 			return
 		}
 	}
@@ -1118,15 +1133,38 @@ func applyOrdering(qs reflect.Value, r *http.Request) reflect.Value {
 	return qs
 }
 
-// populateFromMap populates a model instance from a map, optionally ignoring specified keys
-func populateFromMap(instance interface{}, data map[string]interface{}, ignoredKeys ...string) {
+// fieldError describes a single request-field conversion failure.
+type fieldError struct {
+	Field   string
+	Message string
+}
+
+func (e *fieldError) Error() string {
+	return fmt.Sprintf("invalid value for field %q: %s", e.Field, e.Message)
+}
+
+// validationErrorForPopulate converts a populateFromMap failure into a 400
+// validation exception so the ErrorWriter (or the default RFC 7807 writer)
+// renders it instead of leaking anything verbatim.
+func validationErrorForPopulate(err error) error {
+	if fe, ok := err.(*fieldError); ok {
+		return exceptions.NewValidationError(map[string][]string{fe.Field: {fe.Message}})
+	}
+	return exceptions.NewValidationError(map[string][]string{"non_field_errors": {err.Error()}})
+}
+
+// populateFromMap populates a model instance from a map, optionally ignoring specified keys.
+// Keys are matched case-insensitively against the Go field name, the json tag
+// name and the db tag name. A value that cannot be converted to the field type
+// returns a *fieldError; nothing is silently dropped.
+func populateFromMap(instance interface{}, data map[string]interface{}, ignoredKeys ...string) error {
 	instanceValue := reflect.ValueOf(instance)
 	if instanceValue.Kind() == reflect.Ptr {
 		instanceValue = instanceValue.Elem()
 	}
 
 	if instanceValue.Kind() != reflect.Struct {
-		return
+		return nil
 	}
 
 	ignored := make(map[string]bool, len(ignoredKeys))
@@ -1134,8 +1172,8 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 		ignored[strings.ToLower(k)] = true
 	}
 
-	var applyToStruct func(target reflect.Value)
-	applyToStruct = func(target reflect.Value) {
+	var applyToStruct func(target reflect.Value) error
+	applyToStruct = func(target reflect.Value) error {
 		targetType := target.Type()
 		for i := 0; i < targetType.NumField(); i++ {
 			field := targetType.Field(i)
@@ -1147,13 +1185,17 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 			if field.Anonymous {
 				switch fieldValue.Kind() {
 				case reflect.Struct:
-					applyToStruct(fieldValue)
+					if err := applyToStruct(fieldValue); err != nil {
+						return err
+					}
 				case reflect.Ptr:
 					if fieldValue.IsNil() {
 						continue
 					}
 					if fieldValue.Elem().Kind() == reflect.Struct {
-						applyToStruct(fieldValue.Elem())
+						if err := applyToStruct(fieldValue.Elem()); err != nil {
+							return err
+						}
 					}
 				}
 				continue
@@ -1168,18 +1210,23 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 			if key == "" {
 				continue
 			}
-			if ignored[strings.ToLower(key)] || ignored[strings.ToLower(field.Name)] {
+			dbTag := strings.Split(field.Tag.Get("db"), ",")[0]
+			if ignored[strings.ToLower(key)] || ignored[strings.ToLower(field.Name)] ||
+				(dbTag != "" && dbTag != "-" && ignored[strings.ToLower(dbTag)]) {
 				continue
 			}
 			if value, ok := data[key]; ok {
 				if fieldValue.CanSet() {
-					setFieldValue(fieldValue, value)
+					if err := setFieldValue(fieldValue, value); err != nil {
+						return &fieldError{Field: key, Message: err.Error()}
+					}
 				}
 			}
 		}
+		return nil
 	}
 
-	applyToStruct(instanceValue)
+	return applyToStruct(instanceValue)
 }
 
 // getSchemaPrimaryKeyField returns the primary key field from the model's schema if available.
@@ -1478,56 +1525,428 @@ func isIntKind(k reflect.Kind) bool {
 	return (k >= reflect.Int && k <= reflect.Int64) || (k >= reflect.Uint && k <= reflect.Uint64)
 }
 
-// setFieldValue sets a field value from interface{}
-func setFieldValue(field reflect.Value, value interface{}) {
+// setFieldValue sets a field value from interface{}. It supports the Go types
+// codegen emits (float32/float64 for Float/Decimal, []byte for JSON/Bytes)
+// plus re-marshaling for map, slice, struct and interface fields. JSON numbers
+// arrive as float64 (or json.Number) and numeric strings are accepted for
+// numeric fields. An incompatible value returns an error; it is never dropped
+// silently.
+func setFieldValue(field reflect.Value, value interface{}) error {
 	if !field.CanSet() {
-		return
+		return nil
 	}
 
-	valueValue := reflect.ValueOf(value)
-	if !valueValue.IsValid() {
+	if value == nil {
 		switch field.Kind() {
 		case reflect.Ptr, reflect.Interface, reflect.Slice, reflect.Map:
 			field.Set(reflect.Zero(field.Type()))
 		}
-		return
+		return nil
+	}
+
+	fieldType := field.Type()
+
+	// []byte fields (codegen JSON/Bytes): accept a base64 string like
+	// encoding/json does, or an array of byte values.
+	if fieldType.Kind() == reflect.Slice && fieldType.Elem().Kind() == reflect.Uint8 {
+		return setBytesField(field, value)
 	}
 
 	switch field.Kind() {
 	case reflect.String:
-		if valueValue.Kind() == reflect.String {
-			field.SetString(valueValue.String())
+		s, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("expected string, got %T", value)
 		}
+		field.SetString(s)
+		return nil
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if valueValue.Kind() == reflect.Float64 {
-			field.SetInt(int64(valueValue.Float()))
-		} else if valueValue.Kind() == reflect.Int || valueValue.Kind() == reflect.Int64 {
-			field.SetInt(valueValue.Int())
-		}
+		return setIntField(field, value)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return setUintField(field, value)
+	case reflect.Float32, reflect.Float64:
+		return setFloatField(field, value)
 	case reflect.Bool:
-		if valueValue.Kind() == reflect.Bool {
-			field.SetBool(valueValue.Bool())
+		b, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("expected boolean, got %T", value)
 		}
+		field.SetBool(b)
+		return nil
+	case reflect.Ptr:
+		elem := reflect.New(fieldType.Elem())
+		if err := setFieldValue(elem.Elem(), value); err != nil {
+			return err
+		}
+		field.Set(elem)
+		return nil
+	case reflect.Slice, reflect.Map:
+		return setCompositeField(field, value)
 	case reflect.Struct:
-		if field.Type() == reflect.TypeOf(time.Time{}) {
-			if str, ok := value.(string); ok {
-				if str == "" {
-					field.Set(reflect.ValueOf(time.Time{}))
-					return
-				}
-				if parsed, err := time.Parse(time.RFC3339, str); err == nil {
-					field.Set(reflect.ValueOf(parsed))
-					return
-				}
-				if parsed, err := time.Parse("2006-01-02", str); err == nil {
-					field.Set(reflect.ValueOf(parsed))
-					return
-				}
+		if fieldType == reflect.TypeOf(time.Time{}) {
+			return setTimeField(field, value)
+		}
+		return setCompositeField(field, value)
+	case reflect.Interface:
+		valueValue := reflect.ValueOf(value)
+		if valueValue.Type().AssignableTo(fieldType) {
+			field.Set(valueValue)
+			return nil
+		}
+		if valueValue.Type().Implements(fieldType) {
+			field.Set(valueValue)
+			return nil
+		}
+		return setCompositeField(field, value)
+	default:
+		valueValue := reflect.ValueOf(value)
+		if valueValue.Type().AssignableTo(fieldType) {
+			field.Set(valueValue)
+			return nil
+		}
+		return fmt.Errorf("cannot assign %T to %s", value, fieldType)
+	}
+}
+
+// setFloatField assigns JSON numbers (float64 or json.Number), numeric strings
+// and integers to float32/float64 fields.
+func setFloatField(field reflect.Value, value interface{}) error {
+	bitSize := 64
+	if field.Kind() == reflect.Float32 {
+		bitSize = 32
+	}
+	f, err := parseFloatValue(value, bitSize)
+	if err != nil {
+		return err
+	}
+	field.SetFloat(f)
+	return nil
+}
+
+func parseFloatValue(value interface{}, bitSize int) (float64, error) {
+	switch v := value.(type) {
+	case float64:
+		if bitSize == 32 {
+			if _, err := strconv.ParseFloat(strconv.FormatFloat(v, 'g', -1, 64), 32); err != nil {
+				return 0, fmt.Errorf("value %v out of range for float32", v)
 			}
 		}
+		if math.IsNaN(v) || math.IsInf(v, 0) {
+			return 0, fmt.Errorf("invalid numeric value %v", v)
+		}
+		return v, nil
+	case float32:
+		return float64(v), nil
+	case json.Number:
+		f, err := strconv.ParseFloat(strings.TrimSpace(v.String()), bitSize)
+		if err != nil {
+			return 0, fmt.Errorf("invalid numeric value %q", v.String())
+		}
+		return f, nil
+	case string:
+		s := strings.TrimSpace(v)
+		if s == "" {
+			return 0, fmt.Errorf("empty string is not a number")
+		}
+		f, err := strconv.ParseFloat(s, bitSize)
+		if err != nil {
+			return 0, fmt.Errorf("invalid numeric value %q", v)
+		}
+		return f, nil
+	case int:
+		return float64(v), nil
+	case int8:
+		return float64(v), nil
+	case int16:
+		return float64(v), nil
+	case int32:
+		return float64(v), nil
+	case int64:
+		return float64(v), nil
+	case uint:
+		return float64(v), nil
+	case uint8:
+		return float64(v), nil
+	case uint16:
+		return float64(v), nil
+	case uint32:
+		return float64(v), nil
+	case uint64:
+		return float64(v), nil
 	default:
-		if valueValue.Type().AssignableTo(field.Type()) {
-			field.Set(valueValue)
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			return float64(rv.Int()), nil
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			return float64(rv.Uint()), nil
+		case reflect.Float32, reflect.Float64:
+			return parseFloatValue(rv.Float(), bitSize)
+		}
+		return 0, fmt.Errorf("expected number, got %T", value)
+	}
+}
+
+// setIntField assigns JSON numbers, integers, json.Number values and numeric
+// strings to signed integer fields.
+func setIntField(field reflect.Value, value interface{}) error {
+	var n int64
+	switch v := value.(type) {
+	case float64:
+		n = int64(v)
+	case float32:
+		n = int64(v)
+	case int:
+		n = int64(v)
+	case int8:
+		n = int64(v)
+	case int16:
+		n = int64(v)
+	case int32:
+		n = int64(v)
+	case int64:
+		n = v
+	case uint:
+		n = int64(v)
+	case uint8:
+		n = int64(v)
+	case uint16:
+		n = int64(v)
+	case uint32:
+		n = int64(v)
+	case uint64:
+		n = int64(v)
+	case json.Number:
+		parsed, err := v.Int64()
+		if err != nil {
+			if f, ferr := strconv.ParseFloat(strings.TrimSpace(v.String()), 64); ferr == nil {
+				n = int64(f)
+			} else {
+				return fmt.Errorf("invalid integer value %q", v.String())
+			}
+		} else {
+			n = parsed
+		}
+	case string:
+		s := strings.TrimSpace(v)
+		parsed, err := strconv.ParseInt(s, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid integer value %q", v)
+		}
+		n = parsed
+	default:
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			n = rv.Int()
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			n = int64(rv.Uint())
+		case reflect.Float32, reflect.Float64:
+			n = int64(rv.Float())
+		default:
+			return fmt.Errorf("expected integer, got %T", value)
 		}
 	}
+	if field.OverflowInt(n) {
+		return fmt.Errorf("value %d out of range for %s", n, field.Type())
+	}
+	field.SetInt(n)
+	return nil
+}
+
+// setUintField assigns JSON numbers, integers, json.Number values and numeric
+// strings to unsigned integer fields.
+func setUintField(field reflect.Value, value interface{}) error {
+	var n uint64
+	switch v := value.(type) {
+	case float64:
+		if v < 0 {
+			return fmt.Errorf("negative value %v invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case float32:
+		if v < 0 {
+			return fmt.Errorf("negative value %v invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case int:
+		if v < 0 {
+			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case int8:
+		if v < 0 {
+			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case int16:
+		if v < 0 {
+			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case int32:
+		if v < 0 {
+			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case int64:
+		if v < 0 {
+			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
+		}
+		n = uint64(v)
+	case uint:
+		n = uint64(v)
+	case uint8:
+		n = uint64(v)
+	case uint16:
+		n = uint64(v)
+	case uint32:
+		n = uint64(v)
+	case uint64:
+		n = v
+	case json.Number:
+		parsed, err := strconv.ParseUint(strings.TrimSpace(v.String()), 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid unsigned integer value %q", v.String())
+		}
+		n = parsed
+	case string:
+		parsed, err := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid unsigned integer value %q", v)
+		}
+		n = parsed
+	default:
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			n = rv.Uint()
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if rv.Int() < 0 {
+				return fmt.Errorf("negative value %d invalid for %s", rv.Int(), field.Type())
+			}
+			n = uint64(rv.Int())
+		case reflect.Float32, reflect.Float64:
+			if rv.Float() < 0 {
+				return fmt.Errorf("negative value %v invalid for %s", rv.Float(), field.Type())
+			}
+			n = uint64(rv.Float())
+		default:
+			return fmt.Errorf("expected unsigned integer, got %T", value)
+		}
+	}
+	if field.OverflowUint(n) {
+		return fmt.Errorf("value %d out of range for %s", n, field.Type())
+	}
+	field.SetUint(n)
+	return nil
+}
+
+// setBytesField assigns a base64 string (like encoding/json does for []byte),
+// a byte array, or another []uint8 value to a []byte field.
+func setBytesField(field reflect.Value, value interface{}) error {
+	switch v := value.(type) {
+	case string:
+		decoded, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			return fmt.Errorf("invalid base64 string: %v", err)
+		}
+		field.SetBytes(decoded)
+		return nil
+	case []byte:
+		field.SetBytes(v)
+		return nil
+	case []interface{}:
+		b := make([]byte, len(v))
+		for i, e := range v {
+			n, ok := byteValue(e)
+			if !ok {
+				return fmt.Errorf("invalid byte value at index %d: %T", i, e)
+			}
+			b[i] = n
+		}
+		field.SetBytes(b)
+		return nil
+	default:
+		rv := reflect.ValueOf(value)
+		if rv.Kind() == reflect.Slice && rv.Type().Elem().Kind() == reflect.Uint8 {
+			field.SetBytes(rv.Bytes())
+			return nil
+		}
+		return fmt.Errorf("expected base64 string, got %T", value)
+	}
+}
+
+func byteValue(value interface{}) (byte, bool) {
+	switch v := value.(type) {
+	case float64:
+		if v < 0 || v > 255 || v != float64(int(v)) {
+			return 0, false
+		}
+		return byte(int(v)), true
+	case int:
+		if v < 0 || v > 255 {
+			return 0, false
+		}
+		return byte(v), true
+	case json.Number:
+		n, err := v.Int64()
+		if err != nil || n < 0 || n > 255 {
+			return 0, false
+		}
+		return byte(n), true
+	default:
+		rv := reflect.ValueOf(value)
+		switch rv.Kind() {
+		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+			if n := rv.Int(); n >= 0 && n <= 255 {
+				return byte(n), true
+			}
+		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+			if n := rv.Uint(); n <= 255 {
+				return byte(n), true
+			}
+		case reflect.Float32, reflect.Float64:
+			if f := rv.Float(); f >= 0 && f <= 255 && f == float64(int(f)) {
+				return byte(int(f)), true
+			}
+		}
+		return 0, false
+	}
+}
+
+// setCompositeField assigns decoded JSON values (maps, slices, structs) to map,
+// slice, struct or compatible fields by re-marshaling through encoding/json.
+func setCompositeField(field reflect.Value, value interface{}) error {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("cannot encode value for %s: %v", field.Type(), err)
+	}
+	target := reflect.New(field.Type())
+	if err := json.Unmarshal(raw, target.Interface()); err != nil {
+		return fmt.Errorf("cannot decode value into %s: %v", field.Type(), err)
+	}
+	field.Set(target.Elem())
+	return nil
+}
+
+// setTimeField assigns date/time strings to time.Time fields.
+func setTimeField(field reflect.Value, value interface{}) error {
+	str, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("expected date/time string, got %T", value)
+	}
+	if str == "" {
+		field.Set(reflect.ValueOf(time.Time{}))
+		return nil
+	}
+	if parsed, err := time.Parse(time.RFC3339, str); err == nil {
+		field.Set(reflect.ValueOf(parsed))
+		return nil
+	}
+	if parsed, err := time.Parse("2006-01-02", str); err == nil {
+		field.Set(reflect.ValueOf(parsed))
+		return nil
+	}
+	return fmt.Errorf("invalid date/time value %q", str)
 }

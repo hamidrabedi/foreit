@@ -61,6 +61,12 @@ func (w *Writer) WriteAPI(definitions []*ModelDefinition, outputDir string) erro
 		return nil
 	}
 
+	// Generated REST APIs address rows by integer IDs; reject models with
+	// non-integer primary keys instead of emitting broken CRUD.
+	if err := ValidateAPIModels(definitions); err != nil {
+		return err
+	}
+
 	packageName := definitions[0].Package
 
 	t := template.New("api").Funcs(template.FuncMap{

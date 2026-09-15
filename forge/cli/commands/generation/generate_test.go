@@ -10,6 +10,99 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const testUUIDModelSource = `package testmodels
+
+import (
+	"github.com/forgego/forge/schema"
+)
+
+type Document struct {
+	schema.BaseSchema
+}
+
+func (Document) Fields() []schema.Field {
+	return []schema.Field{
+		schema.UUID("id").Primary().Build(),
+		schema.String("title").Required().MaxLength(255).Build(),
+	}
+}
+
+func (Document) Meta() schema.Meta {
+	return schema.Meta{
+		TableName: "test_documents",
+		VerboseName: "Document",
+	}
+}
+
+func (Document) Relations() []schema.Relation {
+	return []schema.Relation{}
+}
+
+func (Document) Hooks() *schema.ModelHooks {
+	return nil
+}
+`
+
+const testStringPKModelSource = `package testmodels
+
+import (
+	"github.com/forgego/forge/schema"
+)
+
+type Category struct {
+	schema.BaseSchema
+}
+
+func (Category) Fields() []schema.Field {
+	return []schema.Field{
+		schema.String("code").Primary().Build(),
+		schema.String("title").Build(),
+	}
+}
+
+func (Category) Meta() schema.Meta {
+	return schema.Meta{
+		TableName: "test_categories",
+		VerboseName: "Category",
+	}
+}
+
+func (Category) Relations() []schema.Relation {
+	return []schema.Relation{}
+}
+
+func (Category) Hooks() *schema.ModelHooks {
+	return nil
+}
+`
+
+func TestGenerateCommand_APIFlag_RejectsNonIntegerPrimaryKey(t *testing.T) {
+	tests := []struct {
+		name   string
+		source string
+	}{
+		{name: "uuid primary key", source: testUUIDModelSource},
+		{name: "string primary key", source: testStringPKModelSource},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			modelFile := filepath.Join(tmpDir, "models.go")
+			require.NoError(t, os.WriteFile(modelFile, []byte(tc.source), 0644))
+
+			cmd := NewGenerateCommand()
+			def := cmd.Definition()
+			require.NoError(t, def.ParseFlags([]string{"--models", tmpDir, "--output", tmpDir, "--api"}))
+
+			ctx := &core.Context{Cmd: def}
+			err := cmd.Execute(ctx, []string{})
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "non-integer primary key")
+			assert.NoFileExists(t, filepath.Join(tmpDir, "api_gen.go"))
+		})
+	}
+}
+
 const testModelSource = `package testmodels
 
 import (

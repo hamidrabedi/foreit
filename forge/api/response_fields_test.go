@@ -225,3 +225,28 @@ func TestBaseViewSet_ExcludeResponseFields_OmitsFieldsInListRetrieveCreateUpdate
 	assert.NotContains(t, m, "password")
 	assert.Equal(t, "alice2", m["username"])
 }
+
+type nonEditableTestModel struct {
+	schema.BaseSchema
+	ID        int64  `json:"id" db:"id"`
+	CreatedBy string `json:"created_by" db:"created_by_col"`
+	Title     string `json:"title" db:"title"`
+}
+
+func (nonEditableTestModel) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id"),
+		{Name: "created_by", DBColumn: "created_by_col", Type: schema.TypeString, Editable: false, Serialize: true},
+		schema.StringField("title"),
+	}
+}
+
+func TestNonEditableFields_ReturnsOnlyEditableFalseFields(t *testing.T) {
+	got := NonEditableFields(&nonEditableTestModel{})
+	require.Contains(t, got, "created_by")
+	require.Contains(t, got, "created_by_col")
+	assert.NotContains(t, got, "title")
+	assert.NotContains(t, got, "id")
+	assert.Nil(t, NonEditableFields(struct{}{}))
+	assert.Nil(t, NonEditableFields(nil))
+}

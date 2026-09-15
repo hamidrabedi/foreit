@@ -50,6 +50,8 @@ func TestViewForRequest_CopiesAllExportedFields(t *testing.T) {
 			setFunc(fv)
 		case "ExcludeResponseFields":
 			fv.Set(reflect.ValueOf([]string{"password"}))
+		case "ReadOnlyRequestFields":
+			fv.Set(reflect.ValueOf([]string{"created_at"}))
 		default:
 			t.Fatalf("unhandled exported field %s — update viewForRequest to copy it", field.Name)
 		}

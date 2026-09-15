@@ -106,6 +106,7 @@ func CleanupDB(t *testing.T, database *sql.DB) {
 		FROM pg_tables 
 		WHERE schemaname = 'public' 
 		AND tablename != 'schema_migrations'
+		AND tablename != 'forge_migration_checksums'
 	`)
 	if err != nil {
 		t.Fatalf("Failed to list tables: %v", err)

@@ -221,6 +221,11 @@ func (s *userService) ListUsers(ctx context.Context, filters *UserFilters) ([]*m
 
 // Register registers a new user (public endpoint)
 func (s *userService) Register(ctx context.Context, req *RegisterRequest) (*models.User, error) {
+	// Validate email before any database lookup
+	if err := validateEmail(req.Email); err != nil {
+		return nil, err
+	}
+
 	// Create user request
 	createReq := &CreateUserRequest{
 		Username: req.Username,
@@ -353,17 +358,12 @@ func validateCreateUserRequest(req *CreateUserRequest) error {
 		return ErrInvalidUsername
 	}
 
-	if req.Email == "" {
-		return ErrInvalidEmail
+	if err := validateEmail(req.Email); err != nil {
+		return err
 	}
 
 	if req.Password == "" {
 		return fmt.Errorf("password is required")
-	}
-
-	// Basic email validation (more thorough validation should be done in serializer)
-	if len(req.Email) > 254 {
-		return ErrInvalidEmail
 	}
 
 	// Basic username validation
@@ -372,4 +372,35 @@ func validateCreateUserRequest(req *CreateUserRequest) error {
 	}
 
 	return nil
+}
+
+// validateEmail validates an email address format and length
+func validateEmail(email string) error {
+	if !isValidEmail(email) {
+		return ErrInvalidEmail
+	}
+	return nil
+}
+
+// isValidEmail performs basic email validation
+func isValidEmail(email string) bool {
+	if len(email) < 3 || len(email) > 254 {
+		return false
+	}
+
+	atIndex := -1
+	dotIndex := -1
+
+	for i, char := range email {
+		if char == '@' {
+			if atIndex != -1 {
+				return false // Multiple @
+			}
+			atIndex = i
+		} else if char == '.' {
+			dotIndex = i
+		}
+	}
+
+	return atIndex > 0 && dotIndex > atIndex && dotIndex < len(email)-1
 }

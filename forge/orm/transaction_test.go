@@ -281,6 +281,10 @@ func TestGetDBTX_And_GetDialect_Resolution(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, tx.Tx, sqlTxDBTX)
 
+		rawDialect, err := GetDialect(tx.Tx)
+		require.NoError(t, err)
+		assert.Equal(t, NewSQLBuilder().Placeholder(1), rawDialect.Placeholder(1))
+
 		txDialect, err := GetDialect(tx)
 		assert.NoError(t, err)
 		assert.Equal(t, "sqlite", txDialect.Name())
@@ -299,6 +303,10 @@ func TestGetDBTX_And_GetDialect_Resolution(t *testing.T) {
 	_, err = GetDBTX(nilTx)
 	assert.Error(t, err)
 	_, err = GetDialect(nilTx)
+	assert.Error(t, err)
+
+	var nilSQLTx *sql.Tx
+	_, err = GetDialect(nilSQLTx)
 	assert.Error(t, err)
 
 	var nilSQLDB *sql.DB

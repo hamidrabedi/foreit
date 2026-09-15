@@ -265,10 +265,6 @@ func handleInString(query string, i int, b *strings.Builder) (int, bool) {
 		}
 		return i + 1, false
 	}
-	if ch == '\\' && i+1 < len(query) {
-		b.WriteByte(query[i+1])
-		return i + 2, true
-	}
 	return i + 1, true
 }
 

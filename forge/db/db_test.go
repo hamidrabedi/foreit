@@ -127,3 +127,12 @@ func TestDB_RebindPlaceholders_SkipsLiterals(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, expected)
 	}
 }
+
+func TestRebindPlaceholders_SQLiteBackslashBeforeQuote(t *testing.T) {
+	database := &DB{Driver: "sqlite3"}
+	query := `SELECT * FROM t WHERE note = 'C:\' AND title ILIKE $1`
+	want := `SELECT * FROM t WHERE note = 'C:\' AND title LIKE ?1`
+	if got := database.RebindPlaceholders(query); got != want {
+		t.Fatalf("RebindPlaceholders() = %q, want %q", got, want)
+	}
+}

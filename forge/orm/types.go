@@ -74,6 +74,9 @@ func GetSQLDB(conn interface{}) (*sql.DB, error) {
 
 // GetDialect extracts the SQL dialect from a database connection.
 // Returns the dialect for generating database-agnostic SQL queries.
+// A bare *sql.Tx exposes no driver metadata, so it uses PostgreSQL, matching
+// the SQL builder's default for a raw *sql.DB without dialect information.
+// Use *db.Tx to retain the parent database's dialect.
 func GetDialect(conn interface{}) (dialect.Dialect, error) {
 	switch v := conn.(type) {
 	case *db.DB:
@@ -86,6 +89,11 @@ func GetDialect(conn interface{}) (dialect.Dialect, error) {
 			return nil, fmt.Errorf("transaction has no parent database")
 		}
 		return v.DB().Dialect(), nil
+	case *sql.Tx:
+		if v == nil {
+			return nil, fmt.Errorf("transaction is nil")
+		}
+		return dialect.NewPostgreSQLDialect(), nil
 	case interface {
 		Dialect() (dialect.Dialect, error)
 	}:

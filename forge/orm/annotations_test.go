@@ -1,6 +1,7 @@
 package orm
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"testing"
@@ -13,10 +14,10 @@ import (
 )
 
 func TestAnnotation_QueryExprAndExpressionRendering(t *testing.T) {
-	fieldExpr := NewFieldExpr[float64]("CreatedAt", "")
+	fieldExpr := NewFieldExpr[float64]("price", "")
 	annFromField := NewAnnotation("high_price", fieldExpr.Greater(10.0))
 
-	field := NewField[float64]("CreatedAt", "")
+	field := NewField[float64]("price", "")
 	annFromExpr := NewExpressionAnnotation("high_price", field.Gt(10.0))
 
 	t.Run("PostgreSQL builder produces identical SELECT fragment", func(t *testing.T) {
@@ -34,8 +35,8 @@ func TestAnnotation_QueryExprAndExpressionRendering(t *testing.T) {
 		b2 := NewSQLBuilderWithDialect(dialect.NewPostgreSQLDialect())
 		select2 := base2.buildSelectClause(b2, false)
 
-		assert.Contains(t, select1, `CreatedAt > $1 AS "high_price"`)
-		assert.Contains(t, select2, `"CreatedAt" > $1 AS "high_price"`)
+		assert.Contains(t, select1, `price > $1 AS "high_price"`)
+		assert.Contains(t, select2, `"price" > $1 AS "high_price"`)
 		assert.Equal(t, []interface{}{10.0}, b1.Args())
 	})
 
@@ -54,8 +55,8 @@ func TestAnnotation_QueryExprAndExpressionRendering(t *testing.T) {
 		b2 := NewSQLBuilderWithDialect(dialect.NewSQLiteDialect())
 		select2 := base2.buildSelectClause(b2, false)
 
-		assert.Contains(t, select1, `CreatedAt > ? AS "high_price"`)
-		assert.Contains(t, select2, `"CreatedAt" > ? AS "high_price"`)
+		assert.Contains(t, select1, `price > ? AS "high_price"`)
+		assert.Contains(t, select2, `"price" > ? AS "high_price"`)
 		assert.Equal(t, []interface{}{10.0}, b1.Args())
 	})
 }
@@ -232,4 +233,19 @@ func TestAnnotation_ArgOrder_MatchesPlaceholderOrder(t *testing.T) {
 		assert.Equal(t, 3.0, args[0])
 		assert.Equal(t, 1.0, args[1])
 	})
+}
+
+func TestAnnotation_UnknownFieldSQLite(t *testing.T) {
+	database, err := db.NewDBWithDriver("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer database.Close()
+	_, err = database.Exec(`CREATE TABLE test_table (id INTEGER PRIMARY KEY); INSERT INTO test_table VALUES (1)`)
+	require.NoError(t, err)
+	qs, err := NewQuerySet[testModel]("test_table")
+	require.NoError(t, err)
+	qs = qs.SetDB(database).Annotate(NewExpressionAnnotation("bad", F("missing_field").Eq("missing_field")))
+	_, _, err = qs.(*BaseQuerySet[testModel]).buildSQL()
+	require.ErrorContains(t, err, "missing_field")
+	_, err = qs.All(context.Background())
+	require.ErrorContains(t, err, "missing_field")
 }

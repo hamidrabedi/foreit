@@ -186,6 +186,12 @@ func (qs *BaseQuerySet[T]) buildSelectClause(builder *SQLBuilder, hasPathJoins b
 			if expr == nil {
 				expr = newQueryExprAdapter(ann.Expr)
 			}
+			if err := expr.Resolve(qs.schema); err != nil {
+				if qs.err == nil {
+					qs.err = err
+				}
+				continue
+			}
 			annSQL, _, err := expr.ToSQL(builder)
 			if err != nil && qs.err == nil {
 				qs.err = err

@@ -2,10 +2,12 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -641,4 +643,98 @@ func (mr *MigrationRunner) Close() error {
 	}
 
 	return nil
+}
+
+// AdoptChecksumBaseline adopts existing applied migrations into the checksum baseline table.
+// Under the same lock helper used for applying, it creates the table if missing and inserts rows
+// for applied versions that have no row, using current file hashes. It never overwrites an existing row.
+// Returns the slice of adopted versions. If a migration file is missing, it returns an error naming the version.
+func (mr *MigrationRunner) AdoptChecksumBaseline(ctx context.Context) ([]uint, error) {
+	var adopted []uint
+	err := mr.withMigrationChecksums(ctx, func(executor checksumExecutor) error {
+		currentVersion, dirty, err := mr.migrate.Version()
+		if err != nil {
+			if errors.Is(err, migrate.ErrNilVersion) {
+				return nil
+			}
+			return fmt.Errorf("failed to get migration version: %w", err)
+		}
+		if dirty {
+			return fmt.Errorf("database is in a dirty state (version %d). Resolve before adopting baseline", currentVersion)
+		}
+		if currentVersion == 0 {
+			return nil
+		}
+
+		// Query existing versions in forge_migration_checksums
+		rows, err := executor.QueryContext(ctx, "SELECT version FROM forge_migration_checksums")
+		if err != nil {
+			return fmt.Errorf("failed to query existing checksums: %w", err)
+		}
+		defer rows.Close()
+
+		existing := make(map[uint]bool)
+		for rows.Next() {
+			var v uint
+			if err := rows.Scan(&v); err != nil {
+				return fmt.Errorf("failed to scan existing checksum version: %w", err)
+			}
+			existing[v] = true
+		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("error reading existing checksums: %w", err)
+		}
+
+		// Determine applied versions:
+		// every migration file version <= current schema_migrations version,
+		// plus current version itself even if its file is gone.
+		appliedSet := make(map[uint]bool)
+		appliedSet[currentVersion] = true
+
+		index, err := indexMigrationFiles(mr.migrationsPath)
+		if err != nil {
+			return err
+		}
+		for v := range index {
+			if v <= currentVersion {
+				appliedSet[v] = true
+			}
+		}
+
+		// Also check existing in forge_migration_checksums <= currentVersion
+		for v := range existing {
+			if v <= currentVersion {
+				appliedSet[v] = true
+			}
+		}
+
+		var sortedApplied []uint
+		for v := range appliedSet {
+			sortedApplied = append(sortedApplied, v)
+		}
+		sort.Slice(sortedApplied, func(i, j int) bool { return sortedApplied[i] < sortedApplied[j] })
+
+		for _, v := range sortedApplied {
+			upHash, downHash, err := index.checksums(v)
+			if err != nil {
+				return fmt.Errorf("cannot adopt baseline: migration file for version %d is missing: %w", v, err)
+			}
+
+			if existing[v] {
+				continue
+			}
+
+			_, err = executor.ExecContext(ctx,
+				`INSERT INTO forge_migration_checksums (version, up_sha256, down_sha256) VALUES ($1, $2, $3)`,
+				v, upHash, downHash,
+			)
+			if err != nil {
+				return fmt.Errorf("failed to insert checksum for version %d: %w", v, err)
+			}
+			adopted = append(adopted, v)
+		}
+
+		return nil
+	})
+	return adopted, err
 }

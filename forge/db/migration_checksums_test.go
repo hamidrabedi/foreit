@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/forgego/forge/db/migrate/execute"
 	"github.com/forgego/forge/internal/testutils"
 	"github.com/stretchr/testify/require"
 )
@@ -105,6 +106,14 @@ func testChecksumBaseline(t *testing.T, database *DB) {
 	}
 	require.NoError(t, runner.Up(ctx))
 	assertRows(3)
+	// Adoption must share the lock connection even when the pool has only two.
+	_, err = database.Exec("DELETE FROM forge_migration_checksums")
+	require.NoError(t, err)
+	adopted, err := runner.AdoptChecksumBaseline(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []uint{1, 2, 3}, adopted)
+	assertRows(3)
+
 	require.NoError(t, runner.Rollback(ctx))
 	assertRows(2)
 	require.NoError(t, runner.Up(ctx))
@@ -304,4 +313,25 @@ func TestChecksumBaseline_EmptyRollbackReconciles(t *testing.T) {
 	var count int
 	require.NoError(t, database.QueryRow("SELECT count(*) FROM forge_migration_checksums").Scan(&count))
 	require.Zero(t, count)
+}
+
+func TestChecksumBaseline_VerifyDifferentDownStem(t *testing.T) {
+	database, runner := checksumRegressionRunner(t)
+	ctx := context.Background()
+	recovery := execute.NewRecovery(database.DB)
+	report, err := recovery.VerifyAgainstBaseline(ctx, runner.migrationsPath)
+	require.NoError(t, err)
+	require.True(t, report.AllVerified())
+	_, err = database.Exec("DELETE FROM forge_migration_checksums")
+	require.NoError(t, err)
+	adopted, err := runner.AdoptChecksumBaseline(ctx)
+	require.NoError(t, err)
+	require.Equal(t, []uint{1, 2, 3}, adopted)
+	report, err = recovery.VerifyAgainstBaseline(ctx, runner.migrationsPath)
+	require.NoError(t, err)
+	require.True(t, report.AllVerified())
+	require.NoError(t, os.WriteFile(filepath.Join(runner.migrationsPath, "1_create_rollback.down.sql"), []byte("SELECT 3;"), 0600))
+	report, err = recovery.VerifyAgainstBaseline(ctx, runner.migrationsPath)
+	require.NoError(t, err)
+	require.Equal(t, execute.BaselineMismatched, report.Entries[0].Status)
 }

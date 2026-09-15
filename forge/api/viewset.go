@@ -64,11 +64,63 @@ type BaseViewSet struct {
 	Authentication []authentication.Authentication
 	// Permissions uses the current defaults when nil; a non-nil empty slice disables permission checks.
 	Permissions []permissions.Permission
+	// Throttles uses the current defaults when nil; a non-nil empty slice disables throttling.
 	Throttles   []throttling.Throttle
 	ErrorWriter func(http.ResponseWriter, *http.Request, error)
 
 	actionMu sync.RWMutex
 	action   string
+}
+
+type actionContextKeyType struct{}
+
+var actionContextKey = actionContextKeyType{}
+
+// ActionFromContext returns the action name stored in ctx, or an empty string if none is set.
+func ActionFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	if action, ok := ctx.Value(actionContextKey).(string); ok {
+		return action
+	}
+	return ""
+}
+
+// GetActionFromRequest returns the action name stored in r's context, or an empty string if none is set.
+func GetActionFromRequest(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	return ActionFromContext(r.Context())
+}
+
+func withAction(r *http.Request, action string) *http.Request {
+	if r == nil {
+		return nil
+	}
+	return r.WithContext(context.WithValue(r.Context(), actionContextKey, action))
+}
+
+type requestBoundViewSet struct {
+	*BaseViewSet
+	r *http.Request
+}
+
+// GetAction returns the action from the request context, falling back to BaseViewSet.GetAction()
+// if no action is stored in the request context.
+func (rb *requestBoundViewSet) GetAction() string {
+	if action := GetActionFromRequest(rb.r); action != "" {
+		return action
+	}
+	return rb.BaseViewSet.GetAction()
+}
+
+func (vs *BaseViewSet) viewForRequest(r *http.Request) *requestBoundViewSet {
+	return &requestBoundViewSet{
+		BaseViewSet: vs,
+		r:           r,
+	}
 }
 
 // NewBaseViewSet creates a new base viewset
@@ -96,14 +148,17 @@ func (vs *BaseViewSet) getManager() reflect.Value {
 	return reflect.Value{}
 }
 
-// GetAction returns the current action name for permission checks.
+// GetAction returns the action name. When called on BaseViewSet directly without
+// a request context, it returns the fallback action value. During HTTP request processing,
+// permission checks receive a request-scoped view where GetAction reads from the request context.
 func (vs *BaseViewSet) GetAction() string {
 	vs.actionMu.RLock()
 	defer vs.actionMu.RUnlock()
 	return vs.action
 }
 
-// SetAction sets the current action name for permission checks.
+// SetAction sets the fallback action name on BaseViewSet for backward compatibility.
+// During normal HTTP request processing, actions are carried in the request context.
 func (vs *BaseViewSet) SetAction(action string) {
 	vs.actionMu.Lock()
 	defer vs.actionMu.Unlock()
@@ -132,11 +187,12 @@ func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	if permissions.CheckPermissions(r, vs, perms) {
+	view := vs.viewForRequest(r)
+	if permissions.CheckPermissions(r, view, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasPermission(r, vs) {
+		if !permission.HasPermission(r, view) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -148,11 +204,12 @@ func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	if permissions.CheckObjectPermissions(r, vs, object, perms) {
+	view := vs.viewForRequest(r)
+	if permissions.CheckObjectPermissions(r, view, object, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasObjectPermission(r, vs, object) {
+		if !permission.HasObjectPermission(r, view, object) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -160,7 +217,12 @@ func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{
 }
 
 func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
-	err := throttling.CheckThrottles(r, vs, vs.Throttles)
+	throttles := vs.Throttles
+	if throttles == nil {
+		throttles = GetDefaultThrottles()
+	}
+	view := vs.viewForRequest(r)
+	err := throttling.CheckThrottles(r, view, throttles)
 	if err == nil {
 		return nil
 	}
@@ -172,7 +234,9 @@ func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
 }
 
 func (vs *BaseViewSet) checkRequest(w http.ResponseWriter, r *http.Request, action string) bool {
-	vs.SetAction(action)
+	if GetActionFromRequest(r) == "" {
+		r = withAction(r, action)
+	}
 	checks := []func(*http.Request) error{
 		vs.authenticateRequest,
 		vs.checkPermissions,
@@ -205,6 +269,7 @@ func (vs *BaseViewSet) allowObject(w http.ResponseWriter, r *http.Request, objec
 
 // List handles GET /resource/
 func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
+	r = withAction(r, "list")
 	if !vs.checkRequest(w, r, "list") {
 		return
 	}
@@ -316,6 +381,7 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 
 // Create handles POST /resource/
 func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
+	r = withAction(r, "create")
 	if !vs.checkRequest(w, r, "create") {
 		return
 	}
@@ -384,6 +450,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 
 // Retrieve handles GET /resource/{id}/
 func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
+	r = withAction(r, "retrieve")
 	if !vs.checkRequest(w, r, "retrieve") {
 		return
 	}
@@ -455,6 +522,7 @@ func (vs *BaseViewSet) Update(w http.ResponseWriter, r *http.Request) {
 }
 
 func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action string) {
+	r = withAction(r, action)
 	if !vs.checkRequest(w, r, action) {
 		return
 	}
@@ -527,8 +595,20 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 		return
 	}
 
-	// Populate from data
-	populateFromMap(instance, data)
+	// Capture primary key from existing instance before populating
+	origPK := getPrimaryKeyValue(instance)
+
+	// Collect primary-key fields and read-only fields to ignore from body
+	ignoredKeys := []string{"id", "ID", "Id"}
+	if ro, ok := serializer.(interface{ ReadOnlyFields() []string }); ok {
+		ignoredKeys = append(ignoredKeys, ro.ReadOnlyFields()...)
+	}
+
+	// Populate from data, ignoring primary-key fields
+	populateFromMap(instance, data, ignoredKeys...)
+
+	// Restore primary key from the object loaded via the URL after populating
+	restorePrimaryKey(instance, origPK, id)
 
 	// Update
 	updateMethod, ok := globalCache.GetMethod(managerType, "Update")
@@ -563,6 +643,7 @@ func (vs *BaseViewSet) PartialUpdate(w http.ResponseWriter, r *http.Request) {
 
 // Destroy handles DELETE /resource/{id}/
 func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
+	r = withAction(r, "destroy")
 	if !vs.checkRequest(w, r, "destroy") {
 		return
 	}
@@ -964,8 +1045,8 @@ func applyOrdering(qs reflect.Value, r *http.Request) reflect.Value {
 	return qs
 }
 
-// populateFromMap populates a model instance from a map
-func populateFromMap(instance interface{}, data map[string]interface{}) {
+// populateFromMap populates a model instance from a map, optionally ignoring specified keys
+func populateFromMap(instance interface{}, data map[string]interface{}, ignoredKeys ...string) {
 	instanceValue := reflect.ValueOf(instance)
 	if instanceValue.Kind() == reflect.Ptr {
 		instanceValue = instanceValue.Elem()
@@ -973,6 +1054,11 @@ func populateFromMap(instance interface{}, data map[string]interface{}) {
 
 	if instanceValue.Kind() != reflect.Struct {
 		return
+	}
+
+	ignored := make(map[string]bool, len(ignoredKeys))
+	for _, k := range ignoredKeys {
+		ignored[strings.ToLower(k)] = true
 	}
 
 	var applyToStruct func(target reflect.Value)
@@ -1009,6 +1095,9 @@ func populateFromMap(instance interface{}, data map[string]interface{}) {
 			if key == "" {
 				continue
 			}
+			if ignored[strings.ToLower(key)] || ignored[strings.ToLower(field.Name)] {
+				continue
+			}
 			if value, ok := data[key]; ok {
 				if fieldValue.CanSet() {
 					setFieldValue(fieldValue, value)
@@ -1018,6 +1107,120 @@ func populateFromMap(instance interface{}, data map[string]interface{}) {
 	}
 
 	applyToStruct(instanceValue)
+}
+
+// getPrimaryKeyValue extracts the primary key value from instance if present.
+func getPrimaryKeyValue(instance interface{}) interface{} {
+	if instance == nil {
+		return nil
+	}
+	if m, ok := instance.(interface{ GetID() int64 }); ok {
+		return m.GetID()
+	}
+	v := reflect.ValueOf(instance)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+	for _, name := range []string{"ID", "Id", "id"} {
+		f := v.FieldByName(name)
+		if f.IsValid() && f.CanInterface() {
+			return f.Interface()
+		}
+	}
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("json")
+		parts := strings.Split(tag, ",")
+		if len(parts) > 0 && strings.EqualFold(parts[0], "id") {
+			f := v.Field(i)
+			if f.IsValid() && f.CanInterface() {
+				return f.Interface()
+			}
+		}
+	}
+	return nil
+}
+
+// restorePrimaryKey restores the primary key value on instance from the original value or urlID.
+func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64) {
+	if instance == nil {
+		return
+	}
+	if m, ok := instance.(interface{ SetID(int64) }); ok {
+		if origInt, ok := origPK.(int64); ok && origInt != 0 {
+			m.SetID(origInt)
+		} else {
+			m.SetID(urlID)
+		}
+		return
+	}
+	v := reflect.ValueOf(instance)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	setField := func(f reflect.Value) bool {
+		if !f.CanSet() {
+			return false
+		}
+		if origPK != nil {
+			origVal := reflect.ValueOf(origPK)
+			if origVal.IsValid() && origVal.Type().AssignableTo(f.Type()) {
+				f.Set(origVal)
+				return true
+			}
+		}
+		if isIntKind(f.Kind()) {
+			if f.Kind() >= reflect.Uint && f.Kind() <= reflect.Uint64 {
+				f.SetUint(uint64(urlID))
+			} else {
+				f.SetInt(urlID)
+			}
+			return true
+		}
+		return false
+	}
+
+	for _, name := range []string{"ID", "Id", "id"} {
+		f := v.FieldByName(name)
+		if f.IsValid() {
+			if setField(f) {
+				return
+			}
+		}
+	}
+
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		tag := field.Tag.Get("json")
+		parts := strings.Split(tag, ",")
+		if len(parts) > 0 && strings.EqualFold(parts[0], "id") {
+			f := v.Field(i)
+			if f.IsValid() {
+				if setField(f) {
+					return
+				}
+			}
+		}
+	}
+}
+
+func isIntKind(k reflect.Kind) bool {
+	return (k >= reflect.Int && k <= reflect.Int64) || (k >= reflect.Uint && k <= reflect.Uint64)
 }
 
 // setFieldValue sets a field value from interface{}

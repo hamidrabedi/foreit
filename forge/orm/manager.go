@@ -141,10 +141,14 @@ func (m *Manager[T]) GetFieldAccessor() (*FieldAccessor[T], error) {
 func (m *Manager[T]) QuerySet() QuerySet[T] {
 	qs, err := NewQuerySet[T](m.tableName)
 	if err != nil {
-		return &BaseQuerySet[T]{table: m.tableName, db: m.db, err: err}
+		var raw any
+		if m.hasDB() {
+			raw = m.db.raw()
+		}
+		return &BaseQuerySet[T]{table: m.tableName, db: raw, err: err}
 	}
-	if m.db != nil {
-		qs = qs.SetDB(m.db)
+	if m.hasDB() {
+		qs = qs.SetDB(m.db.raw())
 	}
 	return qs
 }

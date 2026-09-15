@@ -101,7 +101,7 @@ func TestGenerateCommand_APIFlag(t *testing.T) {
 			genBytes, err := os.ReadFile(genFile)
 			require.NoError(t, err)
 			assert.Contains(t, string(genBytes), "type ProductGenerated struct")
-			assert.Contains(t, string(genBytes), "var ProductObjects, _ = orm.NewManager[Product]")
+			assert.Contains(t, string(genBytes), "var ProductObjects = orm.MustNewManager[Product]")
 			genGoOutputs = append(genGoOutputs, genBytes)
 
 			// api_gen.go check

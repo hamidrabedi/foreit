@@ -61,6 +61,8 @@ type BaseViewSet struct {
 	Serializer func() Serializer
 	Queryset   interface{} // This would be a QuerySet in real implementation
 	Model      interface{}
+	// ExcludeResponseFields holds response keys removed from serialized output; nil keeps every field.
+	ExcludeResponseFields []string
 	// Authentication uses the current defaults when nil; a non-nil empty slice disables authentication.
 	Authentication []authentication.Authentication
 	// Permissions uses the current defaults when nil; a non-nil empty slice disables permission checks.
@@ -128,8 +130,9 @@ func (vs *BaseViewSet) getManager() reflect.Value {
 	return reflect.Value{}
 }
 
-// GetAction returns the most recently dispatched action (shared across concurrent requests).
-// Request-aware code should prefer GetActionFromRequest(r).
+// GetAction returns the dispatched action. Inside permission and throttle checks
+// the view is request-scoped, so it returns that request's action; on the shared
+// viewset it returns the most recently dispatched action.
 func (vs *BaseViewSet) GetAction() string {
 	vs.actionMu.RLock()
 	defer vs.actionMu.RUnlock()
@@ -161,16 +164,37 @@ func (vs *BaseViewSet) authenticateRequest(r *http.Request) error {
 	return nil
 }
 
+// viewForRequest returns a request-scoped view carrying the request's action.
+// When the request carries no action it returns vs unchanged.
+func (vs *BaseViewSet) viewForRequest(r *http.Request) *BaseViewSet {
+	action := GetActionFromRequest(r)
+	if action == "" {
+		return vs
+	}
+	return &BaseViewSet{
+		Serializer:            vs.Serializer,
+		Queryset:              vs.Queryset,
+		Model:                 vs.Model,
+		ExcludeResponseFields: vs.ExcludeResponseFields,
+		Authentication:        vs.Authentication,
+		Permissions:           vs.Permissions,
+		Throttles:             vs.Throttles,
+		ErrorWriter:           vs.ErrorWriter,
+		action:                action,
+	}
+}
+
 func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
 	perms := vs.Permissions
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	if permissions.CheckPermissions(r, vs, perms) {
+	reqView := vs.viewForRequest(r)
+	if permissions.CheckPermissions(r, reqView, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasPermission(r, vs) {
+		if !permission.HasPermission(r, reqView) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -182,11 +206,12 @@ func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	if permissions.CheckObjectPermissions(r, vs, object, perms) {
+	reqView := vs.viewForRequest(r)
+	if permissions.CheckObjectPermissions(r, reqView, object, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasObjectPermission(r, vs, object) {
+		if !permission.HasObjectPermission(r, reqView, object) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -198,7 +223,7 @@ func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
 	if throttles == nil {
 		throttles = GetDefaultThrottles()
 	}
-	err := throttling.CheckThrottles(r, vs, throttles)
+	err := throttling.CheckThrottles(r, vs.viewForRequest(r), throttles)
 	if err == nil {
 		return nil
 	}
@@ -356,7 +381,7 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Serialize results
-	serialized := SerializeMany(resultList)
+	serialized := vs.stripExcludedFieldsMany(SerializeMany(resultList))
 
 	// Send paginated response
 	// nolint:errcheck // HTTP response errors can't be handled meaningfully
@@ -427,7 +452,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Serialize and return created instance
-	serialized := SerializeModel(instance)
+	serialized := vs.stripExcludedFields(SerializeModel(instance))
 	// nolint:errcheck // HTTP response errors can't be handled meaningfully
 	_ = forgehttp.SendJSON(w, http.StatusCreated, serialized)
 }
@@ -495,7 +520,7 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 	if !vs.allowObject(w, r, instance) {
 		return
 	}
-	serialized := SerializeModel(instance)
+	serialized := vs.stripExcludedFields(SerializeModel(instance))
 	// nolint:errcheck // HTTP response errors can't be handled meaningfully
 	_ = forgehttp.SendJSON(w, http.StatusOK, serialized)
 }
@@ -628,7 +653,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 		}
 	}
 
-	serialized := SerializeModel(instance)
+	serialized := vs.stripExcludedFields(SerializeModel(instance))
 	forgehttp.SendJSON(w, http.StatusOK, serialized)
 }
 

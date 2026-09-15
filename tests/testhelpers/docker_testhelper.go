@@ -29,6 +29,50 @@ type PostgresOpts struct {
 	Host      string // Database host (e.g., "127.0.0.1")
 	Port      string // Database port (e.g., "5432")
 	UseDirect bool   // If true, connect directly without creating container
+	RawQuery  string // URL query parameters from FORGE_TEST_DATABASE_URL (e.g. "sslmode=require&connect_timeout=5")
+}
+
+// DSN returns the PostgreSQL connection string for opts.
+// When FORGE_TEST_DATABASE_URL query parameters are present in opts.RawQuery, they are preserved.
+// Otherwise, it defaults to sslmode=disable.
+func (opts PostgresOpts) DSN() string {
+	host := opts.Host
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	port := opts.Port
+	if port == "" {
+		port = "5432"
+	}
+	user := opts.User
+	if user == "" {
+		user = "postgres"
+	}
+	password := opts.Password
+	if password == "" {
+		if envPass := os.Getenv("POSTGRES_PASSWORD"); envPass != "" {
+			password = envPass
+		} else {
+			password = "123"
+		}
+	}
+	dbName := opts.DBName
+	if dbName == "" {
+		dbName = "testdb"
+	}
+	dbName = strings.ToLower(dbName)
+	dbName = truncateDBName(dbName)
+
+	query := "sslmode=disable"
+	if opts.RawQuery != "" {
+		query = opts.RawQuery
+	}
+	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?%s", user, password, host, port, dbName, query)
+}
+
+// DeriveDSN returns the connection string derived from opts, preserving any query parameters.
+func DeriveDSN(opts PostgresOpts) string {
+	return opts.DSN()
 }
 
 // DefaultPostgresOpts returns sensible defaults
@@ -361,8 +405,7 @@ func startDirectPostgresConnection(ctx context.Context, opts PostgresOpts) (*sql
 	}
 
 	// Now connect to the test database
-	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
-		user, password, host, port, dbName)
+	dsn := opts.DSN()
 
 	db, err := sql.Open("postgres", dsn)
 	if err != nil {

@@ -56,6 +56,9 @@ func applyDatabaseURLToOpts(opts *PostgresOpts) {
 			opts.Password = pass
 		}
 	}
+	if u.RawQuery != "" {
+		opts.RawQuery = u.RawQuery
+	}
 }
 
 // LocalPostgresOpts returns PostgreSQL options for local database

@@ -213,3 +213,70 @@ func TestDetailedFailureReporting(t *testing.T) {
 		}
 	})
 }
+
+func TestOutputBufferingBounded(t *testing.T) {
+	t.Run("10,000 output lines for a passing test leave no retained buffer", func(t *testing.T) {
+		var sb strings.Builder
+		for i := 1; i <= 10000; i++ {
+			fmt.Fprintf(&sb, "{\"Action\":\"output\",\"Package\":\"p\",\"Test\":\"TestPass10k\",\"Output\":\"line %d\\n\"}\n", i)
+		}
+		sb.WriteString("{\"Action\":\"pass\",\"Package\":\"p\",\"Test\":\"TestPass10k\"}\n")
+		sb.WriteString("{\"Action\":\"pass\",\"Package\":\"p\"}\n")
+
+		col, err := collectEvents(strings.NewReader(sb.String()), options{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		id := testID{pkg: "p", test: "TestPass10k"}
+		if buf, exists := col.testOutputs[id]; exists && buf != nil {
+			t.Fatalf("expected passing test to leave no retained buffer, got %v", buf)
+		}
+	})
+
+	t.Run("10,000 output lines for a failing test keep only 60 lines plus omitted count", func(t *testing.T) {
+		var sb strings.Builder
+		for i := 1; i <= 10000; i++ {
+			fmt.Fprintf(&sb, "{\"Action\":\"output\",\"Package\":\"p\",\"Test\":\"TestFail10k\",\"Output\":\"line %d\\n\"}\n", i)
+		}
+		sb.WriteString("{\"Action\":\"fail\",\"Package\":\"p\",\"Test\":\"TestFail10k\"}\n")
+		sb.WriteString("{\"Action\":\"fail\",\"Package\":\"p\"}\n")
+
+		col, err := collectEvents(strings.NewReader(sb.String()), options{})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		id := testID{pkg: "p", test: "TestFail10k"}
+		buf, exists := col.testOutputs[id]
+		if !exists || buf == nil {
+			t.Fatalf("expected failing test to have retained buffer")
+		}
+		buf.finish()
+		if len(buf.lines) != 60 {
+			t.Fatalf("expected 60 lines, got %d", len(buf.lines))
+		}
+		if buf.omitted != 9940 {
+			t.Fatalf("expected 9940 omitted lines, got %d", buf.omitted)
+		}
+		if buf.lines[0] != "line 9941" || buf.lines[59] != "line 10000" {
+			t.Fatalf("unexpected line contents: first=%q, last=%q", buf.lines[0], buf.lines[59])
+		}
+
+		// Verify end-to-end report generation
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(sb.String()), &out, options{})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1", code, err)
+		}
+		s := out.String()
+		wantMsg := "... 9940 earlier lines omitted"
+		if !strings.Contains(s, wantMsg) {
+			t.Fatalf("expected %q in %q", wantMsg, s)
+		}
+		if strings.Contains(s, "\nline 1\n") || strings.Contains(s, "\nline 9940\n") {
+			t.Fatalf("omitted lines should not appear in report: %q", s)
+		}
+		if !strings.Contains(s, "\nline 9941\n") || !strings.Contains(s, "\nline 10000\n") {
+			t.Fatalf("retained lines should appear in report: %q", s)
+		}
+	})
+}

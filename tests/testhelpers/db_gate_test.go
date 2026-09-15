@@ -1,6 +1,7 @@
 package testhelpers
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -23,6 +24,45 @@ func TestDBGateContract(t *testing.T) {
 				t.Errorf("expected %q, got %q", defaultURL, got)
 			}
 		})
+	})
+
+	// Test derived DSN keeps query parameters from FORGE_TEST_DATABASE_URL
+	t.Run("derived DSN keeps query parameters", func(t *testing.T) {
+		const customURL = "postgres://u:p@remotehost:5432/customdb?sslmode=require&connect_timeout=5"
+		t.Setenv("FORGE_TEST_DATABASE_URL", customURL)
+
+		opts := LocalPostgresOpts("gate_test")
+		dsn := opts.DSN()
+
+		if !strings.Contains(dsn, "sslmode=require") {
+			t.Errorf("expected dsn to contain sslmode=require, got %q", dsn)
+		}
+		if !strings.Contains(dsn, "connect_timeout=5") {
+			t.Errorf("expected dsn to contain connect_timeout=5, got %q", dsn)
+		}
+		if !strings.Contains(dsn, "remotehost:5432") {
+			t.Errorf("expected dsn to contain remotehost:5432, got %q", dsn)
+		}
+		if strings.Contains(dsn, "/customdb?") {
+			t.Errorf("expected customdb to be swapped for test database name, got %q", dsn)
+		}
+		if !strings.Contains(dsn, "test_gate_test_") {
+			t.Errorf("expected test database name in dsn, got %q", dsn)
+		}
+	})
+
+	t.Run("derived DSN unchanged without env var", func(t *testing.T) {
+		t.Setenv("FORGE_TEST_DATABASE_URL", "")
+
+		opts := LocalPostgresOpts("gate_test_default")
+		dsn := opts.DSN()
+
+		if !strings.Contains(dsn, "sslmode=disable") {
+			t.Errorf("expected dsn to contain sslmode=disable, got %q", dsn)
+		}
+		if strings.Contains(dsn, "sslmode=require") {
+			t.Errorf("expected dsn not to contain sslmode=require, got %q", dsn)
+		}
 	})
 
 	// Test env parsing and pure decision functions
@@ -57,4 +97,30 @@ func TestDBGateContract(t *testing.T) {
 			}
 		})
 	})
+}
+
+func TestDatabaseURLDerivedDSN(t *testing.T) {
+	const customURL = "postgres://user:pass@dbhost:5432/origdb?sslmode=require&connect_timeout=5"
+	t.Setenv("FORGE_TEST_DATABASE_URL", customURL)
+
+	opts := LocalPostgresOpts("derived")
+	dsn := opts.DSN()
+
+	if !strings.Contains(dsn, "sslmode=require") {
+		t.Errorf("expected dsn to contain sslmode=require, got %q", dsn)
+	}
+	if !strings.Contains(dsn, "connect_timeout=5") {
+		t.Errorf("expected dsn to contain connect_timeout=5, got %q", dsn)
+	}
+	if strings.Contains(dsn, "/origdb?") {
+		t.Errorf("expected origdb to be replaced with test database name, got %q", dsn)
+	}
+	if !strings.Contains(dsn, "test_derived_") {
+		t.Errorf("expected test database name in dsn, got %q", dsn)
+	}
+
+	derived := DeriveDSN(opts)
+	if derived != dsn {
+		t.Errorf("expected DeriveDSN(opts) == opts.DSN(), got %q vs %q", derived, dsn)
+	}
 }

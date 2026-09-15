@@ -61,40 +61,43 @@ func (c *RecoverCommand) Execute(ctx *core.Context, args []string) error {
 	rec := execute.NewRecovery(database.DB)
 	cmdCtx := context.Background()
 
+	runVerify := func() error {
+		fmt.Fprintf(out, "Verifying migration file integrity against baseline in %s...\n", migrationsPath)
+		report, err := rec.VerifyAgainstBaseline(cmdCtx, migrationsPath)
+		if err != nil {
+			fmt.Fprintf(out, "Verification error: %v\n", err)
+			return fmt.Errorf("integrity check failed: %w", err)
+		}
+
+		for _, entry := range report.Entries {
+			if entry.Status != execute.BaselineStatusVerified {
+				if entry.Detail != "" {
+					fmt.Fprintf(out, "  %d  %s  %s\n", entry.Version, entry.Status, entry.Detail)
+				} else {
+					fmt.Fprintf(out, "  %d  %s\n", entry.Version, entry.Status)
+				}
+			}
+		}
+
+		counts := report.Counts()
+		fmt.Fprintf(out, "Summary: %d verified, %d mismatched, %d missing, %d unverified\n",
+			counts[execute.BaselineStatusVerified],
+			counts[execute.BaselineStatusMismatched],
+			counts[execute.BaselineStatusMissing],
+			counts[execute.BaselineStatusUnverified],
+		)
+
+		if !report.AllVerified() {
+			return fmt.Errorf("checksum baseline verification failed")
+		}
+		return nil
+	}
+
 	var verifyErr error
 
 	// 1. Verify against baseline if requested
 	if verifyFlag {
-		fmt.Fprintf(out, "Verifying migration file integrity against baseline in %s...\n", migrationsPath)
-		report, err := rec.VerifyAgainstBaseline(cmdCtx, migrationsPath)
-		if err != nil {
-			verifyErr = fmt.Errorf("integrity check failed: %w", err)
-			fmt.Fprintf(out, "Verification error: %v\n", err)
-		} else {
-
-			for _, entry := range report.Entries {
-				if entry.Status != execute.BaselineStatusVerified {
-					if entry.Detail != "" {
-						fmt.Fprintf(out, "  %d  %s  %s\n", entry.Version, entry.Status, entry.Detail)
-					} else {
-						fmt.Fprintf(out, "  %d  %s\n", entry.Version, entry.Status)
-					}
-				}
-			}
-
-			counts := report.Counts()
-			fmt.Fprintf(out, "Summary: %d verified, %d mismatched, %d missing, %d unverified\n",
-				counts[execute.BaselineStatusVerified],
-				counts[execute.BaselineStatusMismatched],
-				counts[execute.BaselineStatusMissing],
-				counts[execute.BaselineStatusUnverified],
-			)
-
-			if !report.AllVerified() {
-				verifyErr = fmt.Errorf("checksum baseline verification failed")
-			}
-		}
-
+		verifyErr = runVerify()
 	}
 
 	// 2. Check for dirty migration state
@@ -135,6 +138,10 @@ func (c *RecoverCommand) Execute(ctx *core.Context, args []string) error {
 			return fmt.Errorf("failed to mark migration as clean: %w", err)
 		}
 		fmt.Fprintf(out, "✓ Migration %d has been marked as clean.\n", targetVersion)
+		if verifyFlag {
+			// Re-run verification after cleaning; only the post-clean result matters.
+			verifyErr = runVerify()
+		}
 	} else {
 		fmt.Fprintln(out, "To mark this migration as clean after fixing the database manually, run:")
 		fmt.Fprintf(out, "   forge migrate recover --clean --version %d\n", dirtyMigration.Version)

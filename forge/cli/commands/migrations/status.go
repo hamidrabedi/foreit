@@ -68,24 +68,29 @@ func (c *StatusCommand) Execute(ctx *core.Context, args []string) error {
 	}
 	defer database.Close()
 
-	// Checksum baseline verification
+	// Checksum baseline verification. A verification error (e.g. dirty DB) is
+	// non-fatal here: the normal status is still printed below, then the
+	// verification error is printed and a non-nil error is returned.
 	rec := execute.NewRecovery(database.DB)
-	baselineReport, err := rec.VerifyAgainstBaseline(ctx.Cmd.Context(), migrationsPath)
-	if err != nil {
-		return fmt.Errorf("failed to verify checksum baseline: %w", err)
-	}
-
-	renderChecksumBaseline(out, baselineReport)
-
+	baselineReport, verifyCheckErr := rec.VerifyAgainstBaseline(ctx.Cmd.Context(), migrationsPath)
 	var baselineErr error
-	if !baselineReport.AllVerified() {
-		baselineErr = fmt.Errorf("checksum baseline verification failed")
+	if verifyCheckErr != nil {
+		baselineErr = fmt.Errorf("failed to verify checksum baseline: %w", verifyCheckErr)
+	} else {
+		renderChecksumBaseline(out, baselineReport)
+
+		if !baselineReport.AllVerified() {
+			baselineErr = fmt.Errorf("checksum baseline verification failed")
+		}
 	}
 
 	// Create migration runner
 	runner, err := db.NewMigrationRunner(database, migrationsPath)
 	if err != nil {
 		fmt.Fprintln(out, "[WARN] Could not create migration runner - showing file listing only")
+		if verifyCheckErr != nil {
+			fmt.Fprintf(out, "Verification error: %v\n", verifyCheckErr)
+		}
 		return baselineErr
 	}
 	defer runner.Close()
@@ -95,10 +100,16 @@ func (c *StatusCommand) Execute(ctx *core.Context, args []string) error {
 	status, err := runner.Status(cmdCtx)
 	if err != nil {
 		fmt.Fprintln(out, "[WARN] Could not get database status - showing file listing only")
+		if verifyCheckErr != nil {
+			fmt.Fprintf(out, "Verification error: %v\n", verifyCheckErr)
+		}
 		return baselineErr
 	}
 	if status == nil {
 		fmt.Fprintln(out, "[WARN] Database returned empty migration status - showing file listing only")
+		if verifyCheckErr != nil {
+			fmt.Fprintf(out, "Verification error: %v\n", verifyCheckErr)
+		}
 		return baselineErr
 	}
 
@@ -109,6 +120,10 @@ func (c *StatusCommand) Execute(ctx *core.Context, args []string) error {
 	}
 
 	renderMigrationStatus(out, status, detailedStatus)
+
+	if verifyCheckErr != nil {
+		fmt.Fprintf(out, "Verification error: %v\n", verifyCheckErr)
+	}
 
 	return baselineErr
 }

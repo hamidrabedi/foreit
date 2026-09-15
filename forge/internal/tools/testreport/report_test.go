@@ -280,3 +280,149 @@ func TestOutputBufferingBounded(t *testing.T) {
 		}
 	})
 }
+
+func TestBuildEvents(t *testing.T) {
+	t.Run("build-output and build-fail events record output and fail package", func(t *testing.T) {
+		input := `{"Action":"build-output","ImportPath":"pkg/buildfail","Output":"syntax error: unexpected token\n"}
+{"Action":"build-fail","ImportPath":"pkg/buildfail"}
+`
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if !strings.Contains(s, "=== PACKAGE FAIL pkg/buildfail") {
+			t.Errorf("expected '=== PACKAGE FAIL pkg/buildfail' in report, got: %s", s)
+		}
+		if !strings.Contains(s, "syntax error: unexpected token") {
+			t.Errorf("expected build output in report, got: %s", s)
+		}
+		if !strings.Contains(norm, "pkg/buildfail 0 0 0 1") {
+			t.Errorf("expected package failure count 1 in table, got: %s", s)
+		}
+	})
+
+	t.Run("build failure with subsequent package fail event deduplicates package failure count", func(t *testing.T) {
+		input := `{"Action":"build-output","ImportPath":"pkg/buildfail","Output":"syntax error: unexpected token\n"}
+{"Action":"build-fail","ImportPath":"pkg/buildfail"}
+{"Action":"output","Package":"pkg/buildfail","Output":"FAIL\tpkg/buildfail [setup failed]\n"}
+{"Action":"fail","Package":"pkg/buildfail"}
+`
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if !strings.Contains(s, "=== PACKAGE FAIL pkg/buildfail") {
+			t.Errorf("expected '=== PACKAGE FAIL pkg/buildfail' in report, got: %s", s)
+		}
+		if !strings.Contains(norm, "pkg/buildfail 0 0 0 1") {
+			t.Errorf("expected package failure count 1 in table, got: %s", s)
+		}
+	})
+}
+
+func TestPackageLevelSkip(t *testing.T) {
+	t.Run("unrequired package-level skip counts in table", func(t *testing.T) {
+		input := `{"Action":"output","Package":"pkg/notests","Output":"?   \tpkg/notests [no test files]\n"}
+{"Action":"skip","Package":"pkg/notests"}
+`
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{})
+		if code != 0 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 0, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if !strings.Contains(norm, "pkg/notests 0 0 1 0") {
+			t.Errorf("expected skipped package count 1 in table, got: %s", s)
+		}
+		if strings.Contains(s, "REQUIRED TEST SKIPPED") {
+			t.Errorf("did not expect required test skipped in report, got: %s", s)
+		}
+	})
+
+	t.Run("required package-level skip fails run", func(t *testing.T) {
+		input := `{"Action":"output","Package":"pkg/required","Output":"?   \tpkg/required [no test files]\n"}
+{"Action":"skip","Package":"pkg/required"}
+`
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{requireNoSkip: patterns{"^pkg/required$"}})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if !strings.Contains(norm, "pkg/required 0 0 1 0") {
+			t.Errorf("expected skipped package count 1 in table, got: %s", s)
+		}
+		if !strings.Contains(s, "REQUIRED TEST SKIPPED: pkg/required") {
+			t.Errorf("expected 'REQUIRED TEST SKIPPED: pkg/required' in report, got: %s", s)
+		}
+		if !strings.Contains(s, "=== REQUIRED SKIP pkg/required") {
+			t.Errorf("expected '=== REQUIRED SKIP pkg/required' section in report, got: %s", s)
+		}
+	})
+}
+
+func TestAllowSkip(t *testing.T) {
+	input := `{"Action":"output","Package":"github.com/forgego/forge/tests/pkg_migrations","Test":"TestMigrationApplySQLite","Output":"SQLite migration apply is unverified\n"}
+{"Action":"skip","Package":"github.com/forgego/forge/tests/pkg_migrations","Test":"TestMigrationApplySQLite"}
+`
+	t.Run("fails without allow-skip", func(t *testing.T) {
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{
+			requireNoSkip: patterns{"^github.com/forgego/forge/tests/(integration|pkg_migrations|e2e)"},
+		})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1", code, err)
+		}
+		if !strings.Contains(out.String(), "REQUIRED TEST SKIPPED:") {
+			t.Errorf("expected required test skipped, got: %s", out.String())
+		}
+	})
+
+	t.Run("passes with matching allow-skip", func(t *testing.T) {
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{
+			requireNoSkip: patterns{"^github.com/forgego/forge/tests/(integration|pkg_migrations|e2e)"},
+			allowSkip:     patterns{"tests/pkg_migrations$ ^TestMigrationApplySQLite$"},
+		})
+		if code != 0 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 0, err nil", code, err)
+		}
+		s := out.String()
+		norm := strings.Join(strings.Fields(s), " ")
+		if strings.Contains(s, "REQUIRED TEST SKIPPED") {
+			t.Errorf("did not expect required test skipped, got: %s", s)
+		}
+		if !strings.Contains(norm, "github.com/forgego/forge/tests/pkg_migrations 0 0 1 0") {
+			t.Errorf("expected 1 skip recorded in table, got: %s", s)
+		}
+	})
+
+	t.Run("fails if allow-skip pattern does not match test", func(t *testing.T) {
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{
+			requireNoSkip: patterns{"^github.com/forgego/forge/tests/(integration|pkg_migrations|e2e)"},
+			allowSkip:     patterns{"tests/pkg_migrations$ ^OtherTest$"},
+		})
+		if code != 1 || err != nil {
+			t.Fatalf("run = (%d, %v), want code 1", code, err)
+		}
+	})
+
+	t.Run("invalid allow-skip flag format gives exit code 2", func(t *testing.T) {
+		var out bytes.Buffer
+		code, err := run(strings.NewReader(input), &out, options{
+			allowSkip: patterns{"invalid-pattern-without-space"},
+		})
+		if code != 2 || err == nil {
+			t.Fatalf("run = (%d, %v), want code 2 and error", code, err)
+		}
+	})
+}

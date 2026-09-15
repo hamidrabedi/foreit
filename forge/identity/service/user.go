@@ -3,7 +3,10 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/mail"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/forgego/forge/identity/models"
 	"github.com/forgego/forge/identity/repository"
@@ -382,25 +385,43 @@ func validateEmail(email string) error {
 	return nil
 }
 
-// isValidEmail performs basic email validation
+// isValidEmail performs email validation using net/mail.ParseAddress
+// and strict domain/whitespace checks.
 func isValidEmail(email string) bool {
 	if len(email) < 3 || len(email) > 254 {
 		return false
 	}
 
-	atIndex := -1
-	dotIndex := -1
-
-	for i, char := range email {
-		if char == '@' {
-			if atIndex != -1 {
-				return false // Multiple @
-			}
-			atIndex = i
-		} else if char == '.' {
-			dotIndex = i
+	for _, r := range email {
+		if unicode.IsSpace(r) {
+			return false
 		}
 	}
 
-	return atIndex > 0 && dotIndex > atIndex && dotIndex < len(email)-1
+	addr, err := mail.ParseAddress(email)
+	if err != nil || addr.Address != email {
+		return false
+	}
+
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return false
+	}
+
+	localPart, domain := parts[0], parts[1]
+	if localPart == "" {
+		return false
+	}
+
+	labels := strings.Split(domain, ".")
+	if len(labels) < 2 {
+		return false
+	}
+	for _, label := range labels {
+		if label == "" {
+			return false
+		}
+	}
+
+	return true
 }

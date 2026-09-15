@@ -125,7 +125,7 @@ go tool cover -html=coverage.out
 
 ## Release test gate
 
-The release test gate validates that all database integration tests run and pass without being skipped. This gate is executed in CI by the `release-gate` job in `.github/workflows/test.yml`.
+The release test gate validates that all database integration tests run and pass without being skipped. This gate is executed in CI by the `release-gate` job in `.github/workflows/test.yml`. Package binaries must run serially (`-p 1`) because all packages share `FORGE_TEST_DATABASE_URL` and `CleanupDB` truncates tables.
 
 ### Environment Variables
 
@@ -141,14 +141,14 @@ To summarize test output and enforce that required packages have no skipped test
 cd forge && go build -o /tmp/testreport ./internal/tools/testreport
 
 # From the forge module:
-go test -json ./... | /tmp/testreport --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+go test -count=1 -p 1 -json ./... | /tmp/testreport --require-no-skip '^github.com/.*/(identity|internal/testutils)'
 
 # From the tests module:
 cd ../tests
-go test -json ./... | /tmp/testreport --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+go test -count=1 -p 1 -json ./... | /tmp/testreport --require-no-skip '^github.com/forgego/forge/tests/(integration|pkg_migrations|e2e)' --allow-skip 'tests/pkg_migrations$ ^TestMigrationApplySQLite$'
 ```
 
-The `--require-no-skip` flag takes a regular expression matching package paths whose tests must not be skipped. If any matching test is skipped, the reporter prints an error summary and exits with code 1.
+The `--require-no-skip` flag takes a regular expression matching package paths whose tests must not be skipped. If any matching test is skipped, the reporter prints an error summary and exits with code 1. The repeatable `--allow-skip '<package-regexp> <test-regexp>'` flag exempts documented skips.
 
 ## Prerequisites
 

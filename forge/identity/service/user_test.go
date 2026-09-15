@@ -639,6 +639,21 @@ func TestValidateEmail(t *testing.T) {
 			email:   "@b.com",
 			wantErr: true,
 		},
+		{
+			name:    "invalid domain starting with dot",
+			email:   "a@.b",
+			wantErr: true,
+		},
+		{
+			name:    "invalid whitespace in email",
+			email:   "a b@c.d",
+			wantErr: true,
+		},
+		{
+			name:    "invalid consecutive dots in domain",
+			email:   "a@b..c",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {

@@ -16,14 +16,16 @@ import (
 type options struct {
 	out           string
 	requireNoSkip patterns
+	allowSkip     patterns
 }
 
 type event struct {
-	Action  string
-	Package string
-	Test    string
-	Elapsed float64
-	Output  string
+	Action     string
+	Package    string
+	Test       string
+	Elapsed    float64
+	Output     string
+	ImportPath string
 }
 
 type counts struct{ passed, failed, skipped, packageFailed int }
@@ -94,21 +96,55 @@ type reportCollector struct {
 }
 
 func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
-	var required []*regexp.Regexp
-	for _, pattern := range opts.requireNoSkip {
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return &reportCollector{exitCode: 2}, fmt.Errorf("invalid --require-no-skip pattern: %w", err)
-		}
-		required = append(required, re)
-	}
-
 	col := &reportCollector{
 		packages:       make(map[string]*counts),
 		testOutputs:    make(map[testID]*outputBuffer),
 		packageOutputs: make(map[string]*outputBuffer),
 		failedSeen:     make(map[testID]bool),
 		skipSeen:       make(map[testID]bool),
+	}
+
+	var required []*regexp.Regexp
+	for _, pattern := range opts.requireNoSkip {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			col.exitCode = 2
+			return col, fmt.Errorf("invalid --require-no-skip pattern: %w", err)
+		}
+		required = append(required, re)
+	}
+
+	type allowRule struct {
+		pkgRe  *regexp.Regexp
+		testRe *regexp.Regexp
+	}
+	var allowed []allowRule
+	for _, pattern := range opts.allowSkip {
+		parts := strings.Fields(pattern)
+		if len(parts) != 2 {
+			col.exitCode = 2
+			return col, fmt.Errorf("invalid --allow-skip pattern %q: must be '<package-regexp> <test-regexp>'", pattern)
+		}
+		pkgRe, err := regexp.Compile(parts[0])
+		if err != nil {
+			col.exitCode = 2
+			return col, fmt.Errorf("invalid --allow-skip package pattern: %w", err)
+		}
+		testRe, err := regexp.Compile(parts[1])
+		if err != nil {
+			col.exitCode = 2
+			return col, fmt.Errorf("invalid --allow-skip test pattern: %w", err)
+		}
+		allowed = append(allowed, allowRule{pkgRe: pkgRe, testRe: testRe})
+	}
+
+	isAllowed := func(pkg, test string) bool {
+		for _, rule := range allowed {
+			if rule.pkgRe.MatchString(pkg) && rule.testRe.MatchString(test) {
+				return true
+			}
+		}
+		return false
 	}
 
 	reader := bufio.NewReader(r)
@@ -124,6 +160,9 @@ func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
 				col.exitCode = 2
 				return col, fmt.Errorf("line %d: %w", lineNo, err)
 			}
+			if e.Package == "" && e.ImportPath != "" {
+				e.Package = e.ImportPath
+			}
 			if e.Action == "" || e.Package == "" {
 				col.exitCode = 2
 				return col, fmt.Errorf("line %d: missing Action or Package", lineNo)
@@ -134,7 +173,7 @@ func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
 				col.packages[e.Package] = c
 			}
 
-			if e.Action == "output" {
+			if e.Action == "output" || e.Action == "build-output" {
 				if e.Test != "" {
 					id := testID{pkg: e.Package, test: e.Test}
 					b := col.testOutputs[id]
@@ -154,11 +193,34 @@ func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
 			}
 
 			if e.Test == "" {
-				if e.Action == "fail" {
-					c.packageFailed++
+				if e.Action == "fail" || e.Action == "build-fail" {
+					if c.packageFailed == 0 {
+						c.packageFailed = 1
+					}
 					col.exitCode = 1
 				} else if e.Action == "pass" {
 					delete(col.packageOutputs, e.Package)
+				} else if e.Action == "skip" {
+					c.skipped++
+					isRequired := false
+					for _, re := range required {
+						if re.MatchString(e.Package) {
+							if !isAllowed(e.Package, "") {
+								isRequired = true
+								col.forbidden = append(col.forbidden, e.Package)
+								col.exitCode = 1
+								id := testID{pkg: e.Package, test: ""}
+								if !col.skipSeen[id] {
+									col.skipSeen[id] = true
+									col.requiredSkips = append(col.requiredSkips, id)
+								}
+							}
+							break
+						}
+					}
+					if !isRequired {
+						delete(col.packageOutputs, e.Package)
+					}
 				}
 			} else {
 				switch e.Action {
@@ -178,13 +240,15 @@ func collectEvents(r io.Reader, opts options) (*reportCollector, error) {
 					isRequired := false
 					for _, re := range required {
 						if re.MatchString(e.Package) {
-							isRequired = true
-							col.forbidden = append(col.forbidden, e.Package+" "+e.Test)
-							col.exitCode = 1
-							id := testID{pkg: e.Package, test: e.Test}
-							if !col.skipSeen[id] {
-								col.skipSeen[id] = true
-								col.requiredSkips = append(col.requiredSkips, id)
+							if !isAllowed(e.Package, e.Test) {
+								isRequired = true
+								col.forbidden = append(col.forbidden, e.Package+" "+e.Test)
+								col.exitCode = 1
+								id := testID{pkg: e.Package, test: e.Test}
+								if !col.skipSeen[id] {
+									col.skipSeen[id] = true
+									col.requiredSkips = append(col.requiredSkips, id)
+								}
 							}
 							break
 						}
@@ -282,13 +346,25 @@ func (col *reportCollector) render(w io.Writer, opts options) (int, error) {
 	for _, id := range col.requiredSkips {
 		var lines []string
 		var omitted int
-		if b := col.testOutputs[id]; b != nil {
-			b.finish()
-			lines = b.lines
-			omitted = b.omitted
+		if id.test != "" {
+			if b := col.testOutputs[id]; b != nil {
+				b.finish()
+				lines = b.lines
+				omitted = b.omitted
+			}
+		} else {
+			if b := col.packageOutputs[id.pkg]; b != nil {
+				b.finish()
+				lines = b.lines
+				omitted = b.omitted
+			}
+		}
+		header := fmt.Sprintf("=== REQUIRED SKIP %s %s", id.pkg, id.test)
+		if id.test == "" {
+			header = fmt.Sprintf("=== REQUIRED SKIP %s", id.pkg)
 		}
 		sections = append(sections, section{
-			header:  fmt.Sprintf("=== REQUIRED SKIP %s %s", id.pkg, id.test),
+			header:  header,
 			lines:   lines,
 			omitted: omitted,
 		})

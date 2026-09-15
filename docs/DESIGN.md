@@ -660,5 +660,5 @@ This table records which configurations are verified for release.
 
 | Capability | Status | Evidence |
 | --- | --- | --- |
-| SQLite migration apply | unsupported (unverified) | skipped in tests/pkg_migrations |
+| SQLite migration apply | unverified | no automated apply test: the migration generator has no driver selection; tests/pkg_migrations skips it |
 

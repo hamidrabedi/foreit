@@ -1,6 +1,8 @@
 // Command testreport summarizes a go test -json stream from stdin.
 // --out writes a copy of the report; --require-no-skip is repeatable and
 // accepts a regular expression matching package paths whose tests must not skip.
+// --allow-skip is repeatable and accepts '<package-regexp> <test-regexp>'
+// to exempt documented skips.
 package main
 
 import (
@@ -20,6 +22,7 @@ func main() {
 	flags.SetOutput(os.Stderr)
 	flags.StringVar(&opts.out, "out", "", "write the report to a file")
 	flags.Var(&opts.requireNoSkip, "require-no-skip", "package regexp that forbids skipped tests (repeatable)")
+	flags.Var(&opts.allowSkip, "allow-skip", "package and test regexp pair '<package-regexp> <test-regexp>' that permits skipped tests (repeatable)")
 	if err := flags.Parse(os.Args[1:]); err != nil {
 		os.Exit(2)
 	}

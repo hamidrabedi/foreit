@@ -333,14 +333,16 @@ jobs:
         working-directory: forge
         run: |
           set -o pipefail
-          go test -json ./... | "$RUNNER_TEMP/testreport" --out "$RUNNER_TEMP/forge-report.txt" --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+          # Run package binaries serially (-p 1) because all packages share FORGE_TEST_DATABASE_URL and CleanupDB truncates tables.
+          go test -count=1 -p 1 -json ./... | "$RUNNER_TEMP/testreport" --out "$RUNNER_TEMP/forge-report.txt" --require-no-skip '^github.com/.*/(identity|internal/testutils)'
 
       - name: Collect integration release evidence
         if: ${{ !cancelled() && steps.reporter.outcome == 'success' }}
         working-directory: tests
         run: |
           set -o pipefail
-          go test -json ./... | "$RUNNER_TEMP/testreport" --out "$RUNNER_TEMP/tests-report.txt" --require-no-skip '^github.com/.*/(identity|internal/testutils)'
+          # Run package binaries serially (-p 1) because all packages share FORGE_TEST_DATABASE_URL and CleanupDB truncates tables.
+          go test -count=1 -p 1 -json ./... | "$RUNNER_TEMP/testreport" --out "$RUNNER_TEMP/tests-report.txt" --require-no-skip '^github.com/forgego/forge/tests/(integration|pkg_migrations|e2e)' --allow-skip 'tests/pkg_migrations$ ^TestMigrationApplySQLite$'
 
       - name: Upload release evidence
         if: always()

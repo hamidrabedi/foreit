@@ -17,6 +17,7 @@ import (
 	"github.com/forgego/forge/api/permissions"
 	"github.com/forgego/forge/api/throttling"
 	"github.com/forgego/forge/orm"
+	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
 )
 
@@ -102,27 +103,6 @@ func withAction(r *http.Request, action string) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), actionContextKey, action))
 }
 
-type requestBoundViewSet struct {
-	*BaseViewSet
-	r *http.Request
-}
-
-// GetAction returns the action from the request context, falling back to BaseViewSet.GetAction()
-// if no action is stored in the request context.
-func (rb *requestBoundViewSet) GetAction() string {
-	if action := GetActionFromRequest(rb.r); action != "" {
-		return action
-	}
-	return rb.BaseViewSet.GetAction()
-}
-
-func (vs *BaseViewSet) viewForRequest(r *http.Request) *requestBoundViewSet {
-	return &requestBoundViewSet{
-		BaseViewSet: vs,
-		r:           r,
-	}
-}
-
 // NewBaseViewSet creates a new base viewset
 func NewBaseViewSet(serializer func() Serializer, queryset, model interface{}) *BaseViewSet {
 	return &BaseViewSet{
@@ -148,9 +128,8 @@ func (vs *BaseViewSet) getManager() reflect.Value {
 	return reflect.Value{}
 }
 
-// GetAction returns the action name. When called on BaseViewSet directly without
-// a request context, it returns the fallback action value. During HTTP request processing,
-// permission checks receive a request-scoped view where GetAction reads from the request context.
+// GetAction returns the most recently dispatched action (shared across concurrent requests).
+// Request-aware code should prefer GetActionFromRequest(r).
 func (vs *BaseViewSet) GetAction() string {
 	vs.actionMu.RLock()
 	defer vs.actionMu.RUnlock()
@@ -187,12 +166,11 @@ func (vs *BaseViewSet) checkPermissions(r *http.Request) error {
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	view := vs.viewForRequest(r)
-	if permissions.CheckPermissions(r, view, perms) {
+	if permissions.CheckPermissions(r, vs, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasPermission(r, view) {
+		if !permission.HasPermission(r, vs) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -204,12 +182,11 @@ func (vs *BaseViewSet) checkObjectPermissions(r *http.Request, object interface{
 	if perms == nil {
 		perms = GetDefaultPermissions()
 	}
-	view := vs.viewForRequest(r)
-	if permissions.CheckObjectPermissions(r, view, object, perms) {
+	if permissions.CheckObjectPermissions(r, vs, object, perms) {
 		return nil
 	}
 	for _, permission := range perms {
-		if !permission.HasObjectPermission(r, view, object) {
+		if !permission.HasObjectPermission(r, vs, object) {
 			return exceptions.NewPermissionDenied(permission.GetMessage())
 		}
 	}
@@ -221,8 +198,7 @@ func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
 	if throttles == nil {
 		throttles = GetDefaultThrottles()
 	}
-	view := vs.viewForRequest(r)
-	err := throttling.CheckThrottles(r, view, throttles)
+	err := throttling.CheckThrottles(r, vs, throttles)
 	if err == nil {
 		return nil
 	}
@@ -234,6 +210,7 @@ func (vs *BaseViewSet) checkThrottles(r *http.Request) error {
 }
 
 func (vs *BaseViewSet) checkRequest(w http.ResponseWriter, r *http.Request, action string) bool {
+	vs.SetAction(action)
 	if GetActionFromRequest(r) == "" {
 		r = withAction(r, action)
 	}
@@ -275,16 +252,23 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	// Get pagination parameters
-	page, pageSize, _ := ParsePaginationParams(r, 20)
+	// Get pagination parameters, defaulting to the configured page size.
+	defaultPageSize := 20
+	if s := GetSettings(); s != nil && s.PageSize > 0 {
+		defaultPageSize = s.PageSize
+	}
+	page, pageSize, _ := ParsePaginationParams(r, defaultPageSize)
 
-	// Get queryset using reflection
+	// Get queryset using reflection. A bare manager that cannot paginate is
+	// converted to a queryset via its QuerySet constructor when available, so
+	// Offset/Limit are applied through the queryset instead of loading all rows.
 	querysetValue := reflect.ValueOf(vs.Queryset)
 	if !querysetValue.IsValid() {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusInternalServerError, "Queryset not set")
 		return
 	}
+	querysetValue = paginatableQueryset(querysetValue)
 
 	// Apply filtering from query params
 	qs := applyFilters(querysetValue, r)
@@ -595,11 +579,23 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 		return
 	}
 
+	// Get schema primary key field info
+	pkGoName, pkDBName, pkJSONName := vs.getSchemaPrimaryKeyField()
+
 	// Capture primary key from existing instance before populating
-	origPK := getPrimaryKeyValue(instance)
+	origPK := getPrimaryKeyValue(instance, pkGoName, pkDBName, pkJSONName)
 
 	// Collect primary-key fields and read-only fields to ignore from body
 	ignoredKeys := []string{"id", "ID", "Id"}
+	if pkJSONName != "" {
+		ignoredKeys = append(ignoredKeys, pkJSONName)
+	}
+	if pkGoName != "" {
+		ignoredKeys = append(ignoredKeys, pkGoName)
+	}
+	if pkDBName != "" && pkDBName != pkGoName && pkDBName != pkJSONName {
+		ignoredKeys = append(ignoredKeys, pkDBName)
+	}
 	if ro, ok := serializer.(interface{ ReadOnlyFields() []string }); ok {
 		ignoredKeys = append(ignoredKeys, ro.ReadOnlyFields()...)
 	}
@@ -608,7 +604,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 	populateFromMap(instance, data, ignoredKeys...)
 
 	// Restore primary key from the object loaded via the URL after populating
-	restorePrimaryKey(instance, origPK, id)
+	restorePrimaryKey(instance, origPK, id, pkGoName, pkDBName, pkJSONName)
 
 	// Update
 	updateMethod, ok := globalCache.GetMethod(managerType, "Update")
@@ -899,6 +895,58 @@ func (r *Router) RegisterRoutes(router *forgehttp.Router) {
 
 // Helper functions for viewset operations
 
+// paginatableQueryset returns a queryset capable of Offset/Limit. If qs already
+// supports Offset and Limit it is returned unchanged. Otherwise, when it exposes
+// a zero-argument QuerySet constructor (like orm managers and the generated
+// API managers), that constructor is invoked and its result is used, so
+// pagination is applied through the queryset instead of loading all rows.
+func paginatableQueryset(qs reflect.Value) reflect.Value {
+	if !qs.IsValid() {
+		return qs
+	}
+	qsType := qs.Type()
+	if _, ok := globalCache.GetMethod(qsType, "Offset"); !ok {
+		return maybeConvertToQueryset(qs)
+	}
+	if _, ok := globalCache.GetMethod(qsType, "Limit"); !ok {
+		return maybeConvertToQueryset(qs)
+	}
+	return qs
+}
+
+func maybeConvertToQueryset(qs reflect.Value) reflect.Value {
+	qsType := qs.Type()
+	qsMethod, ok := globalCache.GetMethod(qsType, "QuerySet")
+	if !ok {
+		return qs
+	}
+	if !qsMethod.Func.IsValid() || qsMethod.Func.Type().NumIn() != 1 {
+		return qs
+	}
+	results := qsMethod.Func.Call([]reflect.Value{qs})
+	if len(results) == 0 {
+		return qs
+	}
+	if len(results) >= 2 {
+		if errVal := results[1]; errVal.IsValid() && errVal.CanInterface() {
+			if err, ok := errVal.Interface().(error); ok && err != nil {
+				return qs
+			}
+		}
+	}
+	first := results[0]
+	if !first.IsValid() || (first.Kind() == reflect.Ptr && first.IsNil()) {
+		return qs
+	}
+	if !first.CanInterface() || first.Interface() == nil {
+		return qs
+	}
+	if first.Kind() == reflect.Interface && !first.IsNil() {
+		first = first.Elem()
+	}
+	return first
+}
+
 // applyFilters applies query parameter filters to queryset
 func applyFilters(qs reflect.Value, r *http.Request) reflect.Value {
 	// Get filter parameters from query string
@@ -1109,14 +1157,124 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 	applyToStruct(instanceValue)
 }
 
-// getPrimaryKeyValue extracts the primary key value from instance if present.
-func getPrimaryKeyValue(instance interface{}) interface{} {
-	if instance == nil {
-		return nil
+// getSchemaPrimaryKeyField returns the primary key field from the model's schema if available.
+// Returns the Go struct field name, db column name, and json tag name.
+// When no schema is available it returns empty strings and callers fall back
+// to the "id"/"ID"/"Id" variants.
+func (vs *BaseViewSet) getSchemaPrimaryKeyField() (goName, dbName, jsonName string) {
+	if vs.Model == nil {
+		return "", "", ""
 	}
-	if m, ok := instance.(interface{ GetID() int64 }); ok {
-		return m.GetID()
+	// Check if model implements schema.Schema
+	modelSchema, ok := vs.Model.(schema.Schema)
+	if !ok {
+		return "", "", ""
 	}
+	var pkName, pkDB string
+	for _, f := range modelSchema.Fields() {
+		if f.PrimaryKey {
+			pkName = f.Name
+			pkDB = f.DBColumn
+			break
+		}
+	}
+	if pkName == "" && pkDB == "" {
+		return "", "", ""
+	}
+	if pkDB == "" {
+		pkDB = pkName
+	}
+	goResolved, jsonResolved := resolveModelFieldNames(vs.Model, pkName, pkDB)
+	if goResolved == "" {
+		// No matching Go struct field found; still return db/json names so the
+		// body value for the primary key is ignored.
+		if jsonResolved == "" {
+			jsonResolved = pkName
+		}
+		return "", pkDB, jsonResolved
+	}
+	if jsonResolved == "" {
+		jsonResolved = pkName
+	}
+	return goResolved, pkDB, jsonResolved
+}
+
+// resolveModelFieldNames finds the Go struct field name and json tag name matching
+// any of the given schema/db names (case-insensitive on Go name, exact on tags).
+func resolveModelFieldNames(model interface{}, names ...string) (goName, jsonName string) {
+	v := reflect.ValueOf(model)
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			t := v.Type().Elem()
+			if t.Kind() == reflect.Struct {
+				return resolveFieldNamesInType(t, names...)
+			}
+			return "", ""
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return "", ""
+	}
+	return resolveFieldNamesInType(v.Type(), names...)
+}
+
+func resolveFieldNamesInType(t reflect.Type, names ...string) (goName, jsonName string) {
+	lowered := make(map[string]bool, len(names))
+	for _, n := range names {
+		if n != "" {
+			lowered[strings.ToLower(n)] = true
+		}
+	}
+	var search func(rt reflect.Type) (string, string, bool)
+	search = func(rt reflect.Type) (string, string, bool) {
+		for i := 0; i < rt.NumField(); i++ {
+			field := rt.Field(i)
+			if !field.IsExported() {
+				continue
+			}
+			if field.Anonymous {
+				ft := field.Type
+				if ft.Kind() == reflect.Ptr {
+					ft = ft.Elem()
+				}
+				if ft.Kind() == reflect.Struct {
+					if gn, jn, ok := search(ft); ok {
+						return gn, jn, true
+					}
+				}
+				continue
+			}
+			jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
+			dbTag := strings.Split(field.Tag.Get("db"), ",")[0]
+			matched := lowered[strings.ToLower(field.Name)]
+			for _, n := range names {
+				if n == "" {
+					continue
+				}
+				if jsonTag != "" && jsonTag != "-" && n == jsonTag {
+					matched = true
+				}
+				if dbTag != "" && n == dbTag {
+					matched = true
+				}
+			}
+			if matched {
+				return field.Name, jsonTag, true
+			}
+		}
+		return "", "", false
+	}
+	gn, jn, ok := search(t)
+	if !ok {
+		return "", ""
+	}
+	return gn, jn
+}
+
+// getPrimaryKeyValue reads the current primary key value from instance, preferring
+// the schema primary key field names and falling back to "ID"/"Id"/"id".
+func getPrimaryKeyValue(instance interface{}, pkGoName, pkDBName, pkJSONName string) interface{} {
 	v := reflect.ValueOf(instance)
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -1127,39 +1285,35 @@ func getPrimaryKeyValue(instance interface{}) interface{} {
 	if v.Kind() != reflect.Struct {
 		return nil
 	}
-	for _, name := range []string{"ID", "Id", "id"} {
-		f := v.FieldByName(name)
-		if f.IsValid() && f.CanInterface() {
-			return f.Interface()
-		}
+	if fv, ok := findPrimaryKeyField(v, []string{pkGoName, pkDBName, pkJSONName}); ok {
+		return fv.Interface()
 	}
-	t := v.Type()
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		tag := field.Tag.Get("json")
-		parts := strings.Split(tag, ",")
-		if len(parts) > 0 && strings.EqualFold(parts[0], "id") {
-			f := v.Field(i)
-			if f.IsValid() && f.CanInterface() {
-				return f.Interface()
-			}
+	if pkGoName == "" && pkDBName == "" && pkJSONName == "" {
+		if fv, ok := findPrimaryKeyField(v, []string{"ID", "Id", "id"}); ok {
+			return fv.Interface()
 		}
 	}
 	return nil
 }
 
 // restorePrimaryKey restores the primary key value on instance from the original value or urlID.
-func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64) {
+// Schema primary key field names take precedence; "ID"/"Id"/"id" are only used
+// as a fallback when no schema primary key is known. A body value for the
+// primary key never changes which row is written.
+func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64, pkGoName, pkDBName, pkJSONName string) {
 	if instance == nil {
 		return
 	}
-	if m, ok := instance.(interface{ SetID(int64) }); ok {
-		if origInt, ok := origPK.(int64); ok && origInt != 0 {
-			m.SetID(origInt)
-		} else {
-			m.SetID(urlID)
+	hasSchemaPK := pkGoName != "" || pkDBName != "" || pkJSONName != ""
+	if !hasSchemaPK {
+		if m, ok := instance.(interface{ SetID(int64) }); ok {
+			if origInt, ok := origPK.(int64); ok && origInt != 0 {
+				m.SetID(origInt)
+			} else {
+				m.SetID(urlID)
+			}
+			return
 		}
-		return
 	}
 	v := reflect.ValueOf(instance)
 	if v.Kind() == reflect.Ptr {
@@ -1194,6 +1348,15 @@ func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64) {
 		return false
 	}
 
+	// Prefer the schema primary key when known.
+	if pkGoName != "" || pkDBName != "" || pkJSONName != "" {
+		if f, ok := findPrimaryKeyField(v, []string{pkGoName, pkDBName, pkJSONName}); ok {
+			if setField(f) {
+				return
+			}
+		}
+	}
+
 	for _, name := range []string{"ID", "Id", "id"} {
 		f := v.FieldByName(name)
 		if f.IsValid() {
@@ -1217,6 +1380,73 @@ func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64) {
 			}
 		}
 	}
+}
+
+// findPrimaryKeyField locates the settable struct field matching any of the given
+// names (Go field name case-insensitively, or exact json/db tag match),
+// searching into embedded structs.
+func findPrimaryKeyField(v reflect.Value, names []string) (reflect.Value, bool) {
+	clean := make([]string, 0, len(names))
+	lowered := make(map[string]bool)
+	for _, n := range names {
+		if n == "" {
+			continue
+		}
+		clean = append(clean, n)
+		lowered[strings.ToLower(n)] = true
+	}
+	if len(clean) == 0 {
+		return reflect.Value{}, false
+	}
+	// Fast path: direct Go field name lookup.
+	for _, n := range clean {
+		if f := v.FieldByName(n); f.IsValid() {
+			return f, true
+		}
+	}
+	t := v.Type()
+	var search func(rv reflect.Value, rt reflect.Type) (reflect.Value, bool)
+	search = func(rv reflect.Value, rt reflect.Type) (reflect.Value, bool) {
+		for i := 0; i < rt.NumField(); i++ {
+			sf := rt.Field(i)
+			if !sf.IsExported() {
+				continue
+			}
+			fv := rv.Field(i)
+			if sf.Anonymous {
+				ft := sf.Type
+				fvv := fv
+				if ft.Kind() == reflect.Ptr {
+					if fvv.IsNil() {
+						continue
+					}
+					fvv = fvv.Elem()
+					ft = ft.Elem()
+				}
+				if ft.Kind() == reflect.Struct {
+					if res, ok := search(fvv, ft); ok {
+						return res, true
+					}
+				}
+				continue
+			}
+			jsonTag := strings.Split(sf.Tag.Get("json"), ",")[0]
+			dbTag := strings.Split(sf.Tag.Get("db"), ",")[0]
+			if lowered[strings.ToLower(sf.Name)] {
+				return fv, true
+			}
+			for _, n := range clean {
+				if jsonTag != "" && jsonTag != "-" && n == jsonTag {
+					return fv, true
+				}
+				if dbTag != "" && n == dbTag {
+					return fv, true
+				}
+			}
+		}
+		return reflect.Value{}, false
+	}
+	return search(v, t)
 }
 
 func isIntKind(k reflect.Kind) bool {

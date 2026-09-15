@@ -19,11 +19,11 @@ type listOnlyPermission struct{}
 func (p listOnlyPermission) HasPermission(r *http.Request, view permissions.ViewSet) bool {
 	// Widen the race window to expose concurrent action clobbering
 	time.Sleep(100 * time.Microsecond)
-	return view.GetAction() == "list"
+	return GetActionFromRequest(r) == "list"
 }
 
 func (p listOnlyPermission) HasObjectPermission(r *http.Request, view permissions.ViewSet, obj interface{}) bool {
-	return view.GetAction() == "list"
+	return GetActionFromRequest(r) == "list"
 }
 
 func (p listOnlyPermission) GetMessage() string { return "only list is permitted" }

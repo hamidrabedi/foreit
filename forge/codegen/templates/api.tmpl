@@ -34,7 +34,7 @@ func New{{.Name}}ViewSet() *{{.Name}}ViewSet {
 	return &{{.Name}}ViewSet{
 		BaseViewSet: api.NewBaseViewSet(
 			New{{.Name}}Serializer,
-			{{.Name}}Objects,
+			{{.Name}}Objects.QuerySet(),
 			&{{.Name}}{},
 		),
 	}

@@ -77,8 +77,8 @@ commit, and pass/fail/skip counts):
       (models/services, API/DB integration, purchase/return/support flows verified in `main_test.go`).
 - [x] Authenticated integration coverage + object-specific 403 paths
       where SQLite-backed (verified across Payment, Order, Warehouse, Coupon in `main_test.go`).
-- [x] `make seed` references `scripts/seed.go`:
-      recreated seed script in `examples/ecommerce/scripts/seed.go`.
+- [x] `make seed` runs a seed script again:
+      recreated in `examples/ecommerce/scripts/seed.go`.
 - [x] Production hardening: auto-generate ephemeral secrets and warn for
       placeholder keys in `ensureSecrets()`, cleared static secrets in `config.yaml`.
 - [x] `Mark Delivered` sets `delivered_at`; required-field

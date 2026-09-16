@@ -17,7 +17,7 @@ Scope: what stays public vs. what stays local. This file owns only the policy.
 
 - `.codex/`, `.claude/`, `CLAUDE.md`.
 - `docs/design/tasks/` (working tasks, drafts).
-- `docs/design/admin-ui-tasks.md`, `docs/design/backend-tasks.md`, `docs/design/backend-handoff.md` (scratch, session-local notes).
+- `docs/design/admin-ui-tasks.md`, `docs/design/backend-tasks.md`, `docs/design/backend-handoff.md` (scratch, session-local notes). <!-- doclinks:ignore -->
 - Local tooling: `.specify/` and installed speckit skills.
 - Do NOT blanket-ignore specs: keep them local until triaged, then
   promote, archive, or delete by explicit decision.
@@ -39,8 +39,8 @@ Scope: what stays public vs. what stays local. This file owns only the policy.
   and in other clones/forks.
 - Approved cleanup: coordinator untracks while preserving local files:
   `.codex/`, `.claude/`, `CLAUDE.md`, `docs/design/tasks/`,
-  `docs/design/admin-ui-tasks.md`, `docs/design/backend-tasks.md`,
-  `docs/design/backend-handoff.md`.
+  `docs/design/admin-ui-tasks.md`, `docs/design/backend-tasks.md`, <!-- doclinks:ignore -->
+  `docs/design/backend-handoff.md`. <!-- doclinks:ignore -->
 - `.specify/` and installed speckit skills are local and ignored.
 - Specs are NOT blanket-ignored: `specs/001-forge-v1-baseline`
   remains an untracked draft, not included in this PR.

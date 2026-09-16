@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	forgeerrors "github.com/forgego/forge/errors"
 	forgehttp "github.com/forgego/forge/server"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -101,7 +102,7 @@ func (m *priceTestManager) Get(ctx context.Context, id int64) (interface{}, erro
 	defer m.mu.Unlock()
 	item, ok := m.items[id]
 	if !ok {
-		return nil, errors.New("not found")
+		return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
 	}
 	cp := *item
 	return &cp, nil

@@ -63,7 +63,7 @@ func (m *persistenceTestManager) Get(ctx context.Context, id int64) (interface{}
 		cp := *item
 		return &cp, nil
 	}
-	return nil, errors.New("not found")
+	return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
 }
 
 func (m *persistenceTestManager) Update(ctx context.Context, model interface{}) error {
@@ -200,15 +200,54 @@ func TestBaseViewSet_InvalidInputError_Returns400(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "title")
 }
 
-func TestBaseViewSet_LookupError_Returns404WithoutDetail(t *testing.T) {
+func TestBaseViewSet_LookupOperationalError_Returns500WithoutDetail(t *testing.T) {
 	mgr := &persistenceTestManager{
 		items:  map[int64]*persistenceTestItem{},
 		getErr: errors.New("sql: connection refused at 10.0.0.5"),
 	}
 	handler := newPersistenceRouter(mgr)
-	req := httptest.NewRequest(http.MethodGet, "/api/items/1", nil)
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-	require.Equal(t, http.StatusNotFound, rec.Code)
-	assert.NotContains(t, rec.Body.String(), "10.0.0.5")
+	for _, method := range []string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			var body *bytes.Buffer
+			if method == http.MethodPut || method == http.MethodPatch {
+				body = bytes.NewBufferString(`{"title":"x"}`)
+			} else {
+				body = bytes.NewBuffer(nil)
+			}
+			req := httptest.NewRequest(method, "/api/items/1", body)
+			if body.Len() > 0 {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusInternalServerError, rec.Code)
+			assert.NotContains(t, rec.Body.String(), "10.0.0.5")
+		})
+	}
+}
+
+func TestBaseViewSet_LookupNotFound_Returns404(t *testing.T) {
+	mgr := &persistenceTestManager{
+		items:  map[int64]*persistenceTestItem{},
+		getErr: forgeerrors.NewNotFoundErrorWithMessage("items matching query does not exist"),
+	}
+	handler := newPersistenceRouter(mgr)
+	for _, method := range []string{http.MethodGet, http.MethodPatch, http.MethodDelete} {
+		t.Run(method, func(t *testing.T) {
+			var body *bytes.Buffer
+			if method == http.MethodPatch {
+				body = bytes.NewBufferString(`{"title":"x"}`)
+			} else {
+				body = bytes.NewBuffer(nil)
+			}
+			req := httptest.NewRequest(method, "/api/items/1", body)
+			if body.Len() > 0 {
+				req.Header.Set("Content-Type", "application/json")
+			}
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusNotFound, rec.Code)
+			assert.Contains(t, rec.Body.String(), "Not found")
+		})
+	}
 }

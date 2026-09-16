@@ -3,13 +3,13 @@ package api
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
 
+	forgeerrors "github.com/forgego/forge/errors"
 	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
 	"github.com/stretchr/testify/assert"
@@ -49,7 +49,7 @@ func (m *fakeUpdateManager) Get(ctx context.Context, id int64) (interface{}, err
 	defer m.mu.Unlock()
 	item, ok := m.items[id]
 	if !ok {
-		return nil, errors.New("not found")
+		return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
 	}
 	// Return a copy so in-memory pointer mutation doesn't alias map entry directly
 	copy := *item
@@ -146,7 +146,7 @@ func (m *fakeCodeUpdateManager) Get(ctx context.Context, id int64) (interface{},
 	key := fmt.Sprintf("row%d", id)
 	item, ok := m.items[key]
 	if !ok {
-		return nil, errors.New("not found")
+		return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
 	}
 	copy := *item
 	return &copy, nil

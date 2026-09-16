@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	forgeerrors "github.com/forgego/forge/errors"
 	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
 	"github.com/stretchr/testify/assert"
@@ -119,7 +120,7 @@ func (m *excludeResponseManager) Get(ctx context.Context, id int64) (interface{}
 			return &cp, nil
 		}
 	}
-	return nil, errors.New("not found")
+	return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
 }
 
 func (m *excludeResponseManager) Create(ctx context.Context, model interface{}) error {
@@ -150,7 +151,7 @@ func (m *excludeResponseManager) Update(ctx context.Context, model interface{}) 
 			return nil
 		}
 	}
-	return errors.New("not found")
+	return forgeerrors.NewNotFoundErrorWithMessage("not found")
 }
 
 func (m *excludeResponseManager) Delete(ctx context.Context, model interface{}) error {

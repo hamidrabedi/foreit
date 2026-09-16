@@ -76,31 +76,29 @@ func (Product) Hooks() *schema.ModelHooks {
 	assert.Contains(t, string(apiBytes), "RegisterAPIRoutes(router *forgehttp.Router)")
 }
 
-func TestValidateAPIModels_AllowsIntegerAndImplicitPrimaryKey(t *testing.T) {
-	intPK := &ModelDefinition{
-		Name: "Product",
-		Fields: []FieldDefinition{
-			{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true},
-			{Name: "name", Type: "String", GoType: "string"},
-		},
+func TestValidateAPIModels_AcceptsOnlyInt64IDPrimaryKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		model   *ModelDefinition
+		wantErr string
+	}{
+		{name: "int64 id", model: &ModelDefinition{Name: "Product", Fields: []FieldDefinition{{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}},
+		{name: "no primary key", model: &ModelDefinition{Name: "Log", Fields: []FieldDefinition{{Name: "message", Type: "String", GoType: "string"}}}, wantErr: "has no primary key"},
+		{name: "int32 id", model: &ModelDefinition{Name: "Counter", Fields: []FieldDefinition{{Name: "id", Type: "Int32", GoType: "int32", PrimaryKey: true}}}, wantErr: "require an int64 primary key"},
+		{name: "int64 non id", model: &ModelDefinition{Name: "Product", Fields: []FieldDefinition{{Name: "product_id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}, wantErr: "field \"product_id\""},
+		{name: "string id", model: &ModelDefinition{Name: "Category", Fields: []FieldDefinition{{Name: "id", Type: "String", GoType: "string", PrimaryKey: true}}}, wantErr: "non-integer primary key"},
+		{name: "two primary keys", model: &ModelDefinition{Name: "Pair", Fields: []FieldDefinition{{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true}, {Name: "other_id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}, wantErr: "more than one primary key"},
 	}
-	assert.NoError(t, ValidateAPIModels([]*ModelDefinition{intPK}))
 
-	noPK := &ModelDefinition{
-		Name: "Log",
-		Fields: []FieldDefinition{
-			{Name: "message", Type: "String", GoType: "string"},
-		},
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateAPIModels([]*ModelDefinition{tt.model})
+			if tt.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
 	}
-	assert.NoError(t, ValidateAPIModels([]*ModelDefinition{noPK}))
-
-	stringPK := &ModelDefinition{
-		Name: "Category",
-		Fields: []FieldDefinition{
-			{Name: "code", Type: "String", GoType: "string", PrimaryKey: true},
-		},
-	}
-	err := ValidateAPIModels([]*ModelDefinition{stringPK})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "non-integer primary key")
 }

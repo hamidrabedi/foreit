@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"net/http"
@@ -19,6 +21,7 @@ import (
 	"github.com/forgego/forge/api/exceptions"
 	"github.com/forgego/forge/api/permissions"
 	"github.com/forgego/forge/api/throttling"
+	forgeerrors "github.com/forgego/forge/errors"
 	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
@@ -526,7 +529,7 @@ func (vs *BaseViewSet) Retrieve(w http.ResponseWriter, r *http.Request) {
 
 	if !results[1].IsNil() {
 		if err, ok := results[1].Interface().(error); ok && err != nil {
-			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
+			vs.handleException(w, r, lookupException(err))
 			return
 		}
 	}
@@ -608,7 +611,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	if len(getResults) < 2 || !getResults[1].IsNil() {
 		if err, ok := getResults[1].Interface().(error); ok && err != nil {
-			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
+			vs.handleException(w, r, lookupException(err))
 			return
 		}
 	}
@@ -725,7 +728,7 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 
 	if len(getResults) < 2 || !getResults[1].IsNil() {
 		if err, ok := getResults[1].Interface().(error); ok && err != nil {
-			vs.handleException(w, r, exceptions.NewNotFound("Not found"))
+			vs.handleException(w, r, lookupException(err))
 			return
 		}
 	}
@@ -757,6 +760,17 @@ func (vs *BaseViewSet) Destroy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func lookupException(err error) error {
+	if forgeerrors.IsNotFound(err) || errors.Is(err, sql.ErrNoRows) {
+		return exceptions.NewNotFound("Not found")
+	}
+	var notFound *exceptions.NotFound
+	if errors.As(err, &notFound) {
+		return exceptions.NewNotFound("Not found")
+	}
+	return persistenceException(err)
 }
 
 // ViewSetHandler creates an HTTP handler from a viewset

@@ -81,54 +81,78 @@ func (g *Generator) generateCombined(definitions []*ModelDefinition) error {
 	return g.writer.WriteCombined(definitions, g.outputDir)
 }
 
-// integerAPIKeyGoTypes are the Go types accepted as generated REST API
-// primary keys. Detail routes address rows by integer IDs.
-var integerAPIKeyGoTypes = map[string]bool{
-	"int":   true,
-	"int8":  true,
-	"int16": true,
-	"int32": true,
-	"int64": true,
+// int64APIKeyFieldTypes are the schema field builder names codegen maps to
+// int64, used as a fallback when GoType is empty.
+var int64APIKeyFieldTypes = map[string]bool{
+	"BigInt":          true,
+	"ForeignKey":      true,
+	"ForeignKeyField": true,
+	"Int":             true,
+	"IntField":        true,
+	"Int64":           true,
+	"Int64Field":      true,
+	"ManyToMany":      true,
+	"ManyToManyField": true,
+	"OneToMany":       true,
+	"OneToManyField":  true,
+	"OneToOne":        true,
+	"OneToOneField":   true,
 }
 
-// integerAPIKeyFieldTypes are the schema field builder names that map to
-// integer Go types, used as a fallback when GoType is empty.
-var integerAPIKeyFieldTypes = map[string]bool{
-	"Int":        true,
-	"IntField":   true,
-	"Int64":      true,
-	"Int64Field": true,
-	"Int32":      true,
-	"Int32Field": true,
-}
-
-// ValidateAPIModels rejects models whose primary key field is not an integer
-// type, since generated REST APIs currently require an integer primary key
-// (detail routes parse {id} as an integer). Models without an explicit
-// primary key field are unaffected.
+// ValidateAPIModels rejects models whose primary key cannot be used by the
+// generated REST API manager, which requires an int64 field named id.
 func ValidateAPIModels(definitions []*ModelDefinition) error {
 	for _, def := range definitions {
 		if def == nil {
 			continue
 		}
+		var primaryKeys []FieldDefinition
 		for _, f := range def.Fields {
-			if !f.PrimaryKey {
-				continue
+			if f.PrimaryKey {
+				primaryKeys = append(primaryKeys, f)
 			}
-			if integerAPIKeyGoTypes[f.GoType] || integerAPIKeyFieldTypes[f.Type] {
-				continue
+		}
+		if len(primaryKeys) == 0 {
+			return fmt.Errorf("model %s has no primary key; generated REST APIs require an int64 primary key named \"id\"", def.Name)
+		}
+		if len(primaryKeys) > 1 {
+			return fmt.Errorf("model %s has more than one primary key field (%q and %q); generated REST APIs require exactly one int64 primary key named \"id\"", def.Name, primaryKeys[0].Name, primaryKeys[1].Name)
+		}
+
+		primaryKey := primaryKeys[0]
+		label := primaryKey.Type
+		if label == "" {
+			label = primaryKey.GoType
+		}
+		if label == "" {
+			label = "unknown"
+		}
+		isInt64 := primaryKey.GoType == "int64" || (primaryKey.GoType == "" && int64APIKeyFieldTypes[primaryKey.Type])
+		if !isInt64 {
+			if (primaryKey.GoType == "" && !isKnownIntegerAPIKeyType(primaryKey.Type)) ||
+				(primaryKey.GoType != "" && !isIntegerGoType(primaryKey.GoType)) {
+				return fmt.Errorf("model %s has non-integer primary key field %q (type %s): generated REST APIs require an int64 primary key named \"id\"", def.Name, primaryKey.Name, label)
 			}
-			label := f.Type
-			if label == "" {
-				label = f.GoType
-			}
-			if label == "" {
-				label = "unknown"
-			}
-			return fmt.Errorf("model %s has non-integer primary key field %q (type %s): generated REST APIs currently require an integer primary key (int64/int32/int)", def.Name, f.Name, label)
+			return fmt.Errorf("model %s has primary key field %q with type %s; generated REST APIs require an int64 primary key named \"id\"", def.Name, primaryKey.Name, label)
+		}
+		if primaryKey.Name != "id" {
+			return fmt.Errorf("model %s has primary key field %q; generated REST APIs require an int64 primary key named \"id\"", def.Name, primaryKey.Name)
 		}
 	}
 	return nil
+}
+
+func isKnownIntegerAPIKeyType(fieldType string) bool {
+	return fieldType == "Int32" || fieldType == "Int32Field" || int64APIKeyFieldTypes[fieldType]
+}
+
+func isIntegerGoType(goType string) bool {
+	switch goType {
+	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	default:
+		return false
+	}
 }
 
 // ModelDefinition represents a parsed model definition

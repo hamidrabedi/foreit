@@ -76,6 +76,28 @@ func (Category) Hooks() *schema.ModelHooks {
 }
 `
 
+const testNoPKModelSource = `package testmodels
+
+import "github.com/forgego/forge/schema"
+
+type Log struct { schema.BaseSchema }
+
+func (Log) Fields() []schema.Field {
+	return []schema.Field{schema.String("message").Build()}
+}
+`
+
+const testInt32PKModelSource = `package testmodels
+
+import "github.com/forgego/forge/schema"
+
+type Counter struct { schema.BaseSchema }
+
+func (Counter) Fields() []schema.Field {
+	return []schema.Field{schema.Int32("id").Primary().Build()}
+}
+`
+
 func TestGenerateCommand_APIFlag_RejectsNonIntegerPrimaryKey(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -83,6 +105,8 @@ func TestGenerateCommand_APIFlag_RejectsNonIntegerPrimaryKey(t *testing.T) {
 	}{
 		{name: "uuid primary key", source: testUUIDModelSource},
 		{name: "string primary key", source: testStringPKModelSource},
+		{name: "no primary key", source: testNoPKModelSource},
+		{name: "int32 primary key", source: testInt32PKModelSource},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -97,7 +121,13 @@ func TestGenerateCommand_APIFlag_RejectsNonIntegerPrimaryKey(t *testing.T) {
 			ctx := &core.Context{Cmd: def}
 			err := cmd.Execute(ctx, []string{})
 			require.Error(t, err)
-			assert.Contains(t, err.Error(), "non-integer primary key")
+			if tc.name == "no primary key" {
+				assert.Contains(t, err.Error(), "has no primary key")
+			} else if tc.name == "int32 primary key" {
+				assert.Contains(t, err.Error(), "require an int64 primary key")
+			} else {
+				assert.Contains(t, err.Error(), "non-integer primary key")
+			}
 			assert.NoFileExists(t, filepath.Join(tmpDir, "api_gen.go"))
 		})
 	}

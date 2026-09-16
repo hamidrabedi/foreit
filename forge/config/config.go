@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log"
+	"sort"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 // Config wraps viper for configuration management
 type Config struct {
 	*viper.Viper
+	generatedSecrets []string
 }
 
 // NewConfig creates a new configuration instance
@@ -92,12 +94,24 @@ func (c *Config) ensureSecrets() {
 			continue
 		}
 		c.Viper.Set(key, hex.EncodeToString(buf[:]))
+		c.generatedSecrets = append(c.generatedSecrets, key)
 		if isPlaceholderSecret(val) && val != "" {
-			log.Printf("forge/config: WARNING: %s is set to an insecure placeholder value %q; overriding with a generated ephemeral value (set it explicitly for production)", key, val)
+			log.Printf("forge/config: WARNING: %s is set to an insecure placeholder; overriding with a generated ephemeral value (set it explicitly for production)", key)
 		} else {
 			log.Printf("forge/config: WARNING: %s is not configured; using a generated ephemeral value (set it explicitly for production)", key)
 		}
 	}
+}
+
+// GeneratedSecrets returns the names of security settings whose values were
+// generated because they were missing or insecure placeholders.
+func (c *Config) GeneratedSecrets() []string {
+	if c == nil || len(c.generatedSecrets) == 0 {
+		return nil
+	}
+	keys := append([]string(nil), c.generatedSecrets...)
+	sort.Strings(keys)
+	return keys
 }
 
 // GetString gets a string value with a default

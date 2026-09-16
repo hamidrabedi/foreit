@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/forgego/forge/cli/core"
 	"github.com/spf13/cobra"
@@ -53,26 +54,38 @@ func (c *AuthCommand) Execute(ctx *core.Context, args []string) error {
 	userModel := `package auth
 
 import (
+	"time"
+
+	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 )
 
 // User represents a user model
 type User struct {
 	schema.BaseSchema
+	ID int64 ` + "`json:\"id\" db:\"id\"`" + `
+	Username string ` + "`json:\"username\" db:\"username\"`" + `
+	Email string ` + "`json:\"email\" db:\"email\"`" + `
+	Password string ` + "`json:\"password\" db:\"password\"`" + `
+	IsActive bool ` + "`json:\"is_active\" db:\"is_active\"`" + `
+	IsStaff bool ` + "`json:\"is_staff\" db:\"is_staff\"`" + `
+	IsSuperuser bool ` + "`json:\"is_superuser\" db:\"is_superuser\"`" + `
+	DateJoined time.Time ` + "`json:\"date_joined\" db:\"date_joined\"`" + `
+	LastLogin *time.Time ` + "`json:\"last_login\" db:\"last_login\"`" + `
 }
 
 // Fields returns all field definitions for User
 func (User) Fields() []schema.Field {
 	return []schema.Field{
-		schema.Int64("id").Primary().AutoIncrement().Build(),
-		schema.String("username").Unique().Required().MaxLength(150).Build(),
-		schema.String("email").Unique().Required().MaxLength(255).Build(),
-		schema.String("password").Required().MaxLength(128).Build(),
-		schema.Bool("is_active").Default(true).Build(),
-		schema.Bool("is_staff").Default(false).Build(),
-		schema.Bool("is_superuser").Default(false).Build(),
-		schema.Time("date_joined").AutoNowAdd().Build(),
-		schema.Time("last_login").Build(),
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("username", schema.Unique(), schema.Required(), schema.MaxLength(150)),
+		schema.StringField("email", schema.Unique(), schema.Required(), schema.MaxLength(255)),
+		schema.StringField("password", schema.Required(), schema.MaxLength(128)),
+		schema.BoolField("is_active", schema.Default(true)),
+		schema.BoolField("is_staff", schema.Default(false)),
+		schema.BoolField("is_superuser", schema.Default(false)),
+		schema.TimeField("date_joined", schema.AutoNowAdd()),
+		schema.TimeField("last_login"),
 	}
 }
 
@@ -94,6 +107,10 @@ func (User) Relations() []schema.Relation {
 func (User) Hooks() *schema.ModelHooks {
 	return nil
 }
+
+// UserObjects provides type-safe operations for User.
+// Uses generic orm.Manager[User] following the generated-code pattern.
+var UserObjects = orm.MustNewManager[User]("users")
 `
 
 	if err := os.WriteFile(filepath.Join(appPath, "models.go"), []byte(userModel), 0644); err != nil {
@@ -102,12 +119,6 @@ func (User) Hooks() *schema.ModelHooks {
 
 	// Create admin.go
 	adminCode := `package auth
-
-import (
-	admincore "github.com/forgego/forge/admin"
-	"github.com/forgego/forge/orm"
-	"github.com/forgego/forge/schema"
-)
 
 func init() {
 	// Register User model for admin
@@ -134,30 +145,65 @@ func init() {
 	apiCode := `package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"github.com/forgego/forge/api"
-	httplib "github.com/forgego/forge/server"
+	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/forgego/forge/api"
+	"github.com/forgego/forge/identity"
+	"github.com/forgego/forge/orm"
+	httplib "github.com/forgego/forge/server"
 )
 
 func init() {
 	// Auto-register auth API routes
 }
 
-// RegisterAuthAPI registers authentication API endpoints
-func RegisterAuthAPI(router *httplib.Router) {
+// AuthTokenLifetime is the default JWT lifetime.
+const AuthTokenLifetime = 24 * time.Hour
+
+// ErrInvalidSigningKey is returned when the JWT signing key is too short.
+var ErrInvalidSigningKey = errors.New("auth: signing key must be at least 32 bytes")
+
+var findUserByUsername = func(ctx context.Context, username string) (*User, error) {
+	qs, err := UserObjects.Filter(orm.F("username").Eq(username))
+	if err != nil {
+		return nil, err
+	}
+	return qs.First(ctx)
+}
+
+func authenticateUser(user *User, password string) bool {
+	if user == nil {
+		return false
+	}
+	if !user.IsActive {
+		return false
+	}
+	return identity.CheckPasswordHash(password, user.Password)
+}
+
+// RegisterAuthAPI registers authentication API endpoints.
+// The signing key must be at least 32 bytes; routes are not registered otherwise.
+// Callers should read the key from config security.secret_key.
+func RegisterAuthAPI(router *httplib.Router, signingKey []byte) error {
+	if len(signingKey) < 32 {
+		return ErrInvalidSigningKey
+	}
+	signingKey = append([]byte(nil), signingKey...)
 	// Create viewset for users
 	viewset := api.NewBaseViewSet(
 		func() api.Serializer {
 			return NewUserSerializer()
 		},
-		User.Objects.Filter(),
+		UserObjects,
 		&User{},
 	)
 
@@ -167,8 +213,9 @@ func RegisterAuthAPI(router *httplib.Router) {
 	apiRouter.RegisterRoutes(router)
 
 	// Register auth endpoints
-	router.Post("/api/v1/auth/login", handleLogin)
+	router.Post("/api/v1/auth/login", handleLogin(signingKey))
 	router.Post("/api/v1/auth/logout", handleLogout)
+	return nil
 }
 
 // UserSerializer serializes User model
@@ -179,8 +226,13 @@ type UserSerializer struct {
 // NewUserSerializer creates a new serializer
 func NewUserSerializer() api.Serializer {
 	return &UserSerializer{
-		BaseSerializer: api.NewBaseSerializer(),
+		BaseSerializer: api.NewBaseSerializer(nil),
 	}
+}
+
+// New creates a new serializer instance
+func (s *UserSerializer) New() api.Serializer {
+	return NewUserSerializer()
 }
 
 // Fields returns the fields to serialize
@@ -188,7 +240,8 @@ func (s *UserSerializer) Fields() []string {
 	return []string{"id", "username", "email", "is_active", "date_joined"}
 }
 
-func handleLogin(w http.ResponseWriter, req *http.Request) {
+func handleLogin(signingKey []byte) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -202,22 +255,32 @@ func handleLogin(w http.ResponseWriter, req *http.Request) {
 	}
 
 	username := strings.TrimSpace(payload["username"])
-	password := strings.TrimSpace(payload["password"])
+	password := payload["password"]
 	if username == "" || password == "" {
 		http.Error(w, "username and password are required", http.StatusBadRequest)
 		return
 	}
 
-	// In real projects, replace with real user lookup and password verification.
-	token := generateJWTToken("1", username)
+	user, err := findUserByUsername(req.Context(), username)
+	if err != nil || !authenticateUser(user, password) {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	token, err := generateJWTToken(strconv.FormatInt(user.ID, 10), user.Username, signingKey)
+	if err != nil {
+		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"token":      token,
 		"token_type": "Bearer",
 		"user": map[string]any{
-			"id":       1,
-			"username": username,
+			"id":       user.ID,
+			"username": user.Username,
 		},
 	})
+	}
 }
 
 func handleLogout(w http.ResponseWriter, req *http.Request) {
@@ -228,16 +291,28 @@ func handleLogout(w http.ResponseWriter, req *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func generateJWTToken(userID, username string) string {
-	headerJSON := "{\"alg\":\"HS256\",\"typ\":\"JWT\"}"
-	payloadJSON := fmt.Sprintf("{\"sub\":%q,\"username\":%q,\"iat\":%d}", userID, username, time.Now().Unix())
-	header := base64.RawURLEncoding.EncodeToString([]byte(headerJSON))
-	payload := base64.RawURLEncoding.EncodeToString([]byte(payloadJSON))
+func generateJWTToken(userID, username string, signingKey []byte) (string, error) {
+	if len(signingKey) < 32 {
+		return "", ErrInvalidSigningKey
+	}
+	now := time.Now()
+	headerJSON := []byte("{\"alg\":\"HS256\",\"typ\":\"JWT\"}")
+	payloadJSON, err := json.Marshal(map[string]any{
+		"sub":      userID,
+		"username": username,
+		"iat":      now.Unix(),
+		"exp":      now.Add(AuthTokenLifetime).Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
+	header := base64.RawURLEncoding.EncodeToString(headerJSON)
+	payload := base64.RawURLEncoding.EncodeToString(payloadJSON)
 	unsigned := header + "." + payload
-	mac := hmac.New(sha256.New, []byte("change-me-in-production"))
+	mac := hmac.New(sha256.New, signingKey)
 	_, _ = mac.Write([]byte(unsigned))
 	signature := base64.RawURLEncoding.EncodeToString(mac.Sum(nil))
-	return unsigned + "." + signature
+	return unsigned + "." + signature, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
@@ -250,6 +325,9 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	if err := os.WriteFile(filepath.Join(appPath, "api.go"), []byte(apiCode), 0644); err != nil {
 		return fmt.Errorf("failed to create api.go: %w", err)
 	}
+	if err := wireAuthAPI(projectRoot); err != nil {
+		return err
+	}
 
 	fmt.Printf("✓ Scaffolded auth app\n")
 	fmt.Printf("  Location: %s\n", appPath)
@@ -259,5 +337,59 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	fmt.Printf("  2. Run: forge makemigrations\n")
 	fmt.Printf("  3. Run: forge migrate\n")
 
+	return nil
+}
+
+func wireAuthAPI(projectRoot string) error {
+	mainPath := filepath.Join(projectRoot, "main.go")
+	mainBytes, err := os.ReadFile(mainPath)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("failed to read main.go: %w", err)
+	}
+	moduleBytes, err := os.ReadFile(filepath.Join(projectRoot, "go.mod"))
+	if err != nil {
+		return fmt.Errorf("failed to read go.mod: %w", err)
+	}
+	var modulePath string
+	for _, line := range strings.Split(string(moduleBytes), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "module" {
+			modulePath = fields[1]
+			break
+		}
+	}
+	if modulePath == "" {
+		return fmt.Errorf("failed to wire auth API: go.mod has no module directive")
+	}
+
+	content := string(mainBytes)
+	if strings.Contains(content, "auth.RegisterAuthAPI(") {
+		return nil
+	}
+	serverImport := `"github.com/forgego/forge/server"`
+	if !strings.Contains(content, serverImport) {
+		return fmt.Errorf("failed to wire auth API: server import not found in main.go")
+	}
+	content = strings.Replace(content, serverImport, fmt.Sprintf("%q\n\t%s", modulePath+"/app/auth", serverImport), 1)
+
+	adminRoutes := `		if settings.Admin.Enabled {
+			router.Mount(settings.Admin.Path, adminSite.Handler())
+		}`
+	authRoutes := adminRoutes + `
+
+		auth.UserObjects.SetDB(database)
+		if err := auth.RegisterAuthAPI(router, []byte(settings.Security.SecretKey)); err != nil {
+			stdlog.Fatal(err)
+		}`
+	if !strings.Contains(content, adminRoutes) {
+		return fmt.Errorf("failed to wire auth API: route registration block not found in main.go")
+	}
+	content = strings.Replace(content, adminRoutes, authRoutes, 1)
+	if err := os.WriteFile(mainPath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to update main.go: %w", err)
+	}
 	return nil
 }

@@ -1,6 +1,8 @@
 package project
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +12,14 @@ import (
 	"github.com/forgego/forge/cli/templates"
 	"github.com/spf13/cobra"
 )
+
+func generateHexSecret() (string, error) {
+	var buf [32]byte
+	if _, err := rand.Read(buf[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf[:]), nil
+}
 
 // NewCommand creates the "new" command for creating new projects
 type NewCommand struct{}
@@ -213,7 +223,20 @@ func createConfigFile(projectPath, databaseType string) error {
 		return fmt.Errorf("unsupported database type: %s", databaseType)
 	}
 
-	configContent := dbConfig + `
+	secretKey, err := generateHexSecret()
+	if err != nil {
+		return fmt.Errorf("failed to generate security.secret_key: %w", err)
+	}
+	sessionSecret, err := generateHexSecret()
+	if err != nil {
+		return fmt.Errorf("failed to generate security.session_secret: %w", err)
+	}
+	csrfSecret, err := generateHexSecret()
+	if err != nil {
+		return fmt.Errorf("failed to generate security.csrf_secret_key: %w", err)
+	}
+
+	configContent := dbConfig + fmt.Sprintf(`
 server:
   host: localhost
   port: 8000
@@ -225,12 +248,13 @@ admin:
   path: /admin
 
 security:
-  session_secret: change-me-in-production
-  csrf_secret_key: change-me-in-production
+  secret_key: %s
+  session_secret: %s
+  csrf_secret_key: %s
   csrf_exempt_paths:
     - /admin/api
     - /api
-`
+`, secretKey, sessionSecret, csrfSecret)
 
 	configPath := filepath.Join(projectPath, "config", "config.yaml")
 	return os.WriteFile(configPath, []byte(configContent), 0644)

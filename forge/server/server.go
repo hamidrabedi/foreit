@@ -138,6 +138,9 @@ func (s *Server) RegisterRoutes(fn func(*Router)) {
 
 // Start starts the server
 func (s *Server) Start() error {
+	if err := s.validateProductionSecrets(); err != nil {
+		return err
+	}
 	if s.logger != nil {
 		s.logger.Info("Starting server",
 			zap.String("address", s.Addr),
@@ -158,6 +161,9 @@ func (s *Server) Start() error {
 
 // StartWithGracefulShutdown starts the server with graceful shutdown support
 func (s *Server) StartWithGracefulShutdown() error {
+	if err := s.validateProductionSecrets(); err != nil {
+		return err
+	}
 	// Start server in a goroutine
 	serverErr := make(chan error, 1)
 	go func() {
@@ -168,6 +174,17 @@ func (s *Server) StartWithGracefulShutdown() error {
 
 	// Wait for interrupt signal or server error
 	return <-serverErr
+}
+
+func (s *Server) validateProductionSecrets() error {
+	if s == nil || s.config == nil || s.settings == nil || !strings.EqualFold(strings.TrimSpace(s.settings.App.Env), "production") {
+		return nil
+	}
+	keys := s.config.GeneratedSecrets()
+	if len(keys) == 0 {
+		return nil
+	}
+	return fmt.Errorf("production requires explicit %s", strings.Join(keys, ", "))
 }
 
 // Shutdown gracefully shuts down the server

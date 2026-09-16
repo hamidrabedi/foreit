@@ -30,11 +30,13 @@ func TestAuthCommandExecute_ScaffoldsAuthAPIWithLoginLogoutAndJWT(t *testing.T) 
 	require.NoError(t, err)
 	content := string(contentBytes)
 
-	require.Contains(t, content, `router.Post("/api/v1/auth/login", handleLogin)`)
+	require.Contains(t, content, `router.Post("/api/v1/auth/login", handleLogin(signingKey))`)
 	require.Contains(t, content, `router.Post("/api/v1/auth/logout", handleLogout)`)
-	require.Contains(t, content, "func generateJWTToken(userID, username string) string")
+	require.Contains(t, content, "func generateJWTToken(userID, username string, signingKey []byte) (string, error)")
 	require.Contains(t, content, "hmac.New(sha256.New")
-	require.Contains(t, content, "change-me-in-production")
+	require.NotContains(t, content, "change-me")
+	require.NotContains(t, content, `generateJWTToken("1"`)
+	require.Contains(t, content, "identity.CheckPasswordHash(password, user.Password)")
 	require.NotContains(t, strings.ToLower(content), "todo:")
 }
 

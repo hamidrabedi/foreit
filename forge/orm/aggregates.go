@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -10,10 +11,10 @@ import (
 	forgeerrors "github.com/forgego/forge/errors"
 )
 
-// aggregateValuer is deliberately private so AggregateValues does not expand
-// QuerySet's public interface and break external implementations.
-type aggregateValuer interface {
-	aggregateValues(context.Context, ...Aggregate) (map[string]any, error)
+// AggregateValuer is an optional capability that QuerySet implementations may
+// provide to support AggregateValues.
+type AggregateValuer interface {
+	AggregateValues(context.Context, ...Aggregate) (map[string]any, error)
 }
 
 type resolvedAggregate struct {
@@ -21,17 +22,18 @@ type resolvedAggregate struct {
 	function  string
 	field     string
 	column    string
+	fieldType reflect.Type
 	countStar bool
 }
 
 // AggregateValues executes ungrouped aggregates for any QuerySet implementation
 // that supports them.
 func AggregateValues[T any](ctx context.Context, qs QuerySet[T], aggs ...Aggregate) (map[string]any, error) {
-	valuer, ok := qs.(aggregateValuer)
+	valuer, ok := qs.(AggregateValuer)
 	if !ok {
 		return nil, forgeerrors.NewNotImplementedError("AggregateValues for this QuerySet implementation")
 	}
-	return valuer.aggregateValues(ctx, aggs...)
+	return valuer.AggregateValues(ctx, aggs...)
 }
 
 // AggregateValues executes one ungrouped aggregate query. Ordering, limits,
@@ -41,7 +43,7 @@ func (qs *BaseQuerySet[T]) AggregateValues(ctx context.Context, aggs ...Aggregat
 }
 
 func (qs *BaseQuerySet[T]) aggregateValues(ctx context.Context, aggs ...Aggregate) (map[string]any, error) {
-	if qs.err != nil && !qs.aggregateChained {
+	if qs.err != nil && !isAggregateChainError(qs.err) {
 		return nil, qs.err
 	}
 	resolved, err := qs.resolveAggregates(aggs)
@@ -108,6 +110,7 @@ func (qs *BaseQuerySet[T]) resolveAggregates(aggs []Aggregate) ([]resolvedAggreg
 				return nil, forgeerrors.NewInvalidInputError(aggregate.Field, "field does not resolve to a model column")
 			}
 			item.column = EscapeIdentifier(field.DBColumn)
+			item.fieldType = field.Type
 		}
 		resolved = append(resolved, item)
 	}
@@ -117,7 +120,10 @@ func (qs *BaseQuerySet[T]) resolveAggregates(aggs []Aggregate) ([]resolvedAggreg
 func convertAggregateValue(aggregate resolvedAggregate, value any) (any, error) {
 	if aggregate.function == string(AggMin) || aggregate.function == string(AggMax) {
 		if bytes, ok := value.([]byte); ok {
-			return string(bytes), nil
+			if aggregate.fieldType != nil && aggregate.fieldType.Kind() == reflect.String {
+				return string(bytes), nil
+			}
+			return bytes, nil
 		}
 		return value, nil
 	}

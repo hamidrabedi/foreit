@@ -2,11 +2,22 @@ package orm
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	forgeerrors "github.com/forgego/forge/errors"
 )
+
+var aggregateChainError = forgeerrors.NewNotImplementedError("QuerySet.Aggregate chained into a row query; use AggregateValues")
+
+func isAggregateChainError(err error) bool {
+	return errors.Is(err, aggregateChainError)
+}
+
+func canReplaceDeferredError(err error) bool {
+	return err == nil || isAggregateChainError(err)
+}
 
 // QuerySet is the type-safe QuerySet interface
 type QuerySet[T any] interface {
@@ -119,27 +130,26 @@ func NewOrderField(field string, ascending bool) OrderField {
 
 // BaseQuerySet is the implementation
 type BaseQuerySet[T any] struct {
-	table            string
-	schema           *ModelSchema
-	conditions       []Expression
-	excludes         []Expression
-	orderBy          []OrderField
-	limitVal         *int
-	offsetVal        *int
-	distinctFields   []string
-	selectFields     []string
-	onlyFields       []string
-	deferFields      []string
-	selectRelated    []string
-	prefetchRelated  []string
-	preloaded        map[string]bool // Track which relations are preloaded (N+1 prevention)
-	joins            []string
-	joinMap          map[string]bool
-	aggregates       []Aggregate
-	aggregateChained bool             // Aggregate was called for a row query; AggregateValues may ignore that deferred error.
-	annotations      []AnnotationExpr // Using existing AnnotationExpr type
-	db               interface{}      // *db.DB
-	err              error            // Deferred error from Filter/Exclude validation (checked at execution time)
+	table           string
+	schema          *ModelSchema
+	conditions      []Expression
+	excludes        []Expression
+	orderBy         []OrderField
+	limitVal        *int
+	offsetVal       *int
+	distinctFields  []string
+	selectFields    []string
+	onlyFields      []string
+	deferFields     []string
+	selectRelated   []string
+	prefetchRelated []string
+	preloaded       map[string]bool // Track which relations are preloaded (N+1 prevention)
+	joins           []string
+	joinMap         map[string]bool
+	aggregates      []Aggregate
+	annotations     []AnnotationExpr // Using existing AnnotationExpr type
+	db              interface{}      // *db.DB
+	err             error            // Deferred error from Filter/Exclude validation (checked at execution time)
 }
 
 // NewQuerySet creates a new QuerySet
@@ -202,27 +212,26 @@ func (qs *BaseQuerySet[T]) newSQLBuilder() *SQLBuilder {
 // clone creates a deep copy
 func (qs *BaseQuerySet[T]) clone() *BaseQuerySet[T] {
 	clone := &BaseQuerySet[T]{
-		table:            qs.table,
-		schema:           qs.schema,
-		conditions:       append([]Expression{}, qs.conditions...),
-		excludes:         append([]Expression{}, qs.excludes...),
-		orderBy:          append([]OrderField{}, qs.orderBy...),
-		limitVal:         qs.limitVal,
-		offsetVal:        qs.offsetVal,
-		distinctFields:   append([]string{}, qs.distinctFields...),
-		selectFields:     append([]string{}, qs.selectFields...),
-		onlyFields:       append([]string{}, qs.onlyFields...),
-		deferFields:      append([]string{}, qs.deferFields...),
-		selectRelated:    append([]string{}, qs.selectRelated...),
-		prefetchRelated:  append([]string{}, qs.prefetchRelated...),
-		preloaded:        make(map[string]bool),
-		joins:            append([]string{}, qs.joins...),
-		joinMap:          make(map[string]bool),
-		aggregates:       append([]Aggregate{}, qs.aggregates...),
-		aggregateChained: qs.aggregateChained,
-		annotations:      append([]AnnotationExpr{}, qs.annotations...),
-		db:               qs.db,
-		err:              qs.err,
+		table:           qs.table,
+		schema:          qs.schema,
+		conditions:      append([]Expression{}, qs.conditions...),
+		excludes:        append([]Expression{}, qs.excludes...),
+		orderBy:         append([]OrderField{}, qs.orderBy...),
+		limitVal:        qs.limitVal,
+		offsetVal:       qs.offsetVal,
+		distinctFields:  append([]string{}, qs.distinctFields...),
+		selectFields:    append([]string{}, qs.selectFields...),
+		onlyFields:      append([]string{}, qs.onlyFields...),
+		deferFields:     append([]string{}, qs.deferFields...),
+		selectRelated:   append([]string{}, qs.selectRelated...),
+		prefetchRelated: append([]string{}, qs.prefetchRelated...),
+		preloaded:       make(map[string]bool),
+		joins:           append([]string{}, qs.joins...),
+		joinMap:         make(map[string]bool),
+		aggregates:      append([]Aggregate{}, qs.aggregates...),
+		annotations:     append([]AnnotationExpr{}, qs.annotations...),
+		db:              qs.db,
+		err:             qs.err,
 	}
 	// Copy preloaded map
 	for k, v := range qs.preloaded {
@@ -250,7 +259,7 @@ func (qs *BaseQuerySet[T]) Filter(expr Expression) QuerySet[T] {
 	// Validate expression -- store error instead of panicking
 	if err := expr.Resolve(qs.schema); err != nil {
 		clone := qs.clone()
-		if clone.err == nil {
+		if canReplaceDeferredError(clone.err) {
 			clone.err = fmt.Errorf("invalid filter expression: %w", err)
 		}
 		return clone
@@ -267,7 +276,7 @@ func (qs *BaseQuerySet[T]) Exclude(expr Expression) QuerySet[T] {
 	// Validate expression -- store error instead of panicking
 	if err := expr.Resolve(qs.schema); err != nil {
 		clone := qs.clone()
-		if clone.err == nil {
+		if canReplaceDeferredError(clone.err) {
 			clone.err = fmt.Errorf("invalid exclude expression: %w", err)
 		}
 		return clone
@@ -426,9 +435,8 @@ func (qs *BaseQuerySet[T]) PrefetchRelated(relations ...any) QuerySet[T] {
 func (qs *BaseQuerySet[T]) Aggregate(aggs ...Aggregate) QuerySet[T] {
 	clone := qs.clone()
 	clone.aggregates = append(clone.aggregates, aggs...)
-	if clone.err == nil {
-		clone.aggregateChained = true
-		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Aggregate chained into a row query; use AggregateValues")
+	if canReplaceDeferredError(clone.err) {
+		clone.err = aggregateChainError
 	}
 	return clone
 }
@@ -474,7 +482,7 @@ func (qs *BaseQuerySet[T]) UpdateBuilder() (*UpdateBuilder[T], error) {
 // Union performs a UNION operation
 func (qs *BaseQuerySet[T]) Union(other QuerySet[T]) QuerySet[T] {
 	clone := qs.clone()
-	if clone.err == nil {
+	if canReplaceDeferredError(clone.err) {
 		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Union")
 	}
 	return clone
@@ -483,7 +491,7 @@ func (qs *BaseQuerySet[T]) Union(other QuerySet[T]) QuerySet[T] {
 // Intersection performs an INTERSECT operation
 func (qs *BaseQuerySet[T]) Intersection(other QuerySet[T]) QuerySet[T] {
 	clone := qs.clone()
-	if clone.err == nil {
+	if canReplaceDeferredError(clone.err) {
 		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Intersection")
 	}
 	return clone
@@ -492,7 +500,7 @@ func (qs *BaseQuerySet[T]) Intersection(other QuerySet[T]) QuerySet[T] {
 // Difference performs an EXCEPT operation
 func (qs *BaseQuerySet[T]) Difference(other QuerySet[T]) QuerySet[T] {
 	clone := qs.clone()
-	if clone.err == nil {
+	if canReplaceDeferredError(clone.err) {
 		clone.err = forgeerrors.NewNotImplementedError("QuerySet.Difference")
 	}
 	return clone

@@ -21,6 +21,29 @@ type aggregateTestItem struct {
 	Kind   string  `db:"kind"`
 }
 
+type aggregateBlobItem struct {
+	schema.BaseSchema
+	ID   int64  `db:"id"`
+	Text string `db:"text"`
+	Data []byte `db:"data"`
+}
+
+func (aggregateBlobItem) Meta() schema.Meta { return schema.Meta{TableName: "aggregate_blob_items"} }
+
+func (aggregateBlobItem) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("text"),
+		schema.BytesField("data"),
+	}
+}
+
+type aggregateValuesWrapper[T any] struct{ QuerySet[T] }
+
+func (aggregateValuesWrapper[T]) AggregateValues(context.Context, ...Aggregate) (map[string]any, error) {
+	return map[string]any{"sentinel": true}, nil
+}
+
 func (aggregateTestItem) Meta() schema.Meta { return schema.Meta{TableName: "aggregate_test_items"} }
 
 func (aggregateTestItem) Fields() []schema.Field {
@@ -126,4 +149,62 @@ func TestAggregateValuesPackageHelper(t *testing.T) {
 	values, err := AggregateValues(context.Background(), asInterface, Sum("amount"))
 	require.NoError(t, err)
 	assert.Equal(t, 42.0, values["sum"])
+}
+
+func TestAggregateValuesPackageHelperUsesExportedCapability(t *testing.T) {
+	querySet, err := NewQuerySet[aggregateTestItem]("aggregate_test_items")
+	require.NoError(t, err)
+
+	values, err := AggregateValues(context.Background(), aggregateValuesWrapper[aggregateTestItem]{querySet}, Count("id"))
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"sentinel": true}, values)
+
+	_, err = AggregateValues(context.Background(), struct{ QuerySet[aggregateTestItem] }{querySet}, Count("id"))
+	assert.True(t, forgeerrors.IsNotImplemented(err))
+}
+
+func TestAggregateValuesToManyFilterAggregatesBaseRows(t *testing.T) {
+	database := setupToManyDedupeDB(t)
+	defer database.Close()
+	_, err := database.Exec(`UPDATE customers SET credit = CASE id WHEN 1 THEN 10 WHEN 2 THEN 20 WHEN 3 THEN 30 END`)
+	require.NoError(t, err)
+
+	querySet, err := NewQuerySet[TestCustomer]("customers")
+	require.NoError(t, err)
+	values, err := querySet.SetDB(database).Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer]).AggregateValues(context.Background(), Count("id"), Sum("credit"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), values["count"])
+	assert.Equal(t, 30.0, values["sum"])
+}
+
+func TestAggregateValuesDeferredFilterErrorOverridesAggregateChainError(t *testing.T) {
+	database := setupRelationTestDB(t)
+	require.NoError(t, database.Close())
+	querySet, err := NewQuerySet[aggregateTestItem]("aggregate_test_items")
+	require.NoError(t, err)
+	base := querySet.SetDB(database).(*BaseQuerySet[aggregateTestItem])
+
+	_, err = base.Aggregate(Count("id")).Filter(F("unknown_field").Eq(1)).(*BaseQuerySet[aggregateTestItem]).AggregateValues(context.Background(), Count("id"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid filter expression")
+	assert.NotContains(t, err.Error(), "database is closed")
+
+	_, err = base.Aggregate(Count("id")).All(context.Background())
+	assert.True(t, forgeerrors.IsNotImplemented(err))
+}
+
+func TestAggregateValuesMinMaxPreserveBinaryValues(t *testing.T) {
+	database := setupRelationTestDB(t)
+	defer database.Close()
+	_, err := database.Exec(`CREATE TABLE aggregate_blob_items (id INTEGER PRIMARY KEY, text TEXT, data BLOB)`)
+	require.NoError(t, err)
+	_, err = database.Exec(`INSERT INTO aggregate_blob_items (id, text, data) VALUES (1, 'alpha', x'01FF'), (2, 'zulu', x'02AA')`)
+	require.NoError(t, err)
+
+	querySet, err := NewQuerySet[aggregateBlobItem]("aggregate_blob_items")
+	require.NoError(t, err)
+	values, err := querySet.SetDB(database).(*BaseQuerySet[aggregateBlobItem]).AggregateValues(context.Background(), Aggregate{Name: "max_data", Field: "data", Func: string(AggMax)}, Aggregate{Name: "max_text", Field: "text", Func: string(AggMax)})
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x02, 0xAA}, values["max_data"])
+	assert.Equal(t, "zulu", values["max_text"])
 }

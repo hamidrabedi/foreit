@@ -404,8 +404,31 @@ func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (st
 		return "", nil, err
 	}
 	parts := []string{fmt.Sprintf("SELECT %s FROM %s", strings.Join(selects, ", "), EscapeIdentifier(qs.table))}
-	parts = qs.appendWhereAndJoinParts(parts, whereJoins, whereClause)
+	if whereMulti {
+		parts = append(parts, qs.aggregatePKSubquery(whereJoins, whereClause))
+	} else {
+		parts = qs.appendWhereAndJoinParts(parts, whereJoins, whereClause)
+	}
 	return strings.Join(parts, " "), builder.Args(), nil
+}
+
+// aggregatePKSubquery restricts an aggregate to distinct base rows when a
+// reverse or many-to-many filter would otherwise multiply joined rows.
+func (qs *BaseQuerySet[T]) aggregatePKSubquery(joins []string, where string) string {
+	pkCol := "id"
+	if qs.schema != nil && qs.schema.PrimaryKey != "" {
+		pkCol = qs.schema.PrimaryKey
+	}
+	table := EscapeIdentifier(qs.table)
+	pk := EscapeIdentifier(pkCol)
+	innerParts := []string{fmt.Sprintf("SELECT DISTINCT %s.%s FROM %s", table, pk, table)}
+	if len(joins) > 0 {
+		innerParts = append(innerParts, strings.Join(joins, " "))
+	}
+	if where != "" {
+		innerParts = append(innerParts, where)
+	}
+	return fmt.Sprintf("WHERE %s.%s IN (%s)", table, pk, strings.Join(innerParts, " "))
 }
 
 // BuildExistsSQL builds the SQL query and arguments for Exists

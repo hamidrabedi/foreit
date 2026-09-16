@@ -22,8 +22,9 @@ func (p problem) String() string {
 }
 
 var (
-	linkRe = regexp.MustCompile(`\[[^\]]*\]\(([^)]*)\)`)
-	tickRe = regexp.MustCompile(`\x60([^\x60]+)\x60`)
+	linkRe         = regexp.MustCompile(`\[[^\]]*\]\(([^)]*)\)`)
+	referenceDefRe = regexp.MustCompile(`^\s*\[[^\]]+\]:\s*(<[^>]+>|\S+)`)
+	tickRe         = regexp.MustCompile(`\x60([^\x60]+)\x60`)
 )
 
 const fenceMarker = "\x60\x60\x60"
@@ -47,6 +48,10 @@ func collectFiles(root string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	info, err := os.Stat(absRoot)
+	if err != nil || !info.IsDir() {
+		return nil, fmt.Errorf("doclinks: root %s is not a directory", root)
+	}
 	var files []string
 	seen := map[string]bool{}
 	add := func(rel string) {
@@ -65,38 +70,36 @@ func collectFiles(root string) ([]string, error) {
 		"AGENTS.md",
 		"CONTRIBUTING.md",
 		"SECURITY.md",
-		"tests/README.md",
 	} {
 		add(rel)
 	}
-	if entries, err := os.ReadDir(filepath.Join(absRoot, "docs")); err == nil {
-		for _, e := range entries {
-			if e.IsDir() {
-				continue
+	for _, tree := range []string{"docs", "docs-site/docs", "skills", "tests"} {
+		treePath := filepath.Join(absRoot, filepath.FromSlash(tree))
+		if _, err := os.Stat(treePath); os.IsNotExist(err) {
+			continue
+		}
+		if err := filepath.WalkDir(treePath, func(path string, d os.DirEntry, err error) error {
+			if err != nil {
+				return err
 			}
-			if strings.HasSuffix(e.Name(), ".md") {
-				add("docs/" + e.Name())
+			if d.IsDir() {
+				if path != treePath && (strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules" || d.Name() == "dist" || d.Name() == "build") {
+					return filepath.SkipDir
+				}
+				return nil
 			}
+			if strings.HasSuffix(d.Name(), ".md") {
+				rel, err := filepath.Rel(absRoot, path)
+				if err != nil {
+					return err
+				}
+				add(filepath.ToSlash(rel))
+			}
+			return nil
+		}); err != nil {
+			return nil, err
 		}
 	}
-	_ = filepath.WalkDir(filepath.Join(absRoot, "skills"), func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return nil
-		}
-		rel, err := filepath.Rel(absRoot, path)
-		if err != nil {
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-		if d.Name() == "SKILL.md" {
-			add(rel)
-			return nil
-		}
-		if strings.HasSuffix(d.Name(), ".md") && filepath.ToSlash(filepath.Base(filepath.Dir(path))) == "references" {
-			add(rel)
-		}
-		return nil
-	})
 	sort.Strings(files)
 	return files, nil
 }
@@ -150,7 +153,7 @@ func backtickCandidate(tok string) bool {
 	if !strings.Contains(tok, "/") {
 		return false
 	}
-	matched := false
+	matched := strings.HasSuffix(tok, "/")
 	for _, suffix := range backtickSuffixes {
 		if strings.HasSuffix(tok, suffix) {
 			matched = true
@@ -200,8 +203,13 @@ func checkFile(absRoot, absPath string) ([]problem, error) {
 			if !ok {
 				continue
 			}
-			if !targetExists(filepath.Join(dir, filepath.FromSlash(target))) &&
-				!targetExists(filepath.Join(absRoot, filepath.FromSlash(target))) {
+			if !targetExists(filepath.Join(dir, filepath.FromSlash(target))) {
+				problems = append(problems, problem{file: rel, line: lineno, target: target})
+			}
+		}
+		if m := referenceDefRe.FindStringSubmatch(line); m != nil {
+			target, ok := cleanLinkTarget(m[1])
+			if ok && !targetExists(filepath.Join(dir, filepath.FromSlash(target))) {
 				problems = append(problems, problem{file: rel, line: lineno, target: target})
 			}
 		}
@@ -210,8 +218,9 @@ func checkFile(absRoot, absPath string) ([]problem, error) {
 			if !backtickCandidate(tok) {
 				continue
 			}
-			if !targetExists(filepath.Join(absRoot, filepath.FromSlash(tok))) &&
-				!targetExists(filepath.Join(dir, filepath.FromSlash(tok))) {
+			// Markdown links are relative to their containing document, while
+			// backticked repository paths conventionally start at repository root.
+			if !targetExists(filepath.Join(absRoot, filepath.FromSlash(tok))) {
 				problems = append(problems, problem{file: rel, line: lineno, target: tok})
 			}
 		}
@@ -229,6 +238,9 @@ func check(root string) (int, []problem, error) {
 	files, err := collectFiles(absRoot)
 	if err != nil {
 		return 0, nil, err
+	}
+	if len(files) == 0 {
+		return 0, nil, fmt.Errorf("doclinks: no documentation files found under %s", root)
 	}
 	var problems []problem
 	for _, f := range files {

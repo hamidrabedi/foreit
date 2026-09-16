@@ -212,8 +212,77 @@ func TestCollectFilesScope(t *testing.T) {
 		rels = append(rels, filepath.ToSlash(rel))
 	}
 	got := strings.Join(rels, ",")
-	want := "README.md,docs/top.md,skills/demo/SKILL.md,skills/demo/references/ref.md,tests/README.md"
+	want := "README.md,docs/nested/deep.md,docs/top.md,skills/demo/SKILL.md,skills/demo/references/ref.md,tests/README.md"
 	if got != want {
 		t.Fatalf("got files %q, want %q", got, want)
+	}
+}
+
+func TestNestedDocumentationLinkReported(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "docs/guides/nested.md", "[gone](missing.md)\n")
+	problems := checkFixture(t, root)
+	if len(problems) != 1 || problems[0].file != "docs/guides/nested.md" || problems[0].line != 1 {
+		t.Fatalf("unexpected problems: %v", problems)
+	}
+}
+
+func TestMarkdownLinksResolveOnlyFromContainingDirectory(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Root\n")
+	writeFixture(t, root, "models.md", "# Root model\n")
+	writeFixture(t, root, "docs/guides/a.md", "[model](models.md)\n")
+	if problems := checkFixture(t, root); len(problems) != 1 {
+		t.Fatalf("expected nested link to be missing, got %v", problems)
+	}
+	writeFixture(t, root, "docs/guides/models.md", "# Nested model\n")
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected nested link to pass, got %v", problems)
+	}
+}
+
+func TestInvalidRootFails(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "missing")
+	if _, _, err := check(missing); err == nil || err.Error() != "doclinks: root "+missing+" is not a directory" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	file := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := check(file); err == nil || err.Error() != "doclinks: root "+file+" is not a directory" {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestNoDocumentationFilesFails(t *testing.T) {
+	root := t.TempDir()
+	if _, _, err := check(root); err == nil || err.Error() != "doclinks: no documentation files found under "+root {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestReferenceDefinitionsChecked(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "[guide]: docs/missing.md \"Guide\"\n")
+	problems := checkFixture(t, root)
+	if len(problems) != 1 || problems[0].file != "README.md" || problems[0].line != 1 || problems[0].target != "docs/missing.md" {
+		t.Fatalf("unexpected problems: %v", problems)
+	}
+	writeFixture(t, root, "docs/missing.md", "# Guide\n")
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected valid reference definition to pass, got %v", problems)
+	}
+}
+
+func TestBacktickedDirectoriesChecked(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "Missing "+bt+"docs/missing-dir/"+bt+".\nValid "+bt+"forge/orm/"+bt+".\nIgnore "+bt+"go test ./..."+bt+".\n")
+	if err := os.MkdirAll(filepath.Join(root, "forge", "orm"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	problems := checkFixture(t, root)
+	if len(problems) != 1 || problems[0].line != 1 || problems[0].target != "docs/missing-dir/" {
+		t.Fatalf("unexpected problems: %v", problems)
 	}
 }

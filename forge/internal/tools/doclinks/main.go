@@ -18,7 +18,7 @@ func main() {
 	}
 	code, err := run(*root, os.Stdout)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "doclinks:", err)
+		fmt.Fprintln(os.Stderr, err)
 	}
 	os.Exit(code)
 }

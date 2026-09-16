@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -21,12 +22,13 @@ type populateInner struct {
 }
 
 type populateTestModel struct {
-	Price  float64                `json:"price"`
-	Rating float32                `json:"rating"`
-	Data   []byte                 `json:"data"`
-	Meta   map[string]interface{} `json:"meta"`
-	Tags   []string               `json:"tags"`
-	Addr   populateInner          `json:"address"`
+	Price    float64                `json:"price"`
+	Rating   float32                `json:"rating"`
+	Quantity int                    `json:"quantity"`
+	Data     []byte                 `json:"data"`
+	Meta     map[string]interface{} `json:"meta"`
+	Tags     []string               `json:"tags"`
+	Addr     populateInner          `json:"address"`
 }
 
 func TestPopulateFromMap_ConvertsFloatDecimalJSONBytes(t *testing.T) {
@@ -64,10 +66,39 @@ func TestPopulateFromMap_RejectsUnconvertibleValue(t *testing.T) {
 	assert.Equal(t, "price", fe.Field)
 }
 
+func TestPopulateFromMap_RejectsNonIntegralIntegerRepresentations(t *testing.T) {
+	type integerModel struct {
+		Signed   int64  `json:"signed"`
+		Unsigned uint64 `json:"unsigned"`
+	}
+	tests := []struct {
+		name  string
+		field string
+		value interface{}
+	}{
+		{name: "signed numeric string", field: "signed", value: "1.9"},
+		{name: "signed json number", field: "signed", value: json.Number("1.9")},
+		{name: "unsigned float", field: "unsigned", value: 1.9},
+		{name: "unsigned numeric string", field: "unsigned", value: "1.9"},
+		{name: "unsigned json number", field: "unsigned", value: json.Number("1.9")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := populateFromMap(&integerModel{}, map[string]interface{}{tt.field: tt.value})
+			require.Error(t, err)
+			var fieldErr *fieldError
+			require.ErrorAs(t, err, &fieldErr)
+			assert.Equal(t, tt.field, fieldErr.Field)
+		})
+	}
+}
+
 type priceTestItem struct {
-	ID    int64   `json:"id"`
-	Title string  `json:"title"`
-	Price float64 `json:"price"`
+	ID       int64   `json:"id"`
+	Title    string  `json:"title"`
+	Price    float64 `json:"price"`
+	Quantity int     `json:"quantity"`
+	Metadata []byte  `json:"metadata"`
 }
 
 type priceTestSerializer struct {
@@ -81,19 +112,26 @@ func newPriceTestSerializer() Serializer {
 }
 
 func (s *priceTestSerializer) Fields() []string {
-	return []string{"id", "title", "price"}
+	return []string{"id", "title", "price", "quantity", "metadata"}
 }
 
 type priceTestManager struct {
 	mu          sync.Mutex
 	items       map[int64]*priceTestItem
 	createCalls int
+	created     *priceTestItem
 }
 
 func (m *priceTestManager) Create(ctx context.Context, model interface{}) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.createCalls++
+	item, ok := model.(*priceTestItem)
+	if !ok {
+		return errors.New("unexpected model type")
+	}
+	cp := *item
+	m.created = &cp
 	return nil
 }
 
@@ -139,6 +177,82 @@ func TestBaseViewSet_Create_InvalidFieldValueReturns400(t *testing.T) {
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Equal(t, 0, mgr.createCalls)
+}
+
+func TestBaseViewSet_Create_RejectsFractionalIntegerWithoutCallingManager(t *testing.T) {
+	mgr := &priceTestManager{items: map[int64]*priceTestItem{}}
+	handler := newPriceTestHandler(mgr)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(`{"quantity":1.9}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "quantity")
+	assert.Equal(t, 0, mgr.createCalls)
+}
+
+func TestBaseViewSet_Create_AcceptsWholeNumberFloatForInteger(t *testing.T) {
+	mgr := &priceTestManager{items: map[int64]*priceTestItem{}}
+	handler := newPriceTestHandler(mgr)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(`{"quantity":2.0}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusCreated, rec.Code)
+	require.NotNil(t, mgr.created)
+	assert.Equal(t, 2, mgr.created.Quantity)
+}
+
+func TestBaseViewSet_Create_AcceptsJSONAndBase64ForBytes(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []byte
+	}{
+		{name: "object", body: `{"metadata":{"a":1}}`, want: []byte(`{"a":1}`)},
+		{name: "array", body: `{"metadata":["a",1]}`, want: []byte(`["a",1]`)},
+		{name: "base64", body: `{"metadata":"aGVsbG8="}`, want: []byte("hello")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mgr := &priceTestManager{items: map[int64]*priceTestItem{}}
+			handler := newPriceTestHandler(mgr)
+			req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			handler.ServeHTTP(rec, req)
+			require.Equal(t, http.StatusCreated, rec.Code)
+			require.NotNil(t, mgr.created)
+			assert.Equal(t, tt.want, mgr.created.Metadata)
+		})
+	}
+}
+
+func TestBaseViewSet_Create_RejectsInvalidBase64ForBytes(t *testing.T) {
+	mgr := &priceTestManager{items: map[int64]*priceTestItem{}}
+	handler := newPriceTestHandler(mgr)
+	req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(`{"metadata":"%%%"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "metadata")
+	assert.Equal(t, 0, mgr.createCalls)
+}
+
+func newPriceTestHandler(mgr *priceTestManager) *forgehttp.Router {
+	vs := NewBaseViewSet(newPriceTestSerializer, mgr, &priceTestItem{})
+	router := NewRouter("/api")
+	router.Register("items", vs)
+	handler := forgehttp.NewRouter()
+	router.RegisterRoutes(handler)
+	return handler
 }
 
 func TestBaseViewSet_Patch_ConvertsFloat(t *testing.T) {

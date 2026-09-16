@@ -70,10 +70,11 @@ func (w *Writer) WriteAPI(definitions []*ModelDefinition, outputDir string) erro
 	packageName := definitions[0].Package
 
 	t := template.New("api").Funcs(template.FuncMap{
-		"ToLower":  strings.ToLower,
-		"ToSnake":  utils.ToSnake,
-		"ToCamel":  utils.ToCamel,
-		"ToPascal": utils.ToPascal,
+		"ToLower":   strings.ToLower,
+		"ToSnake":   utils.ToSnake,
+		"Pluralize": utils.Pluralize,
+		"ToCamel":   utils.ToCamel,
+		"ToPascal":  utils.ToPascal,
 	})
 
 	t, err := t.Parse(apiTemplate)
@@ -94,11 +95,19 @@ func (w *Writer) WriteAPI(definitions []*ModelDefinition, outputDir string) erro
 // On Windows, os.Rename is not guaranteed atomic and may fail while the
 // destination is open elsewhere.
 func (w *Writer) writeTemplate(t *template.Template, data interface{}, filename string) error {
-	dir := filepath.Dir(filename)
-	base := filepath.Base(filename)
+	writeFilename := filename
+	if fi, err := os.Lstat(filename); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		resolved, err := filepath.EvalSymlinks(filename)
+		if err != nil {
+			return fmt.Errorf("failed to resolve destination symlink %s: %w", filename, err)
+		}
+		writeFilename = resolved
+	}
+	dir := filepath.Dir(writeFilename)
+	base := filepath.Base(writeFilename)
 
 	var perm os.FileMode
-	if fi, err := os.Stat(filename); err == nil {
+	if fi, err := os.Stat(writeFilename); err == nil {
 		perm = fi.Mode().Perm()
 	} else {
 		perm = os.FileMode(0o666 &^ processUmask())
@@ -134,8 +143,8 @@ func (w *Writer) writeTemplate(t *template.Template, data interface{}, filename 
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 
-	if err := os.Rename(tmpPath, filename); err != nil {
-		return fmt.Errorf("failed to rename temp file to %s: %w", filename, err)
+	if err := os.Rename(tmpPath, writeFilename); err != nil {
+		return fmt.Errorf("failed to rename temp file to %s: %w", writeFilename, err)
 	}
 
 	keepTemp = true

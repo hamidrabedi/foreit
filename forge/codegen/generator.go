@@ -47,6 +47,14 @@ func (g *Generator) Generate() error {
 		return nil
 	}
 
+	// Validate all API constraints before writing either generated file so a
+	// failed API generation cannot leave models and API output out of sync.
+	if g.generateAPI {
+		if err := ValidateAPIModels(definitions); err != nil {
+			return fmt.Errorf("failed to generate API code: %w", err)
+		}
+	}
+
 	// Generate all models in a single gen.go file
 	if err := g.generateCombined(definitions); err != nil {
 		return fmt.Errorf("failed to generate combined code: %w", err)

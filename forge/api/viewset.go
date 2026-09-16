@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/big"
 	"net/http"
 	"reflect"
 	"strconv"
@@ -1707,9 +1708,17 @@ func setIntField(field reflect.Value, value interface{}) error {
 	var n int64
 	switch v := value.(type) {
 	case float64:
-		n = int64(v)
+		var err error
+		n, err = integralFloatToInt64(v)
+		if err != nil {
+			return err
+		}
 	case float32:
-		n = int64(v)
+		var err error
+		n, err = integralFloatToInt64(float64(v))
+		if err != nil {
+			return err
+		}
 	case int:
 		n = int64(v)
 	case int8:
@@ -1731,19 +1740,13 @@ func setIntField(field reflect.Value, value interface{}) error {
 	case uint64:
 		n = int64(v)
 	case json.Number:
-		parsed, err := v.Int64()
+		parsed, err := parseIntegralInt64(v.String())
 		if err != nil {
-			if f, ferr := strconv.ParseFloat(strings.TrimSpace(v.String()), 64); ferr == nil {
-				n = int64(f)
-			} else {
-				return fmt.Errorf("invalid integer value %q", v.String())
-			}
-		} else {
-			n = parsed
+			return fmt.Errorf("invalid integer value %q", v.String())
 		}
+		n = parsed
 	case string:
-		s := strings.TrimSpace(v)
-		parsed, err := strconv.ParseInt(s, 10, 64)
+		parsed, err := parseIntegralInt64(v)
 		if err != nil {
 			return fmt.Errorf("invalid integer value %q", v)
 		}
@@ -1756,7 +1759,11 @@ func setIntField(field reflect.Value, value interface{}) error {
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			n = int64(rv.Uint())
 		case reflect.Float32, reflect.Float64:
-			n = int64(rv.Float())
+			var err error
+			n, err = integralFloatToInt64(rv.Float())
+			if err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("expected integer, got %T", value)
 		}
@@ -1768,21 +1775,39 @@ func setIntField(field reflect.Value, value interface{}) error {
 	return nil
 }
 
+func parseIntegralInt64(value string) (int64, error) {
+	rational, ok := new(big.Rat).SetString(strings.TrimSpace(value))
+	if !ok || !rational.IsInt() || !rational.Num().IsInt64() {
+		return 0, fmt.Errorf("not an integer")
+	}
+	return rational.Num().Int64(), nil
+}
+
+func integralFloatToInt64(value float64) (int64, error) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || math.Trunc(value) != value {
+		return 0, fmt.Errorf("non-integral value %v invalid for integer field", value)
+	}
+	formatted := strconv.FormatFloat(value, 'f', -1, 64)
+	return parseIntegralInt64(formatted)
+}
+
 // setUintField assigns JSON numbers, integers, json.Number values and numeric
 // strings to unsigned integer fields.
 func setUintField(field reflect.Value, value interface{}) error {
 	var n uint64
 	switch v := value.(type) {
 	case float64:
-		if v < 0 {
-			return fmt.Errorf("negative value %v invalid for %s", v, field.Type())
+		var err error
+		n, err = integralFloatToUint64(v)
+		if err != nil {
+			return err
 		}
-		n = uint64(v)
 	case float32:
-		if v < 0 {
-			return fmt.Errorf("negative value %v invalid for %s", v, field.Type())
+		var err error
+		n, err = integralFloatToUint64(float64(v))
+		if err != nil {
+			return err
 		}
-		n = uint64(v)
 	case int:
 		if v < 0 {
 			return fmt.Errorf("negative value %d invalid for %s", v, field.Type())
@@ -1819,13 +1844,13 @@ func setUintField(field reflect.Value, value interface{}) error {
 	case uint64:
 		n = v
 	case json.Number:
-		parsed, err := strconv.ParseUint(strings.TrimSpace(v.String()), 10, 64)
+		parsed, err := parseIntegralUint64(v.String())
 		if err != nil {
 			return fmt.Errorf("invalid unsigned integer value %q", v.String())
 		}
 		n = parsed
 	case string:
-		parsed, err := strconv.ParseUint(strings.TrimSpace(v), 10, 64)
+		parsed, err := parseIntegralUint64(v)
 		if err != nil {
 			return fmt.Errorf("invalid unsigned integer value %q", v)
 		}
@@ -1841,10 +1866,11 @@ func setUintField(field reflect.Value, value interface{}) error {
 			}
 			n = uint64(rv.Int())
 		case reflect.Float32, reflect.Float64:
-			if rv.Float() < 0 {
-				return fmt.Errorf("negative value %v invalid for %s", rv.Float(), field.Type())
+			var err error
+			n, err = integralFloatToUint64(rv.Float())
+			if err != nil {
+				return err
 			}
-			n = uint64(rv.Float())
 		default:
 			return fmt.Errorf("expected unsigned integer, got %T", value)
 		}
@@ -1854,6 +1880,22 @@ func setUintField(field reflect.Value, value interface{}) error {
 	}
 	field.SetUint(n)
 	return nil
+}
+
+func parseIntegralUint64(value string) (uint64, error) {
+	rational, ok := new(big.Rat).SetString(strings.TrimSpace(value))
+	if !ok || !rational.IsInt() || rational.Sign() < 0 || !rational.Num().IsUint64() {
+		return 0, fmt.Errorf("not an unsigned integer")
+	}
+	return rational.Num().Uint64(), nil
+}
+
+func integralFloatToUint64(value float64) (uint64, error) {
+	if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || math.Trunc(value) != value {
+		return 0, fmt.Errorf("non-integral value %v invalid for unsigned integer field", value)
+	}
+	formatted := strconv.FormatFloat(value, 'f', -1, 64)
+	return parseIntegralUint64(formatted)
 }
 
 // setBytesField assigns a base64 string (like encoding/json does for []byte),
@@ -1875,11 +1917,23 @@ func setBytesField(field reflect.Value, value interface{}) error {
 		for i, e := range v {
 			n, ok := byteValue(e)
 			if !ok {
-				return fmt.Errorf("invalid byte value at index %d: %T", i, e)
+				encoded, err := json.Marshal(v)
+				if err != nil {
+					return fmt.Errorf("invalid JSON array: %w", err)
+				}
+				field.SetBytes(encoded)
+				return nil
 			}
 			b[i] = n
 		}
 		field.SetBytes(b)
+		return nil
+	case map[string]interface{}:
+		encoded, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("invalid JSON object: %w", err)
+		}
+		field.SetBytes(encoded)
 		return nil
 	default:
 		rv := reflect.ValueOf(value)

@@ -181,14 +181,11 @@ func (v *Validator) ValidateField(field interface{}, tag string) error {
 // formatValidationErrors formats validator errors into a readable format
 func formatValidationErrors(err error) error {
 	if validationErrors, ok := err.(validator.ValidationErrors); ok {
-		var errMsg string
-		for i, fe := range validationErrors {
-			if i > 0 {
-				errMsg += "; "
-			}
-			errMsg += fmt.Sprintf("%s: %s", fe.Field(), getErrorMessage(fe))
+		formatted := &ValidationErrors{}
+		for _, fe := range validationErrors {
+			formatted.Add(fe.Field(), getErrorMessage(fe))
 		}
-		return fmt.Errorf("validation failed: %s", errMsg)
+		return formatted
 	}
 	return err
 }

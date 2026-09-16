@@ -11,6 +11,7 @@ import (
 
 	forgeerrors "github.com/forgego/forge/errors"
 	forgehttp "github.com/forgego/forge/server"
+	validate "github.com/forgego/forge/validate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -198,6 +199,28 @@ func TestBaseViewSet_InvalidInputError_Returns400(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 	assert.Contains(t, rec.Body.String(), "title")
+}
+
+func TestBaseViewSet_GeneratedModelValidationError_Returns400(t *testing.T) {
+	type generatedModel struct {
+		Title string `validate:"required"`
+	}
+	validationErr := validate.ValidateModel(validate.NewValidator(), &generatedModel{})
+	require.Error(t, validationErr)
+
+	mgr := &persistenceTestManager{
+		items:     map[int64]*persistenceTestItem{},
+		createErr: validationErr,
+	}
+	handler := newPersistenceRouter(mgr)
+	req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(`{"title":""}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Contains(t, rec.Body.String(), "Title")
+	assert.Contains(t, rec.Body.String(), "is required")
 }
 
 func TestBaseViewSet_LookupOperationalError_Returns500WithoutDetail(t *testing.T) {

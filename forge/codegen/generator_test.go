@@ -102,3 +102,45 @@ func TestValidateAPIModels_AcceptsOnlyInt64IDPrimaryKey(t *testing.T) {
 		})
 	}
 }
+
+func TestGeneratorGenerate_InvalidAPIModelPreservesGeneratedFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Category struct { schema.BaseSchema }
+func (Category) Fields() []schema.Field {
+	return []schema.Field{schema.String("id").Primary().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+	oldGen := []byte("old models output\n")
+	oldAPI := []byte("old API output\n")
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "gen.go"), oldGen, 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "api_gen.go"), oldAPI, 0644))
+
+	err := NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate()
+	require.Error(t, err)
+	genContents, readErr := os.ReadFile(filepath.Join(tmpDir, "gen.go"))
+	require.NoError(t, readErr)
+	apiContents, readErr := os.ReadFile(filepath.Join(tmpDir, "api_gen.go"))
+	require.NoError(t, readErr)
+	assert.Equal(t, oldGen, genContents)
+	assert.Equal(t, oldAPI, apiContents)
+}
+
+func TestGeneratorGenerate_PluralizesCategoryRoute(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Category struct { schema.BaseSchema }
+func (Category) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+	require.NoError(t, NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate())
+
+	contents, err := os.ReadFile(filepath.Join(tmpDir, "api_gen.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(contents), `apiRouter.Register("categories", NewCategoryViewSet())`)
+}

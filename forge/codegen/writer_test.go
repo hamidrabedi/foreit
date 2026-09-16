@@ -104,3 +104,23 @@ func TestWriteTemplate_DefaultPermissionsWhenFileDoesNotExist(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, matches)
 }
+
+func TestWriteTemplate_UpdatesSymlinkTargetWithoutReplacingLink(t *testing.T) {
+	tmpDir := t.TempDir()
+	targetDir := filepath.Join(tmpDir, "generated")
+	require.NoError(t, os.Mkdir(targetDir, 0755))
+	target := filepath.Join(targetDir, "models.go")
+	require.NoError(t, os.WriteFile(target, []byte("old contents\n"), 0644))
+	link := filepath.Join(tmpDir, "gen.go")
+	require.NoError(t, os.Symlink(filepath.Join("generated", "models.go"), link))
+
+	tmpl := template.Must(template.New("symlink").Parse("new contents\n"))
+	require.NoError(t, NewWriter().writeTemplate(tmpl, nil, link))
+
+	contents, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "new contents\n", string(contents))
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode()&os.ModeSymlink)
+}

@@ -105,6 +105,54 @@ func TestWriteTemplate_DefaultPermissionsWhenFileDoesNotExist(t *testing.T) {
 	assert.Empty(t, matches)
 }
 
+func TestWriteTemplate_DanglingSymlinkCreatesTargetThroughLink(t *testing.T) {
+	tmpDir := t.TempDir()
+	targetDir := filepath.Join(tmpDir, "generated")
+	require.NoError(t, os.Mkdir(targetDir, 0755))
+	// The link target does not exist yet; only its parent directory does.
+	link := filepath.Join(tmpDir, "gen.go")
+	require.NoError(t, os.Symlink(filepath.Join("generated", "models.go"), link))
+
+	tmpl := template.Must(template.New("dangling").Parse("new contents\n"))
+	require.NoError(t, NewWriter().writeTemplate(tmpl, nil, link))
+
+	target := filepath.Join(targetDir, "models.go")
+	contents, err := os.ReadFile(target)
+	require.NoError(t, err)
+	assert.Equal(t, "new contents\n", string(contents))
+	info, err := os.Lstat(link)
+	require.NoError(t, err)
+	assert.NotZero(t, info.Mode()&os.ModeSymlink, "gen.go must still be a symlink")
+}
+
+func TestWriteTemplate_RefusesToOverwriteReadOnlyFile(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("read-only permission bits do not apply to root")
+	}
+	tmpDir := t.TempDir()
+	initialContent := []byte("// protected content\n")
+
+	readOnly := filepath.Join(tmpDir, "protected.go")
+	require.NoError(t, os.WriteFile(readOnly, initialContent, 0444))
+
+	tmpl := template.Must(template.New("readonly").Parse("new contents\n"))
+	err := NewWriter().writeTemplate(tmpl, nil, readOnly)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), readOnly)
+
+	content, readErr := os.ReadFile(readOnly)
+	require.NoError(t, readErr)
+	assert.Equal(t, initialContent, content, "read-only file must be left unchanged")
+
+	// A regularly writable file in the same directory is still replaced.
+	writable := filepath.Join(tmpDir, "writable.go")
+	require.NoError(t, os.WriteFile(writable, []byte("// old\n"), 0644))
+	require.NoError(t, NewWriter().writeTemplate(tmpl, nil, writable))
+	content, readErr = os.ReadFile(writable)
+	require.NoError(t, readErr)
+	assert.Equal(t, "new contents\n", string(content))
+}
+
 func TestWriteTemplate_UpdatesSymlinkTargetWithoutReplacingLink(t *testing.T) {
 	tmpDir := t.TempDir()
 	targetDir := filepath.Join(tmpDir, "generated")

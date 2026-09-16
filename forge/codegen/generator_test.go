@@ -144,3 +144,21 @@ func (Category) Fields() []schema.Field {
 	require.NoError(t, err)
 	assert.Contains(t, string(contents), `apiRouter.Register("categories", NewCategoryViewSet())`)
 }
+
+func TestGeneratorGenerate_UsesKebabCasePluralRouteForCompoundModel(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type ProductVariant struct { schema.BaseSchema }
+func (ProductVariant) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+	require.NoError(t, NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate())
+
+	contents, err := os.ReadFile(filepath.Join(tmpDir, "api_gen.go"))
+	require.NoError(t, err)
+	assert.Contains(t, string(contents), `apiRouter.Register("product-variants", NewProductVariantViewSet())`)
+	assert.NotContains(t, string(contents), "product_variants")
+}

@@ -55,6 +55,14 @@ func ToKebab(s string) string {
 	return strcase.ToKebab(s)
 }
 
+// ToKebabPlural converts a model name to its URL-slug plural form: the name
+// is first normalized to kebab-case (the established form used by
+// hand-written routes, e.g. product-variants) and then pluralized with
+// Pluralize, which remains the single pluralizer.
+func ToKebabPlural(s string) string {
+	return Pluralize(ToKebab(s))
+}
+
 // ToLowerCamel converts a string to lowerCamelCase (same as ToCamel)
 func ToLowerCamel(s string) string {
 	return strcase.ToCamel(s)

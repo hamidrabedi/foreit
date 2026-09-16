@@ -18,3 +18,20 @@ func TestPluralize(t *testing.T) {
 		})
 	}
 }
+
+func TestToKebabPlural(t *testing.T) {
+	tests := map[string]string{
+		"ProductVariant":        "product-variants",
+		"Category":              "categories",
+		"ProductAttributeValue": "product-attribute-values",
+		"TaxRate":               "tax-rates",
+		"Product":               "products",
+	}
+	for singular, want := range tests {
+		t.Run(singular, func(t *testing.T) {
+			if got := ToKebabPlural(singular); got != want {
+				t.Fatalf("ToKebabPlural(%q) = %q, want %q", singular, got, want)
+			}
+		})
+	}
+}

@@ -43,10 +43,12 @@ func nonSerializableFromFields(fields []schema.Field) []string {
 	return out
 }
 
-// NonEditableFields returns the names of fields on model whose Editable flag
-// is false (values that must not be written through create or update). Both
-// the field Name and its DB column name are returned when they differ. It
-// returns nil when model does not implement schema.Schema.
+// NonEditableFields returns the names of fields on model that must not be
+// written through create or update: fields whose Editable flag is false as
+// well as database-owned auto-managed fields (AutoNow, AutoNowAdd and
+// generated columns), which normally keep Editable: true. Both the field
+// Name and its DB column name are returned when they differ. It returns nil
+// when model does not implement schema.Schema.
 func NonEditableFields(model interface{}) []string {
 	if model == nil {
 		return nil
@@ -69,7 +71,7 @@ func NonEditableFields(model interface{}) []string {
 func nonEditableFromFields(fields []schema.Field) []string {
 	var out []string
 	for _, f := range fields {
-		if f.Editable {
+		if f.Editable && !isRequestReadOnly(f) {
 			continue
 		}
 		out = append(out, f.Name)
@@ -78,6 +80,15 @@ func nonEditableFromFields(fields []schema.Field) []string {
 		}
 	}
 	return out
+}
+
+// isRequestReadOnly reports whether a field is owned by the database and must
+// therefore be ignored on requests even when it keeps Editable: true.
+// Mirrors admin/core isAutoManaged for the request path (excluding the
+// primary-key auto-increment case, which the viewset already guards by
+// restoring the URL primary key on update and ignoring body IDs on create).
+func isRequestReadOnly(f schema.Field) bool {
+	return f.AutoNow || f.AutoNowAdd || f.Generated
 }
 
 // stripExcludedFields removes ExcludeResponseFields keys from a serialized map.

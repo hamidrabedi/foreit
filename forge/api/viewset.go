@@ -26,6 +26,7 @@ import (
 	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
+	"github.com/forgego/forge/validate"
 )
 
 // ViewSet is the base interface for all viewsets
@@ -442,6 +443,14 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate the populated model before the manager runs business hooks
+	// (BeforeCreate/BeforeSave), so an invalid request fails with 400 without
+	// triggering hook side effects.
+	if err := validateModelInstance(instance); err != nil {
+		vs.handleException(w, r, modelValidationException(err))
+		return
+	}
+
 	// Get manager and call Create
 	manager := vs.getManager()
 	if !manager.IsValid() {
@@ -652,6 +661,14 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	// Restore primary key from the object loaded via the URL after populating
 	restorePrimaryKey(instance, origPK, id, pkGoName, pkDBName, pkJSONName)
+
+	// Validate the populated model before the manager runs business hooks
+	// (BeforeUpdate/BeforeSave), so an invalid request fails with 400 without
+	// triggering hook side effects.
+	if err := validateModelInstance(instance); err != nil {
+		vs.handleException(w, r, modelValidationException(err))
+		return
+	}
 
 	// Update
 	updateMethod, ok := globalCache.GetMethod(managerType, "Update")
@@ -1156,6 +1173,49 @@ type fieldError struct {
 
 func (e *fieldError) Error() string {
 	return fmt.Sprintf("invalid value for field %q: %s", e.Field, e.Message)
+}
+
+// validateModelInstance runs the model's own validation (Clean method,
+// schema Clean hook, Validate method) in the same order as orm.Manager, so
+// the API request path can reject invalid payloads before business hooks run.
+func validateModelInstance(instance interface{}) error {
+	if validatable, ok := instance.(interface{ Clean() error }); ok {
+		if err := validatable.Clean(); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+	}
+	if s, ok := instance.(schema.Schema); ok {
+		if hooks := s.Hooks(); hooks != nil && hooks.Clean != nil {
+			if err := hooks.Clean(instance); err != nil {
+				return fmt.Errorf("schema validation failed: %w", err)
+			}
+		}
+	}
+	if validatable, ok := instance.(interface{ Validate() error }); ok {
+		if err := validatable.Validate(); err != nil {
+			return fmt.Errorf("model validation failed: %w", err)
+		}
+	}
+	return nil
+}
+
+// modelValidationException converts a validateModelInstance failure into a
+// 400 validation exception. Structured validation errors keep their field
+// detail via persistenceException; anything else becomes a non-field error.
+func modelValidationException(err error) error {
+	var validationErrs *validation.ValidationErrors
+	if errors.As(err, &validationErrs) {
+		return persistenceException(err)
+	}
+	var validationErr *validation.ValidationError
+	if errors.As(err, &validationErr) {
+		return persistenceException(err)
+	}
+	var invalidInput *forgeerrors.InvalidInputError
+	if errors.As(err, &invalidInput) {
+		return persistenceException(err)
+	}
+	return exceptions.NewValidationError(map[string][]string{"non_field_errors": {err.Error()}})
 }
 
 // validationErrorForPopulate converts a populateFromMap failure into a 400

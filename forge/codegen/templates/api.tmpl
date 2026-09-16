@@ -46,7 +46,7 @@ func New{{.Name}}ViewSet() *{{.Name}}ViewSet {
 // Register{{.Name}}Routes registers the REST API endpoints for {{.Name}} on a router
 func Register{{.Name}}Routes(router *forgehttp.Router) {
 	apiRouter := api.NewRouter("/api/v1")
-	apiRouter.Register("{{.Name | ToSnake | Pluralize}}", New{{.Name}}ViewSet())
+	apiRouter.Register("{{.Name | ToKebabPlural}}", New{{.Name}}ViewSet())
 	apiRouter.RegisterRoutes(router)
 }
 {{end}}
@@ -54,6 +54,6 @@ func Register{{.Name}}Routes(router *forgehttp.Router) {
 // RegisterAPIRoutes registers all model REST API endpoints in {{.Package}}
 func RegisterAPIRoutes(router *forgehttp.Router) {
 	apiRouter := api.NewRouter("/api/v1")
-{{range .Models}}	apiRouter.Register("{{.Name | ToSnake | Pluralize}}", New{{.Name}}ViewSet())
+{{range .Models}}	apiRouter.Register("{{.Name | ToKebabPlural}}", New{{.Name}}ViewSet())
 {{end}}	apiRouter.RegisterRoutes(router)
 }

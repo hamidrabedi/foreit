@@ -286,3 +286,110 @@ func TestBacktickedDirectoriesChecked(t *testing.T) {
 		t.Fatalf("unexpected problems: %v", problems)
 	}
 }
+
+func TestImageWrappedLinkOuterDestinationChecked(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"[![License](img/license.png)](LICENSE)\n")
+	writeFixture(t, root, "img/license.png", "image data\n")
+
+	// Outer destination LICENSE does not exist yet; must be reported as missing
+	problems := checkFixture(t, root)
+	if len(problems) != 1 {
+		t.Fatalf("expected 1 problem for missing outer link, got %v", problems)
+	}
+	if got := problems[0]; got.file != "README.md" || got.line != 3 || got.target != "LICENSE" {
+		t.Fatalf("unexpected problem: %v", got)
+	}
+
+	// After LICENSE is created, both destinations exist and pass
+	writeFixture(t, root, "LICENSE", "MIT License\n")
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected 0 problems after creating LICENSE, got %v", problems)
+	}
+}
+
+func TestFootnoteDefinitionsExcludedFromLinkReferences(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"Statement referencing footnote.[^1]\n\n"+
+		"[^1]: explanatory text\n"+
+		"[^note]: This is another note.\n")
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected no problems for footnote definitions, got %v", problems)
+	}
+}
+
+func TestFencesLongerThanThreeBackticksOrTildes(t *testing.T) {
+	root := t.TempDir()
+	sixTicks := strings.Repeat(bt, 6)
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		sixTicks+"markdown\n"+
+		"```go\n"+
+		"[gone](docs/nope.md)\n"+
+		"```\n"+
+		sixTicks+"\n"+
+		"~~~~\n"+
+		"[gone2](docs/nope2.md)\n"+
+		"~~~~\n"+
+		"See [after](docs/after.md).\n")
+
+	problems := checkFixture(t, root)
+	if len(problems) != 1 || problems[0].file != "README.md" || problems[0].line != 11 || problems[0].target != "docs/after.md" {
+		t.Fatalf("expected 1 problem for link after closed fence, got %v", problems)
+	}
+}
+
+func TestURISchemeDetectionCaseInsensitiveAndNonFileSkipped(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"[web](HTTPS://example.com/guide.md)\n"+
+		"[call](tel:+1234567890)\n"+
+		"[files](ftp://example.com/archive.zip)\n"+
+		"[inline](data:text/plain;base64,SGVsbG8=)\n"+
+		"[chat](irc://irc.libera.chat/channel)\n")
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected no problems for non-file URI schemes, got %v", problems)
+	}
+}
+
+func TestPercentEncodedLocalLinksDecoded(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"See [guide](docs/a%20b.md).\n"+
+		"See [literal](docs/100%25real.md).\n"+
+		"See [fallback](docs/invalid%zz.md).\n")
+	writeFixture(t, root, "docs/a b.md", "# Guide A B\n")
+	writeFixture(t, root, "docs/100%real.md", "# Real 100%\n")
+	writeFixture(t, root, "docs/invalid%zz.md", "# Invalid fallback\n")
+
+	if problems := checkFixture(t, root); len(problems) != 0 {
+		t.Fatalf("expected no problems for existing decoded local links, got %v", problems)
+	}
+
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"See [guide](docs/missing%20file.md).\n")
+	problems := checkFixture(t, root)
+	if len(problems) != 1 || problems[0].target != "docs/missing file.md" {
+		t.Fatalf("expected missing decoded target, got %v", problems)
+	}
+}
+
+func TestInlineCodeSpansExcludedFromMarkdownLinks(t *testing.T) {
+	root := t.TempDir()
+	writeFixture(t, root, "README.md", "# Title\n\n"+
+		"Example syntax: "+bt+"[gone](docs/missing.md)"+bt+".\n"+
+		"Double backtick example: "+bt+bt+"[also gone](docs/nope.md)"+bt+bt+".\n"+
+		"Real backtick path: "+bt+"docs/real.md"+bt+".\n"+
+		"Missing backtick path: "+bt+"docs/MISSING.md"+bt+".\n")
+	writeFixture(t, root, "docs/real.md", "# Real\n")
+
+	problems := checkFixture(t, root)
+	if len(problems) != 1 {
+		t.Fatalf("expected exactly 1 problem for missing backticked path, got %v", problems)
+	}
+	got := problems[0]
+	if got.file != "README.md" || got.line != 6 || got.target != "docs/MISSING.md" {
+		t.Fatalf("unexpected problem: %v", got)
+	}
+}

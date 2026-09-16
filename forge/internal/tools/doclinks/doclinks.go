@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -22,12 +23,10 @@ func (p problem) String() string {
 }
 
 var (
-	linkRe         = regexp.MustCompile(`\[[^\]]*\]\(([^)]*)\)`)
-	referenceDefRe = regexp.MustCompile(`^\s*\[[^\]]+\]:\s*(<[^>]+>|\S+)`)
+	referenceDefRe = regexp.MustCompile(`^\s*\[[^^\]][^\]]*\]:\s*(<[^>]+>|\S+)`)
 	tickRe         = regexp.MustCompile(`\x60([^\x60]+)\x60`)
+	uriSchemeRe    = regexp.MustCompile(`^([a-zA-Z][a-zA-Z0-9+.-]*):`)
 )
-
-const fenceMarker = "\x60\x60\x60"
 
 var backtickSuffixes = []string{".md", ".go", ".yml", ".yaml", ".json"}
 
@@ -126,12 +125,15 @@ func cleanLinkTarget(raw string) (string, bool) {
 	} else if fields := strings.Fields(t); len(fields) > 0 {
 		t = fields[0]
 	}
-	for _, prefix := range []string{"http://", "https://", "mailto:", "#"} {
-		if strings.HasPrefix(t, prefix) {
+	if m := uriSchemeRe.FindStringSubmatch(t); m != nil {
+		scheme := strings.ToLower(m[1])
+		if scheme != "file" {
 			return "", false
 		}
+		t = t[len(m[0]):]
+		t = strings.TrimPrefix(t, "//")
 	}
-	if strings.HasPrefix(t, "/") {
+	if strings.HasPrefix(t, "/") || strings.HasPrefix(t, "#") {
 		return "", false
 	}
 	if i := strings.Index(t, "#"); i >= 0 {
@@ -139,6 +141,13 @@ func cleanLinkTarget(raw string) (string, bool) {
 	}
 	if i := strings.Index(t, "?"); i >= 0 {
 		t = t[:i]
+	}
+	t = strings.TrimSpace(t)
+	if t == "" {
+		return "", false
+	}
+	if decoded, err := url.PathUnescape(t); err == nil {
+		t = decoded
 	}
 	t = strings.TrimSpace(t)
 	if t == "" {
@@ -170,6 +179,160 @@ func backtickCandidate(tok string) bool {
 	return backtickPathRoots[firstSegment]
 }
 
+func parseFenceOpen(line string) (char rune, length int, ok bool) {
+	trimmed := strings.TrimLeft(line, " \t")
+	if len(trimmed) < 3 {
+		return 0, 0, false
+	}
+	r := rune(trimmed[0])
+	if r != '`' && r != '~' {
+		return 0, 0, false
+	}
+	k := 0
+	for k < len(trimmed) && rune(trimmed[k]) == r {
+		k++
+	}
+	if k < 3 {
+		return 0, 0, false
+	}
+	if r == '`' && strings.ContainsRune(trimmed[k:], '`') {
+		return 0, 0, false
+	}
+	return r, k, true
+}
+
+func isFenceClose(line string, openChar rune, openLen int) bool {
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) < openLen {
+		return false
+	}
+	for _, r := range trimmed {
+		if r != openChar {
+			return false
+		}
+	}
+	return true
+}
+
+func maskCodeSpans(s string) string {
+	b := []byte(s)
+	n := len(b)
+	i := 0
+	for i < n {
+		if b[i] == '`' {
+			start := i
+			for i < n && b[i] == '`' {
+				i++
+			}
+			tickCount := i - start
+
+			found := false
+			j := i
+			for j < n {
+				if b[j] == '`' {
+					closeStart := j
+					for j < n && b[j] == '`' {
+						j++
+					}
+					closeCount := j - closeStart
+					if closeCount == tickCount {
+						for k := start; k < j; k++ {
+							b[k] = ' '
+						}
+						i = j
+						found = true
+						break
+					}
+				} else {
+					j++
+				}
+			}
+			if !found {
+				i = start + tickCount
+			}
+		} else {
+			i++
+		}
+	}
+	return string(b)
+}
+
+func parseLinkDestination(s string) (string, int, bool) {
+	if len(s) < 2 || s[0] != '(' {
+		return "", 0, false
+	}
+	parenDepth := 0
+	inQuotes := false
+	var quoteChar byte
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if i > 0 && s[i-1] == '\\' {
+			continue
+		}
+		if inQuotes {
+			if c == quoteChar {
+				inQuotes = false
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			inQuotes = true
+			quoteChar = c
+			continue
+		}
+		if c == '(' {
+			parenDepth++
+		} else if c == ')' {
+			parenDepth--
+			if parenDepth == 0 {
+				return s[1:i], i + 1, true
+			}
+		}
+	}
+	return "", 0, false
+}
+
+func extractLinks(line string) []string {
+	var links []string
+	var stack []int
+
+	isEscaped := func(i int) bool {
+		count := 0
+		for k := i - 1; k >= 0 && line[k] == '\\'; k-- {
+			count++
+		}
+		return count%2 == 1
+	}
+
+	i := 0
+	n := len(line)
+	for i < n {
+		if isEscaped(i) {
+			i++
+			continue
+		}
+		c := line[i]
+		if c == '[' {
+			stack = append(stack, i)
+			i++
+		} else if c == ']' && len(stack) > 0 {
+			stack = stack[:len(stack)-1]
+			if i+1 < n && line[i+1] == '(' {
+				dest, endOffset, ok := parseLinkDestination(line[i+1:])
+				if ok {
+					links = append(links, dest)
+					i = i + 1 + endOffset
+					continue
+				}
+			}
+			i++
+		} else {
+			i++
+		}
+	}
+	return links
+}
+
 // checkFile scans a single file for missing link targets.
 func checkFile(absRoot, absPath string) ([]problem, error) {
 	data, err := os.ReadFile(absPath)
@@ -183,23 +346,28 @@ func checkFile(absRoot, absPath string) ([]problem, error) {
 	rel = filepath.ToSlash(rel)
 	dir := filepath.Dir(absPath)
 	var problems []problem
-	inFence := false
+	var fenceChar rune
+	var fenceLen int
 	for i, line := range strings.Split(string(data), "\n") {
 		if strings.Contains(line, "<!-- doclinks:ignore -->") {
 			continue
 		}
-		if strings.Contains(line, fenceMarker) {
-			if strings.Count(line, fenceMarker)%2 == 1 {
-				inFence = !inFence
+		if fenceLen > 0 {
+			if isFenceClose(line, fenceChar, fenceLen) {
+				fenceChar = 0
+				fenceLen = 0
 			}
 			continue
 		}
-		if inFence {
+		if char, length, ok := parseFenceOpen(line); ok {
+			fenceChar = char
+			fenceLen = length
 			continue
 		}
 		lineno := i + 1
-		for _, m := range linkRe.FindAllStringSubmatch(line, -1) {
-			target, ok := cleanLinkTarget(m[1])
+		lineForLinks := maskCodeSpans(line)
+		for _, raw := range extractLinks(lineForLinks) {
+			target, ok := cleanLinkTarget(raw)
 			if !ok {
 				continue
 			}

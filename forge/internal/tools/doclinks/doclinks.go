@@ -22,8 +22,8 @@ func (p problem) String() string {
 }
 
 var (
-	linkRe = regexp.MustCompile("\\[[^\\]]*\\]\\(([^)]*)\\)")
-	tickRe = regexp.MustCompile("\x60([^\x60]+)\x60")
+	linkRe = regexp.MustCompile(`\[[^\]]*\]\(([^)]*)\)`)
+	tickRe = regexp.MustCompile(`\x60([^\x60]+)\x60`)
 )
 
 const fenceMarker = "\x60\x60\x60"

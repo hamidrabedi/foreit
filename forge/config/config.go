@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"log"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -19,6 +21,10 @@ type Config struct {
 
 // NewConfig creates a new configuration instance
 func NewConfig() *Config {
+	// Load local .env secrets (e.g. written by `forge new`) so they are
+	// visible through the config instead of being replaced by ephemeral
+	// generated values.
+	loadDotEnv()
 	v := viper.New()
 	v.SetEnvPrefix("FORGE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
@@ -70,14 +76,71 @@ func NewConfig() *Config {
 	return c
 }
 
-// isPlaceholderSecret detects unconfigured or insecure placeholder secrets.
-func isPlaceholderSecret(val string) bool {
+// IsPlaceholderSecret detects unconfigured or insecure placeholder secrets.
+// It is exported so production validation (forge/server) reuses the same
+// definition instead of duplicating it.
+func IsPlaceholderSecret(val string) bool {
 	s := strings.TrimSpace(val)
 	if s == "" {
 		return true
 	}
 	lower := strings.ToLower(s)
 	return strings.HasPrefix(lower, "change-me") || lower == "secret" || lower == "default"
+}
+
+// isPlaceholderSecret detects unconfigured or insecure placeholder secrets.
+func isPlaceholderSecret(val string) bool {
+	return IsPlaceholderSecret(val)
+}
+
+// loadDotEnv loads a `.env` file from the config search path if present,
+// setting only variables not already in the environment.
+func loadDotEnv() {
+	for _, dir := range []string{".", "./config", "../config"} {
+		path := filepath.Join(dir, ".env")
+		if st, err := os.Stat(path); err != nil || st.IsDir() {
+			continue
+		}
+		loadDotEnvFile(path)
+	}
+}
+
+// loadDotEnvFile parses KEY=VALUE lines from path. Comments and blank lines
+// are skipped, single- and double-quoted values are unquoted, and malformed
+// lines without `=` are ignored rather than fatal. Variables already present
+// in the environment are never overwritten.
+func loadDotEnvFile(path string) {
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(content), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if rest, ok := strings.CutPrefix(line, "export "); ok {
+			line = strings.TrimSpace(rest)
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		value = strings.TrimSpace(value)
+		if len(value) >= 2 {
+			first, last := value[0], value[len(value)-1]
+			if (first == '"' && last == '"') || (first == '\'' && last == '\'') {
+				value = value[1 : len(value)-1]
+			}
+		}
+		if _, exists := os.LookupEnv(key); !exists {
+			_ = os.Setenv(key, value)
+		}
+	}
 }
 
 // randRead is the randomness source for secret generation. It is a variable
@@ -125,6 +188,29 @@ func (c *Config) GeneratedSecrets() []string {
 	keys := append([]string(nil), c.generatedSecrets...)
 	sort.Strings(keys)
 	return keys
+}
+
+// Set assigns a configuration value. When a secret key is explicitly set to
+// a non-placeholder value, it is no longer reported as generated so
+// production validation does not rely on stale provenance after
+// post-construction overrides.
+func (c *Config) Set(key string, value interface{}) {
+	c.Viper.Set(key, value)
+	switch key {
+	case "security.secret_key", "security.csrf_secret_key", "security.session_secret":
+		if s, ok := value.(string); ok && !IsPlaceholderSecret(s) {
+			kept := c.generatedSecrets[:0]
+			for _, k := range c.generatedSecrets {
+				if k != key {
+					kept = append(kept, k)
+				}
+			}
+			for i := len(kept); i < len(c.generatedSecrets); i++ {
+				c.generatedSecrets[i] = ""
+			}
+			c.generatedSecrets = kept
+		}
+	}
 }
 
 // GetString gets a string value with a default

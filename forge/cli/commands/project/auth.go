@@ -45,18 +45,27 @@ func (c *AuthCommand) Execute(ctx *core.Context, args []string) error {
 		return fmt.Errorf("auth app already exists")
 	}
 
+	// Validate wiring before writing any file so a wiring failure cannot
+	// leave a partial scaffold behind that blocks the retry with
+	// "auth app already exists".
+	if err := validateAuthWiring(projectRoot); err != nil {
+		return err
+	}
+
 	// Create app directory
 	if err := os.MkdirAll(appPath, 0755); err != nil {
 		return fmt.Errorf("failed to create auth app directory: %w", err)
 	}
-
-	// Create User model
+	// Create User model.
+	// UserObjects is intentionally NOT declared here: forge generate emits
+	// `var UserObjects = orm.MustNewManager[User]("users")` into gen.go and
+	// a handwritten duplicate would break compilation. Run `forge generate`
+	// after scaffolding; api.go and main.go wiring use the generated manager.
 	userModel := `package auth
 
 import (
 	"time"
 
-	"github.com/forgego/forge/orm"
 	"github.com/forgego/forge/schema"
 )
 
@@ -108,12 +117,10 @@ func (User) Hooks() *schema.ModelHooks {
 	return nil
 }
 
-// UserObjects provides type-safe operations for User.
-// Uses generic orm.Manager[User] following the generated-code pattern.
-var UserObjects = orm.MustNewManager[User]("users")
 `
 
 	if err := os.WriteFile(filepath.Join(appPath, "models.go"), []byte(userModel), 0644); err != nil {
+		_ = os.RemoveAll(appPath)
 		return fmt.Errorf("failed to create models.go: %w", err)
 	}
 
@@ -138,6 +145,7 @@ func init() {
 `
 
 	if err := os.WriteFile(filepath.Join(appPath, "admin.go"), []byte(adminCode), 0644); err != nil {
+		_ = os.RemoveAll(appPath)
 		return fmt.Errorf("failed to create admin.go: %w", err)
 	}
 
@@ -446,9 +454,13 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 `
 
 	if err := os.WriteFile(filepath.Join(appPath, "api.go"), []byte(apiCode), 0644); err != nil {
+		_ = os.RemoveAll(appPath)
 		return fmt.Errorf("failed to create api.go: %w", err)
 	}
 	if err := wireAuthAPI(projectRoot); err != nil {
+		// Remove only the directory this run created (it did not exist
+		// when we started) so the user can fix main.go and retry.
+		_ = os.RemoveAll(appPath)
 		return err
 	}
 
@@ -456,27 +468,37 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	fmt.Printf("  Location: %s\n", appPath)
 	fmt.Printf("  Created: User model, admin config, API endpoints\n")
 	fmt.Printf("\nNext steps:\n")
-	fmt.Printf("  1. Run: forge generate\n")
+	fmt.Printf("  1. Run: forge generate --models app --output app (required: generates UserObjects)\n")
 	fmt.Printf("  2. Run: forge makemigrations\n")
 	fmt.Printf("  3. Run: forge migrate\n")
 
 	return nil
 }
 
-func wireAuthAPI(projectRoot string) error {
+// validateAuthWiring performs every wiring check that wireAuthAPI needs
+// without writing any file, so Execute can fail fast before creating the
+// auth app directory.
+func validateAuthWiring(projectRoot string) error {
+	_, _, _, err := checkAuthWiring(projectRoot)
+	return err
+}
+
+// checkAuthWiring reads main.go and go.mod and verifies the wiring can be
+// applied. It returns the module path and file content for wireAuthAPI to
+// use, plus alreadyWired when no change is needed.
+func checkAuthWiring(projectRoot string) (modulePath, content string, alreadyWired bool, err error) {
 	mainPath := filepath.Join(projectRoot, "main.go")
-	mainBytes, err := os.ReadFile(mainPath)
-	if os.IsNotExist(err) {
-		return nil
+	mainBytes, readErr := os.ReadFile(mainPath)
+	if os.IsNotExist(readErr) {
+		return "", "", true, nil
 	}
-	if err != nil {
-		return fmt.Errorf("failed to read main.go: %w", err)
+	if readErr != nil {
+		return "", "", false, fmt.Errorf("failed to read main.go: %w", readErr)
 	}
-	moduleBytes, err := os.ReadFile(filepath.Join(projectRoot, "go.mod"))
-	if err != nil {
-		return fmt.Errorf("failed to read go.mod: %w", err)
+	moduleBytes, readErr := os.ReadFile(filepath.Join(projectRoot, "go.mod"))
+	if readErr != nil {
+		return "", "", false, fmt.Errorf("failed to read go.mod: %w", readErr)
 	}
-	var modulePath string
 	for _, line := range strings.Split(string(moduleBytes), "\n") {
 		fields := strings.Fields(line)
 		if len(fields) == 2 && fields[0] == "module" {
@@ -485,17 +507,37 @@ func wireAuthAPI(projectRoot string) error {
 		}
 	}
 	if modulePath == "" {
-		return fmt.Errorf("failed to wire auth API: go.mod has no module directive")
+		return "", "", false, fmt.Errorf("failed to wire auth API: go.mod has no module directive")
 	}
 
-	content := string(mainBytes)
+	content = string(mainBytes)
 	if strings.Contains(content, "auth.RegisterAuthAPI(") {
-		return nil
+		return modulePath, content, true, nil
 	}
 	serverImport := `"github.com/forgego/forge/server"`
 	if !strings.Contains(content, serverImport) {
-		return fmt.Errorf("failed to wire auth API: server import not found in main.go")
+		return "", "", false, fmt.Errorf("failed to wire auth API: server import not found in main.go")
 	}
+	adminRoutes := `		if settings.Admin.Enabled {
+			router.Mount(settings.Admin.Path, adminSite.Handler())
+		}`
+	if !strings.Contains(content, adminRoutes) {
+		return "", "", false, fmt.Errorf("failed to wire auth API: route registration block not found in main.go")
+	}
+	return modulePath, content, false, nil
+}
+
+func wireAuthAPI(projectRoot string) error {
+	mainPath := filepath.Join(projectRoot, "main.go")
+	modulePath, content, alreadyWired, err := checkAuthWiring(projectRoot)
+	if err != nil {
+		return err
+	}
+	if alreadyWired {
+		// No main.go to wire, or auth routes are already registered.
+		return nil
+	}
+	serverImport := `"github.com/forgego/forge/server"`
 	content = strings.Replace(content, serverImport, fmt.Sprintf("%q\n\t%s", modulePath+"/app/auth", serverImport), 1)
 
 	adminRoutes := `		if settings.Admin.Enabled {
@@ -507,9 +549,6 @@ func wireAuthAPI(projectRoot string) error {
 		if err := auth.RegisterAuthAPI(router, []byte(settings.Security.SecretKey)); err != nil {
 			stdlog.Fatal(err)
 		}`
-	if !strings.Contains(content, adminRoutes) {
-		return fmt.Errorf("failed to wire auth API: route registration block not found in main.go")
-	}
 	content = strings.Replace(content, adminRoutes, authRoutes, 1)
 	if err := os.WriteFile(mainPath, []byte(content), 0644); err != nil {
 		return fmt.Errorf("failed to update main.go: %w", err)

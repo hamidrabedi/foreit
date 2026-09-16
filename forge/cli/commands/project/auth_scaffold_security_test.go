@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/forgego/forge/cli/core"
+	codegen "github.com/forgego/forge/codegen"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,6 +26,11 @@ func TestAuthScaffoldBuildsAsExternalModule(t *testing.T) {
 	t.Cleanup(func() { _ = os.Chdir(originalWD) })
 	require.NoError(t, os.Chdir(projectPath))
 	require.NoError(t, NewAuthCommand().Execute(&core.Context{}, nil))
+
+	// UserObjects is owned by the generated code, so generation must run
+	// before the scaffold compiles.
+	appPath := filepath.Join(projectPath, "app", "auth")
+	require.NoError(t, codegen.NewGenerator(appPath, appPath).Generate())
 
 	cmd := exec.Command("go", "build", "-mod=mod", "./...")
 	cmd.Dir = projectPath

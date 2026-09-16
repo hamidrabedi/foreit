@@ -145,18 +145,22 @@ func init() {
 	apiCode := `package auth
 
 import (
+	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/forgego/forge/api"
+	"github.com/forgego/forge/api/authentication"
+	"github.com/forgego/forge/api/permissions"
 	"github.com/forgego/forge/identity"
 	"github.com/forgego/forge/orm"
 	httplib "github.com/forgego/forge/server"
@@ -198,7 +202,10 @@ func RegisterAuthAPI(router *httplib.Router, signingKey []byte) error {
 		return ErrInvalidSigningKey
 	}
 	signingKey = append([]byte(nil), signingKey...)
-	// Create viewset for users
+	// Create viewset for users. The users endpoint requires JWT
+	// authentication and staff/superuser permission: without explicit
+	// authentication and permission classes an anonymous caller could list,
+	// create, update and delete users.
 	viewset := api.NewBaseViewSet(
 		func() api.Serializer {
 			return NewUserSerializer()
@@ -206,16 +213,118 @@ func RegisterAuthAPI(router *httplib.Router, signingKey []byte) error {
 		UserObjects,
 		&User{},
 	)
+	viewset.Authentication = []authentication.Authentication{
+		authentication.NewJWTAuthentication(signingKey, lookupUserFromClaims),
+	}
+	viewset.Permissions = []permissions.Permission{
+		permissions.NewIsAuthenticated(),
+		permissions.NewIsStaffUser(),
+	}
 
 	// Register routes
 	apiRouter := api.NewRouter("/api/v1")
-	apiRouter.Register("users", viewset)
+	apiRouter.Register("users", &userViewSet{BaseViewSet: viewset})
 	apiRouter.RegisterRoutes(router)
 
 	// Register auth endpoints
 	router.Post("/api/v1/auth/login", handleLogin(signingKey))
 	router.Post("/api/v1/auth/logout", handleLogout)
 	return nil
+}
+
+// lookupUserFromClaims resolves the JWT subject back to a user for request
+// authentication. Unknown users authenticate as anonymous (nil, nil) so the
+// permission layer rejects the request.
+func lookupUserFromClaims(claims authentication.JWTClaims) (interface{}, error) {
+	username, _ := claims["username"].(string)
+	if username == "" {
+		return nil, nil
+	}
+	user, err := findUserByUsername(context.Background(), username)
+	if err != nil || user == nil {
+		return nil, nil
+	}
+	return user, nil
+}
+
+// userViewSet wraps the users BaseViewSet to enforce write-path protections:
+// privilege flags cannot be set through the public API and plaintext
+// passwords are bcrypt-hashed before they reach the manager.
+type userViewSet struct {
+	*api.BaseViewSet
+}
+
+// Create handles POST /api/v1/users/
+func (vs *userViewSet) Create(w http.ResponseWriter, r *http.Request) {
+	if !prepareUserWrite(w, r) {
+		return
+	}
+	vs.BaseViewSet.Create(w, r)
+}
+
+// Update handles PUT /api/v1/users/{id}/
+func (vs *userViewSet) Update(w http.ResponseWriter, r *http.Request) {
+	if !prepareUserWrite(w, r) {
+		return
+	}
+	vs.BaseViewSet.Update(w, r)
+}
+
+// PartialUpdate handles PATCH /api/v1/users/{id}/
+func (vs *userViewSet) PartialUpdate(w http.ResponseWriter, r *http.Request) {
+	if !prepareUserWrite(w, r) {
+		return
+	}
+	vs.BaseViewSet.PartialUpdate(w, r)
+}
+
+// prepareUserWrite rewrites the request body so is_staff/is_superuser can
+// never be set through the public endpoints and any supplied password is
+// stored as a bcrypt hash rather than plaintext.
+func prepareUserWrite(w http.ResponseWriter, r *http.Request) bool {
+	if r.Body == nil {
+		return true
+	}
+	body, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	if err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return false
+	}
+	if len(bytes.TrimSpace(body)) == 0 {
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		return true
+	}
+	var data map[string]any
+	if err := json.Unmarshal(body, &data); err != nil {
+		// Restore the original body and let the viewset report the 400.
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		r.ContentLength = int64(len(body))
+		return true
+	}
+	delete(data, "is_staff")
+	delete(data, "is_superuser")
+	if raw, ok := data["password"]; ok {
+		password, _ := raw.(string)
+		if strings.TrimSpace(password) == "" {
+			delete(data, "password")
+		} else {
+			hashed, err := identity.HashPassword(password)
+			if err != nil {
+				http.Error(w, "could not process password", http.StatusInternalServerError)
+				return false
+			}
+			data["password"] = hashed
+		}
+	}
+	rewritten, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return false
+	}
+	r.Body = io.NopCloser(bytes.NewReader(rewritten))
+	r.ContentLength = int64(len(rewritten))
+	return true
 }
 
 // UserSerializer serializes User model
@@ -235,9 +344,23 @@ func (s *UserSerializer) New() api.Serializer {
 	return NewUserSerializer()
 }
 
-// Fields returns the fields to serialize
+// Fields returns the fields to serialize. Password, is_staff and
+// is_superuser are deliberately absent: the password hash must never be
+// rendered and privilege flags are not part of the public representation.
 func (s *UserSerializer) Fields() []string {
 	return []string{"id", "username", "email", "is_active", "date_joined"}
+}
+
+// ReadOnlyFields prevents clients from setting the id, privilege flags or
+// server-managed timestamps through the API.
+func (s *UserSerializer) ReadOnlyFields() []string {
+	return []string{"id", "is_staff", "is_superuser", "date_joined", "last_login"}
+}
+
+// WriteOnlyFields ensures passwords are accepted on write but never
+// included in responses.
+func (s *UserSerializer) WriteOnlyFields() []string {
+	return []string{"password"}
 }
 
 func handleLogin(signingKey []byte) http.HandlerFunc {

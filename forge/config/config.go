@@ -23,6 +23,11 @@ func NewConfig() *Config {
 	v.SetEnvPrefix("FORGE")
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
+	// Explicit bindings for security secrets so generated projects can
+	// reference them through the environment (e.g. FORGE_SECURITY_SECRET_KEY).
+	_ = v.BindEnv("security.secret_key", "FORGE_SECURITY_SECRET_KEY")
+	_ = v.BindEnv("security.csrf_secret_key", "FORGE_SECURITY_CSRF_SECRET_KEY")
+	_ = v.BindEnv("security.session_secret", "FORGE_SECURITY_SESSION_SECRET")
 	v.SetConfigType("yaml")
 	v.SetConfigName("config")
 	v.AddConfigPath(".")
@@ -75,6 +80,11 @@ func isPlaceholderSecret(val string) bool {
 	return strings.HasPrefix(lower, "change-me") || lower == "secret" || lower == "default"
 }
 
+// randRead is the randomness source for secret generation. It is a variable
+// (rather than a direct crypto/rand call) so tests can force generation
+// failures and verify fail-closed behavior.
+var randRead = rand.Read
+
 // ensureSecrets generates random secrets for any secret key that was not
 // explicitly configured or was set to an insecure placeholder. Shipping
 // predictable default secrets means every deployment shares the same signing keys.
@@ -88,13 +98,16 @@ func (c *Config) ensureSecrets() {
 		if c.Viper.IsSet(key) && !isPlaceholderSecret(val) {
 			continue
 		}
+		// Mark the key as generated BEFORE attempting generation so a
+		// randomness failure still blocks production startup (fail closed)
+		// instead of letting it start with a missing or placeholder secret.
+		c.generatedSecrets = append(c.generatedSecrets, key)
 		var buf [32]byte
-		if _, err := rand.Read(buf[:]); err != nil {
+		if _, err := randRead(buf[:]); err != nil {
 			log.Printf("forge/config: WARNING: could not generate random value for %s: %v", key, err)
 			continue
 		}
 		c.Viper.Set(key, hex.EncodeToString(buf[:]))
-		c.generatedSecrets = append(c.generatedSecrets, key)
 		if isPlaceholderSecret(val) && val != "" {
 			log.Printf("forge/config: WARNING: %s is set to an insecure placeholder; overriding with a generated ephemeral value (set it explicitly for production)", key)
 		} else {

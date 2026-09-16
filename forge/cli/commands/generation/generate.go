@@ -73,7 +73,12 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 		}
 
 		generatedCount := 0
-		var diagnostics []codegen.Diagnostic
+		type pendingApp struct {
+			appPath      string
+			targetOutput string
+			name         string
+		}
+		var pending []pendingApp
 		for _, entry := range entries {
 			if entry.IsDir() {
 				appPath := filepath.Join(modelsDir, entry.Name())
@@ -86,25 +91,41 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 					} else {
 						targetOutput = filepath.Join(targetOutput, entry.Name())
 					}
-
-					fmt.Printf("  Generating for %s...\n", entry.Name())
-					gen := codegen.NewGenerator(appPath, targetOutput)
-					if err := gen.Generate(); err != nil {
-						return fmt.Errorf("generation failed for %s: %w", entry.Name(), err)
-					}
-					diagnostics = append(diagnostics, gen.Diagnostics()...)
-					generatedCount++
+					pending = append(pending, pendingApp{appPath: appPath, targetOutput: targetOutput, name: entry.Name()})
 				}
 			}
 		}
 
-		if generatedCount > 0 {
-			if err := printDiagnostics(diagnostics, strict); err != nil {
-				return err
+		if len(pending) > 0 {
+			if strict {
+				var preDiagnostics []codegen.Diagnostic
+				for _, app := range pending {
+					preDiagnostics = append(preDiagnostics, collectDiagnostics(app.appPath)...)
+				}
+				if err := printDiagnostics(preDiagnostics, strict); err != nil {
+					return err
+				}
 			}
-			fmt.Printf("✓ Generated code for %d apps\n", generatedCount)
-			return nil
+			var diagnostics []codegen.Diagnostic
+			for _, app := range pending {
+				fmt.Printf("  Generating for %s...\n", app.name)
+				gen := codegen.NewGenerator(app.appPath, app.targetOutput)
+				if err := gen.Generate(); err != nil {
+					return fmt.Errorf("generation failed for %s: %w", app.name, err)
+				}
+				diagnostics = append(diagnostics, gen.Diagnostics()...)
+				generatedCount++
+			}
+
+			if generatedCount > 0 {
+				if err := printDiagnostics(diagnostics, strict); err != nil {
+					return err
+				}
+				fmt.Printf("✓ Generated code for %d apps\n", generatedCount)
+				return nil
+			}
 		}
+
 		// If no apps found, fall through to single directory scan
 	}
 
@@ -112,7 +133,14 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 		outputDir = modelsDir
 	}
 
-	// Create generator and run for single directory
+	// Create generator and run for single directory.
+	// In strict mode, parse first and reject diagnostics before any write so
+	// a failed run cannot truncate the last valid generated file.
+	if strict {
+		if err := printDiagnostics(collectDiagnostics(modelsDir), strict); err != nil {
+			return err
+		}
+	}
 	gen := codegen.NewGenerator(modelsDir, outputDir)
 	if err := gen.Generate(); err != nil {
 		return fmt.Errorf("generation failed: %w", err)
@@ -133,4 +161,14 @@ func printDiagnostics(diagnostics []codegen.Diagnostic, strict bool) error {
 		return fmt.Errorf("generation found %d model expressions that cannot be evaluated; see warnings", len(diagnostics))
 	}
 	return nil
+}
+
+// collectDiagnostics parses models without writing any output, so strict
+// runs can fail before truncating previously generated files.
+func collectDiagnostics(modelsDir string) []codegen.Diagnostic {
+	parser := codegen.NewASTParser()
+	if _, err := parser.ParseDirectory(modelsDir); err != nil {
+		return nil
+	}
+	return parser.Diagnostics()
 }

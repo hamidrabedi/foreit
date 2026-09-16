@@ -29,11 +29,16 @@ func (c *GenerateCommand) Definition() *cobra.Command {
 	cmd.Flags().String("models", "./models", "Directory containing schema definitions")
 	cmd.Flags().String("output", "./models", "Output directory for generated code")
 	cmd.Flags().Bool("api", false, "Generate REST API ViewSets, Serializers, and routes")
+	cmd.Flags().Bool("strict", false, "Fail when model expressions cannot be evaluated during generation")
 	return cmd
 }
 
 // Execute runs the command logic
 func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
+	strict, err := ctx.Cmd.Flags().GetBool("strict")
+	if err != nil {
+		return fmt.Errorf("failed to get strict flag: %w", err)
+	}
 	modelsDir, err := ctx.Cmd.Flags().GetString("models")
 	if err != nil {
 		return fmt.Errorf("failed to get models flag: %w", err)
@@ -68,6 +73,7 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 		}
 
 		generatedCount := 0
+		var diagnostics []codegen.Diagnostic
 		for _, entry := range entries {
 			if entry.IsDir() {
 				appPath := filepath.Join(modelsDir, entry.Name())
@@ -86,12 +92,16 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 					if err := gen.Generate(); err != nil {
 						return fmt.Errorf("generation failed for %s: %w", entry.Name(), err)
 					}
+					diagnostics = append(diagnostics, gen.Diagnostics()...)
 					generatedCount++
 				}
 			}
 		}
 
 		if generatedCount > 0 {
+			if err := printDiagnostics(diagnostics, strict); err != nil {
+				return err
+			}
 			fmt.Printf("✓ Generated code for %d apps\n", generatedCount)
 			return nil
 		}
@@ -107,7 +117,20 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 	if err := gen.Generate(); err != nil {
 		return fmt.Errorf("generation failed: %w", err)
 	}
+	if err := printDiagnostics(gen.Diagnostics(), strict); err != nil {
+		return err
+	}
 
 	fmt.Printf("✓ Generated code from %s to %s\n", modelsDir, outputDir)
+	return nil
+}
+
+func printDiagnostics(diagnostics []codegen.Diagnostic, strict bool) error {
+	for _, diagnostic := range diagnostics {
+		fmt.Fprintf(os.Stderr, "warning: %s\n", diagnostic)
+	}
+	if strict && len(diagnostics) > 0 {
+		return fmt.Errorf("generation found %d model expressions that cannot be evaluated; see warnings", len(diagnostics))
+	}
 	return nil
 }

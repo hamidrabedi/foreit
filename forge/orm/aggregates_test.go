@@ -283,3 +283,162 @@ func TestAggregateValuesRelationJoinPreservedInOuterQuery(t *testing.T) {
 		assert.NotContains(t, subquerySQL, expectedCompanyJoin, "subquery must not contain company join")
 	})
 }
+
+type aggregateM2MItem struct {
+	schema.BaseSchema
+	ID int64 `db:"id"`
+}
+
+func (aggregateM2MItem) Meta() schema.Meta { return schema.Meta{TableName: "aggregate_m2m_items"} }
+
+func (aggregateM2MItem) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+	}
+}
+
+func (aggregateM2MItem) Relations() []schema.Relation {
+	return []schema.Relation{
+		schema.ManyToManyField("Tags", "Tag", schema.Through("item_tags")),
+	}
+}
+
+func TestAggregateValuesMixedScopesDoNotMultiplyBaseRows(t *testing.T) {
+	database := setupToManyDedupeDB(t)
+	defer database.Close()
+
+	ctx := context.Background()
+	querySet, err := NewQuerySet[TestCustomer]("customers")
+	require.NoError(t, err)
+	base := querySet.SetDB(database).(*BaseQuerySet[TestCustomer])
+
+	values, err := base.AggregateValues(ctx, Count("id"), Count("orders__id"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), values["count"])
+	assert.Equal(t, int64(5), values["count_orders__id"])
+}
+
+func TestAggregateValuesToManyPredicateConstrainsRelationAggregate(t *testing.T) {
+	database := setupRelationTestDB(t)
+	defer database.Close()
+
+	_, err := database.Exec(`INSERT INTO companies (id, name) VALUES (1, 'Acme Corp'), (2, 'Beta LLC')`)
+	require.NoError(t, err)
+	_, err = database.Exec(`INSERT INTO customers (id, name, company_id) VALUES (1, 'Customer A', 1), (2, 'Customer B', 2)`)
+	require.NoError(t, err)
+	_, err = database.Exec(`INSERT INTO orders (id, total, customer_id) VALUES (1, 150.0, 1), (2, 250.0, 1), (3, 300.0, 2)`)
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	querySet, err := NewQuerySet[TestCustomer]("customers")
+	require.NoError(t, err)
+	filtered := querySet.SetDB(database).Filter(F("orders__total").Gt(200.0)).(*BaseQuerySet[TestCustomer])
+
+	values, err := filtered.AggregateValues(ctx, Count("id"), Count("orders__id"), Sum("orders__total"))
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), values["count"])
+	assert.Equal(t, int64(2), values["count_orders__id"])
+	assert.Equal(t, 550.0, values["sum_orders__total"])
+}
+
+func TestAggregateValuesManyToManyRejectedBeforeSQL(t *testing.T) {
+	database := setupRelationTestDB(t)
+	require.NoError(t, database.Close())
+
+	_, _ = GetModelSchema[Tag]()
+	querySet, err := NewQuerySet[aggregateM2MItem]("aggregate_m2m_items")
+	require.NoError(t, err)
+	base := querySet.SetDB(database).(*BaseQuerySet[aggregateM2MItem])
+
+	_, err = base.AggregateValues(context.Background(), Count("tags__id"))
+	require.Error(t, err)
+	assert.NotContains(t, err.Error(), "database is closed")
+	assert.True(t, forgeerrors.IsNotImplemented(err))
+	assert.Contains(t, err.Error(), "tags__id")
+	assert.Contains(t, err.Error(), "aggregates across many-to-many relations are not supported yet")
+}
+
+func TestAggregateValuesNonNumericSumAvgRejectedBeforeSQL(t *testing.T) {
+	database := setupRelationTestDB(t)
+	require.NoError(t, database.Close())
+
+	querySetItem, err := NewQuerySet[aggregateTestItem]("aggregate_test_items")
+	require.NoError(t, err)
+	baseItem := querySetItem.SetDB(database).(*BaseQuerySet[aggregateTestItem])
+
+	querySetBlob, err := NewQuerySet[aggregateBlobItem]("aggregate_blob_items")
+	require.NoError(t, err)
+	baseBlob := querySetBlob.SetDB(database).(*BaseQuerySet[aggregateBlobItem])
+
+	ctx := context.Background()
+
+	for _, agg := range []Aggregate{Sum("kind"), Avg("kind")} {
+		_, err := baseItem.AggregateValues(ctx, agg)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "database is closed")
+		assert.True(t, forgeerrors.IsInvalidInput(err))
+	}
+
+	for _, agg := range []Aggregate{Sum("data"), Avg("data")} {
+		_, err := baseBlob.AggregateValues(ctx, agg)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), "database is closed")
+		assert.True(t, forgeerrors.IsInvalidInput(err))
+	}
+
+	dbOpen := setupRelationTestDB(t)
+	defer dbOpen.Close()
+	_, err = dbOpen.Exec(`CREATE TABLE aggregate_test_items (id INTEGER PRIMARY KEY, amount REAL, kind TEXT)`)
+	require.NoError(t, err)
+	_, err = dbOpen.Exec(`INSERT INTO aggregate_test_items (id, amount, kind) VALUES (1, 100, 'a')`)
+	require.NoError(t, err)
+	baseOpen := querySetItem.SetDB(dbOpen).(*BaseQuerySet[aggregateTestItem])
+	values, err := baseOpen.AggregateValues(ctx, Sum("amount"), Avg("amount"), Sum("id"), Avg("id"))
+	require.NoError(t, err)
+	assert.Equal(t, 100.0, values["sum"])
+	assert.Equal(t, 100.0, values["avg"])
+}
+
+func TestAggregateValuesSQLGenerationPerScope(t *testing.T) {
+	database := setupToManyDedupeDB(t)
+	defer database.Close()
+
+	querySet, err := NewQuerySet[TestCustomer]("customers")
+	require.NoError(t, err)
+	base := querySet.SetDB(database).(*BaseQuerySet[TestCustomer])
+
+	// 1. Count("id") alone
+	resolvedAlone, err := base.resolveAggregates([]Aggregate{Count("id")})
+	require.NoError(t, err)
+	sqlAlone, _, err := base.buildAggregateSQL(resolvedAlone)
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT("customers"."id") FROM "customers"`, sqlAlone)
+
+	// 2. Count("id") with to-many filter
+	filtered := base.Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer])
+	resolvedToManyFilterBase, err := filtered.resolveAggregates([]Aggregate{Count("id")})
+	require.NoError(t, err)
+	sqlToManyFilterBase, _, err := filtered.buildAggregateSQL(resolvedToManyFilterBase)
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT("customers"."id") FROM "customers" WHERE "customers"."id" IN (SELECT DISTINCT "customers"."id" FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "orders"."total" > ?)`, sqlToManyFilterBase)
+
+	// 3. Count("orders__id") with to-many filter
+	resolvedToManyFilterRel, err := filtered.resolveAggregates([]Aggregate{Count("orders__id")})
+	require.NoError(t, err)
+	sqlToManyFilterRel, _, err := filtered.buildAggregateSQL(resolvedToManyFilterRel)
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT("orders"."id") FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "customers"."id" IN (SELECT DISTINCT "customers"."id" FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id" WHERE "orders"."total" > ?) AND "orders"."total" > ?`, sqlToManyFilterRel)
+
+	// 4. The mixed call from finding 1: AggregateValues(Count("id"), Count("orders__id"))
+	resolvedMixed, err := base.resolveAggregates([]Aggregate{Count("id"), Count("orders__id")})
+	require.NoError(t, err)
+	groups := groupAggregatesByScope(resolvedMixed)
+	require.Len(t, groups, 2)
+	sqlGroup1, _, err := base.buildAggregateSQL(groups[0].aggs)
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT("customers"."id") FROM "customers"`, sqlGroup1)
+
+	sqlGroup2, _, err := base.buildAggregateSQL(groups[1].aggs)
+	require.NoError(t, err)
+	assert.Equal(t, `SELECT COUNT("orders"."id") FROM "customers" LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id"`, sqlGroup2)
+}

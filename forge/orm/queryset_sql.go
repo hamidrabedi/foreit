@@ -377,6 +377,11 @@ func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (st
 	builder := qs.newSQLBuilder()
 	qs.buildJoinClause(builder)
 
+	scope := ""
+	if len(aggregates) > 0 {
+		scope = aggregates[0].relationPath
+	}
+
 	var aggJoins []string
 	aggSeen := make(map[string]bool)
 	builder.SetJoinResolver(qs.createJoinResolver(&aggJoins, aggSeen, nil))
@@ -409,18 +414,83 @@ func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (st
 	}
 	parts := []string{fmt.Sprintf("SELECT %s FROM %s", strings.Join(selects, ", "), EscapeIdentifier(qs.table))}
 	if whereMulti {
-		if len(qs.joins) > 0 {
-			parts = append(parts, strings.Join(qs.joins, " "))
+		if scope == "" {
+			if len(qs.joins) > 0 {
+				parts = append(parts, strings.Join(qs.joins, " "))
+			}
+			parts = append(parts, qs.aggregatePKSubquery(whereJoins, whereClause))
+		} else {
+			if len(qs.joins) > 0 {
+				parts = append(parts, strings.Join(qs.joins, " "))
+			}
+			if len(aggJoins) > 0 {
+				parts = append(parts, strings.Join(aggJoins, " "))
+			}
+			pkSub := qs.aggregatePKSubquery(whereJoins, whereClause)
+			builder.SetJoinResolver(qs.createJoinResolver(&aggJoins, aggSeen, nil))
+			scopePreds, err := qs.buildScopePredicates(builder, scope)
+			if err != nil {
+				return "", nil, err
+			}
+			if scopePreds != "" {
+				parts = append(parts, pkSub+" AND "+scopePreds)
+			} else {
+				parts = append(parts, pkSub)
+			}
 		}
-		if len(aggJoins) > 0 {
-			parts = append(parts, strings.Join(aggJoins, " "))
-		}
-		parts = append(parts, qs.aggregatePKSubquery(whereJoins, whereClause))
 	} else {
 		outerJoins := mergeJoins(aggJoins, whereJoins)
 		parts = qs.appendWhereAndJoinParts(parts, outerJoins, whereClause)
 	}
 	return strings.Join(parts, " "), builder.Args(), nil
+}
+
+func (qs *BaseQuerySet[T]) conditionTouchesScope(expr Expression, scope string) bool {
+	if expr == nil || scope == "" {
+		return false
+	}
+	probeBuilder := qs.newSQLBuilder()
+	touchesScope := false
+	touchesOther := false
+	probeBuilder.SetJoinResolver(func(parts []string) (string, string, error) {
+		if len(parts) > 1 {
+			relPath := strings.Join(parts[:len(parts)-1], "__")
+			if relPath == scope || strings.HasPrefix(relPath, scope+"__") || strings.HasPrefix(scope, relPath+"__") {
+				touchesScope = true
+			} else {
+				touchesOther = true
+			}
+		}
+		return "alias", "col", nil
+	})
+	_, _, _ = expr.ToSQL(probeBuilder)
+	return touchesScope && !touchesOther
+}
+
+func (qs *BaseQuerySet[T]) buildScopePredicates(builder *SQLBuilder, scope string) (string, error) {
+	var parts []string
+	for _, cond := range qs.conditions {
+		if qs.conditionTouchesScope(cond, scope) {
+			sql, _, err := cond.ToSQL(builder)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, sql)
+		}
+	}
+	for _, exclude := range qs.excludes {
+		if qs.conditionTouchesScope(exclude, scope) {
+			sql, _, err := exclude.ToSQL(builder)
+			if err != nil {
+				return "", err
+			}
+			parts = append(parts, fmt.Sprintf("NOT (%s)", sql))
+		}
+	}
+	if len(parts) == 0 {
+		return "", nil
+	}
+	return strings.Join(parts, " AND "), nil
 }
 
 // aggregatePKSubquery restricts an aggregate to distinct base rows when a

@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -207,4 +208,78 @@ func TestAggregateValuesMinMaxPreserveBinaryValues(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []byte{0x02, 0xAA}, values["max_data"])
 	assert.Equal(t, "zulu", values["max_text"])
+}
+
+func TestAggregateValuesRelationJoinPreservedInOuterQuery(t *testing.T) {
+	database := setupToManyDedupeDB(t)
+	defer database.Close()
+
+	ctx := context.Background()
+	querySet, err := NewQuerySet[TestCustomer]("customers")
+	require.NoError(t, err)
+
+	t.Run("count to-many without filter", func(t *testing.T) {
+		base := querySet.SetDB(database).(*BaseQuerySet[TestCustomer])
+		values, err := base.AggregateValues(ctx, Count("orders__id"))
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), values["count"])
+	})
+
+	t.Run("count to-many filtered by to-many", func(t *testing.T) {
+		filtered := querySet.SetDB(database).Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer])
+		values, err := filtered.AggregateValues(ctx, Count("orders__id"))
+		require.NoError(t, err)
+		assert.Equal(t, int64(4), values["count"])
+	})
+
+	t.Run("count base model filtered by to-many", func(t *testing.T) {
+		filtered := querySet.SetDB(database).Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer])
+		values, err := filtered.AggregateValues(ctx, Count("id"))
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), values["count"])
+	})
+
+	t.Run("assert built SQL for case 2", func(t *testing.T) {
+		filtered := querySet.SetDB(database).Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer])
+		resolved, err := filtered.resolveAggregates([]Aggregate{Count("orders__id")})
+		require.NoError(t, err)
+		sql, _, err := filtered.buildAggregateSQL(resolved)
+		require.NoError(t, err)
+
+		subqueryMarker := `WHERE "customers"."id" IN (`
+		require.Contains(t, sql, subqueryMarker)
+		splitIdx := strings.Index(sql, subqueryMarker)
+		outerSQL := sql[:splitIdx]
+		subquerySQL := sql[splitIdx:]
+
+		const expectedOrderJoin = `LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id"`
+		assert.Contains(t, outerSQL, expectedOrderJoin, "outer query must contain orders join")
+		assert.Contains(t, subquerySQL, expectedOrderJoin, "subquery must contain orders join")
+		assert.Equal(t, 2, strings.Count(sql, expectedOrderJoin), "orders join must appear once in outer and once in subquery")
+	})
+
+	t.Run("count to-one filtered by to-many", func(t *testing.T) {
+		filtered := querySet.SetDB(database).Filter(F("orders__total").Gt(100.0)).(*BaseQuerySet[TestCustomer])
+		values, err := filtered.AggregateValues(ctx, Count("company__id"))
+		require.NoError(t, err)
+		assert.Equal(t, int64(2), values["count"])
+
+		resolved, err := filtered.resolveAggregates([]Aggregate{Count("company__id")})
+		require.NoError(t, err)
+		sql, _, err := filtered.buildAggregateSQL(resolved)
+		require.NoError(t, err)
+
+		subqueryMarker := `WHERE "customers"."id" IN (`
+		require.Contains(t, sql, subqueryMarker)
+		splitIdx := strings.Index(sql, subqueryMarker)
+		outerSQL := sql[:splitIdx]
+		subquerySQL := sql[splitIdx:]
+
+		const expectedCompanyJoin = `LEFT JOIN "companies" AS "company" ON "company"."id" = "customers"."company_id"`
+		const expectedOrderJoin = `LEFT JOIN "orders" AS "orders" ON "orders"."customer_id" = "customers"."id"`
+		assert.Contains(t, outerSQL, expectedCompanyJoin, "outer query must contain company join")
+		assert.NotContains(t, outerSQL, expectedOrderJoin, "outer query must not contain orders join")
+		assert.Contains(t, subquerySQL, expectedOrderJoin, "subquery must contain orders join")
+		assert.NotContains(t, subquerySQL, expectedCompanyJoin, "subquery must not contain company join")
+	})
 }

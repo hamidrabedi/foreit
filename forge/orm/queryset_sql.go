@@ -377,10 +377,9 @@ func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (st
 	builder := qs.newSQLBuilder()
 	qs.buildJoinClause(builder)
 
-	var whereJoins []string
-	whereSeen := make(map[string]bool)
-	var whereMulti bool
-	builder.SetJoinResolver(qs.createJoinResolver(&whereJoins, whereSeen, &whereMulti))
+	var aggJoins []string
+	aggSeen := make(map[string]bool)
+	builder.SetJoinResolver(qs.createJoinResolver(&aggJoins, aggSeen, nil))
 
 	selects := make([]string, 0, len(aggregates))
 	for _, aggregate := range aggregates {
@@ -399,15 +398,27 @@ func (qs *BaseQuerySet[T]) buildAggregateSQL(aggregates []resolvedAggregate) (st
 		selects = append(selects, fmt.Sprintf("%s(%s)", aggregate.function, column))
 	}
 
+	var whereJoins []string
+	whereSeen := make(map[string]bool)
+	var whereMulti bool
+	builder.SetJoinResolver(qs.createJoinResolver(&whereJoins, whereSeen, &whereMulti))
+
 	whereClause, _, err := qs.buildWhereClause(builder)
 	if err != nil {
 		return "", nil, err
 	}
 	parts := []string{fmt.Sprintf("SELECT %s FROM %s", strings.Join(selects, ", "), EscapeIdentifier(qs.table))}
 	if whereMulti {
+		if len(qs.joins) > 0 {
+			parts = append(parts, strings.Join(qs.joins, " "))
+		}
+		if len(aggJoins) > 0 {
+			parts = append(parts, strings.Join(aggJoins, " "))
+		}
 		parts = append(parts, qs.aggregatePKSubquery(whereJoins, whereClause))
 	} else {
-		parts = qs.appendWhereAndJoinParts(parts, whereJoins, whereClause)
+		outerJoins := mergeJoins(aggJoins, whereJoins)
+		parts = qs.appendWhereAndJoinParts(parts, outerJoins, whereClause)
 	}
 	return strings.Join(parts, " "), builder.Args(), nil
 }

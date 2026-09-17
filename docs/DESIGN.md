@@ -166,7 +166,7 @@ Used to build composite systems with injected dependencies.
 
 Used for fluent construction of schema fields/relations and query expressions.
 
-- Schema field chain methods: `forge/schema/field_methods.go`.
+- Schema field constructors and options: `forge/schema/fields_functional.go`.
 - Relations chain methods: `forge/schema/relation.go`.
 - Query expression builders: `forge/orm/expression.go`.
 
@@ -176,7 +176,7 @@ Used to centralize discovery and extension.
 
 - Admin registry: `forge/admin/core/registry.go`.
 - CLI registry: `forge/cli/core/registry.go`.
-- Schema registries: `forge/schema/registry.go`, `forge/schema/relation_registry.go`.
+- Schema registry: `forge/schema/registry.go`.
 
 ### 6.7 Template method pattern
 
@@ -342,7 +342,7 @@ These exist as API surfaces and are intended to prevent N+1.
 - `SelectRelated(...)` implies JOIN-based eager loading.
 - `PrefetchRelated(...)` implies separate query prefetch.
 
-Guardrail: `forge/orm/preload.go` defines errors when relations are accessed without being preloaded.
+No dedicated guardrail currently reports access to a relation that was not loaded with `SelectRelated` or `PrefetchRelated`.
 
 ### 9.5 Updates
 
@@ -643,6 +643,10 @@ those sources were deleted. They document behavior the code implements.
 - `Field.Resolve` validates full nested relation paths (rejects
   non-relation traversal and terminal relations).
 - Aggregate/annotation registries are thread-safe.
+- Ungrouped aggregates (`AggregateValues`) evaluate each aggregate in its own
+  relation scope (base model or relation path). Filter predicates on a relation
+  constrain aggregates over that relation. Aggregates across many-to-many
+  relations are not supported yet.
 - Hook order on write paths is
   `BeforeSave` → `BeforeCreate` → `AfterCreate` → `AfterSave`
   (and the `BeforeUpdate`/`BeforeDelete` analogues).
@@ -661,4 +665,8 @@ This table records which configurations are verified for release.
 | Capability | Status | Evidence |
 | --- | --- | --- |
 | SQLite migration apply | unverified | no automated apply test: the migration generator has no driver selection; tests/pkg_migrations skips it |
-
+| Count, Sum, Avg, Min, Max (ungrouped, via `orm.AggregateValues`) | supported on PostgreSQL and SQLite (evaluated per relation scope; predicates constrain relation aggregates; many-to-many aggregate paths not supported yet) | `forge/orm/aggregates_test.go` |
+| Grouped aggregates, STDDEV/VARIANCE, custom registered aggregates, many-to-many aggregate paths | not implemented | `forge/orm/aggregates_test.go` rejection test |
+| Union, Intersection, Difference | not implemented | `forge/orm/queryset_not_implemented_test.go` |
+| Integer primary keys | supported | `forge/orm/manager.go` |
+| UUID and string primary keys in `Manager.Get` | not supported (`Get` takes `int64`) | no test; `Manager.Get` signature |

@@ -106,6 +106,14 @@ func TestSerializeModel_JSONFieldReturnsObjectBytesFieldStaysBase64(t *testing.T
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusCreated, rec.Code)
 
+	// SerializeModel preserves valid JSON bytes as a RawMessage; marshal the
+	// result to verify that the response representation remains an object.
+	serialized := SerializeModel(mgr.items[1])
+	serializedJSON, err := json.Marshal(serialized)
+	require.NoError(t, err)
+	assert.Contains(t, string(serializedJSON), `"metadata":{"enabled":true}`,
+		"JSON field must marshal as structured JSON, not base64")
+
 	var created map[string]interface{}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &created))
 	assert.Equal(t, map[string]interface{}{"enabled": true}, created["metadata"],

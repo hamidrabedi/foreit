@@ -231,9 +231,8 @@ func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string
 			}
 		default:
 			if raw, ok := value.Interface().([]byte); ok && jsonKeys[key] {
-				var decoded interface{}
-				if err := json.Unmarshal(raw, &decoded); err == nil {
-					result[key] = decoded
+				if json.Valid(raw) {
+					result[key] = json.RawMessage(raw)
 				} else {
 					// Invalid stored bytes must not panic: keep the
 					// current base64 representation.

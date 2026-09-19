@@ -11,13 +11,13 @@ forge uses AST-based code generation to create type-safe code from your schema d
 1. **Parse Models** - AST parser reads your Go model files
 2. **Extract Schema** - Extracts field definitions, relations, meta, hooks
 3. **Generate Code** - Creates type-safe managers, querysets, and field expressions
-4. **Write Files** - Writes generated files to `models/*.gen.go`
+4. **Write Files** - Writes all generated code for a package to one `gen.go` in the output directory (plus `api_gen.go` with `--api`)
 
 ## Generated Files
 
 ### Model Struct
 
-`models/post.gen.go`:
+In `models/gen.go`:
 
 ```go
 type Post struct {
@@ -35,7 +35,7 @@ type Post struct {
 
 ### Field Expressions
 
-`models/post_fields.gen.go`:
+In `models/gen.go`:
 
 ```go
 type PostFields struct {
@@ -59,7 +59,7 @@ var PostFields = PostFields{
 
 ### Manager
 
-`models/post_manager.gen.go`:
+In `models/gen.go`:
 
 ```go
 type PostManagerType struct {
@@ -91,7 +91,7 @@ func (m *PostManagerType) Filter(conditions ...query.QueryExpr) *PostQuerySet {
 
 ### QuerySet
 
-`models/post_queryset.gen.go`:
+In `models/gen.go`:
 
 ```go
 type PostQuerySet struct {
@@ -130,18 +130,29 @@ You can customize generation templates, though this is advanced and not recommen
 ### Generation Options
 
 ```bash
-# Generate for specific models
-forge generate --models Post,User
+# Read schemas from another directory (default ./models)
+forge generate --models ./app/blog
 
-# Output to different directory
+# Output to different directory (default ./models)
 forge generate --output ./generated
+
+# Also generate REST API ViewSets, serializers, and routes (api_gen.go)
+forge generate --api
+
+# Fail when a model expression cannot be evaluated
+forge generate --strict
 ```
+
+`--api` requires each model to have one auto-increment `int64` primary key named `id`,
+and a concrete `int64` `ID`/`Id` field or an `orm.ModelWithID` implementation.
+`gen.go` and `api_gen.go` are replaced together; if a write fails, both keep their
+previous contents.
 
 ## Best Practices
 
 1. **Don't Edit Generated Files** - They will be overwritten
 2. **Regenerate After Model Changes** - Always regenerate after modifying models
-3. **Commit Generated Files** - Include `*.gen.go` files in version control
+3. **Commit Generated Files** - Include `gen.go` and `api_gen.go` in version control
 4. **Use Type-Safe APIs** - Use generated field expressions and querysets
 
 ## Troubleshooting

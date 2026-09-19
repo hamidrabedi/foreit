@@ -256,6 +256,31 @@ This compiles your schema into high-performance Go types with zero runtime refle
 
 Generation reads direct schema constructor calls in a returned slice, a `var` slice literal, an assignment, or an individual `append`. It cannot evaluate helper calls, values computed by functions, loops, conditional (`if` or `switch`) assembly, or appending computed slices. These constructs are reported as warnings; use `forge generate --strict` to turn any warning into an error.
 
+### Generating a REST API
+
+```bash
+forge generate --api
+```
+
+With `--api`, generation also writes `api_gen.go` next to `gen.go`. For each model it contains a serializer, a ViewSet, and a `Register<Model>Routes` function, plus `RegisterAPIRoutes` for the whole package. Routes are mounted under `/api/v1/<kebab-case plural>`. Without the flag, no API code is produced.
+
+Each model with API generation needs:
+
+- exactly one primary key, named `id`, declared as an auto-increment `int64` field in `Fields()`;
+- a concrete `int64` `ID` (or `Id`) struct field, or an implementation of `orm.ModelWithID`.
+
+Generation stops with an error naming the model when either is missing.
+
+Generated endpoints follow the schema:
+
+- Fields marked `Serialize(false)` never appear in responses under any of their names (schema name, column, or JSON tag), and cannot be used to filter, order, or search.
+- Non-editable fields are ignored in create and update bodies.
+- A list request without `ordering` uses the model's `Meta().OrderBy`, or the primary key when none is set, so pages are stable.
+- The request body must be a JSON object; `null` or any other value returns 400.
+- `Time` fields are returned as `15:04:05` and `Date` fields as `2006-01-02`, the layouts requests accept.
+
+`gen.go` and `api_gen.go` are written together: if either write fails, both files keep their previous contents.
+
 ---
 
 ## Next Steps

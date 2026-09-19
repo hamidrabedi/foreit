@@ -60,16 +60,16 @@ func (g *Generator) Generate() error {
 		}
 	}
 
-	// Generate all models in a single gen.go file
-	if err := g.generateCombined(definitions); err != nil {
-		return fmt.Errorf("failed to generate combined code: %w", err)
-	}
-
-	// If API generation is enabled, generate api_gen.go
 	if g.generateAPI {
-		if err := g.writer.WriteAPI(definitions, g.outputDir); err != nil {
+		if err := g.writer.WriteCombinedAndAPI(definitions, g.outputDir); err != nil {
 			return fmt.Errorf("failed to generate API code: %w", err)
 		}
+		return nil
+	}
+
+	// Generate all models in a single gen.go file.
+	if err := g.generateCombined(definitions); err != nil {
+		return fmt.Errorf("failed to generate combined code: %w", err)
 	}
 
 	return nil

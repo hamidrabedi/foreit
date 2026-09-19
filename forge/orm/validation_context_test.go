@@ -17,9 +17,10 @@ var errValidationFlagTargetInvalid = stderrors.New("validation flag target is in
 
 type validationFlagTarget struct {
 	schema.BaseSchema
-	ID              int64  `db:"id"`
-	Name            string `db:"name"`
-	validationCalls *int
+	ID               int64  `db:"id"`
+	Name             string `db:"name"`
+	validationCalls  *int
+	invalidateOnSave bool
 }
 
 func (validationFlagTarget) Fields() []schema.Field {
@@ -39,6 +40,13 @@ func (m *validationFlagTarget) Validate() error {
 	}
 	if m.Name == "invalid" {
 		return errValidationFlagTargetInvalid
+	}
+	return nil
+}
+
+func (m *validationFlagTarget) BeforeSave(context.Context) error {
+	if m.invalidateOnSave {
+		m.Name = "invalid"
 	}
 	return nil
 }
@@ -171,7 +179,7 @@ func TestManager_Update_ValidationFlagDoesNotLeakIntoHooks(t *testing.T) {
 	assert.Equal(t, "original", parentName)
 }
 
-func TestManager_Create_ValidationFlagControlsDirectValidation(t *testing.T) {
+func TestManager_Create_ValidationFlagStillRunsValidate(t *testing.T) {
 	database := setupValidationContextDB(t)
 	manager, err := NewManagerWithDB[validationFlagTarget]("validation_flag_targets", database)
 	require.NoError(t, err)
@@ -186,6 +194,38 @@ func TestManager_Create_ValidationFlagControlsDirectValidation(t *testing.T) {
 		WithModelValidationCompleted(context.Background()),
 		&validationFlagTarget{Name: "invalid", validationCalls: &markedValidationCalls},
 	)
+	require.ErrorIs(t, err, errValidationFlagTargetInvalid)
+	assert.Equal(t, 1, markedValidationCalls)
+}
+
+func TestManager_MarkedValidationRejectsBeforeSaveMutation(t *testing.T) {
+	database := setupValidationContextDB(t)
+	manager, err := NewManagerWithDB[validationFlagTarget]("validation_flag_targets", database)
 	require.NoError(t, err)
-	assert.Zero(t, markedValidationCalls)
+
+	t.Run("create", func(t *testing.T) {
+		calls := 0
+		target := &validationFlagTarget{Name: "valid", validationCalls: &calls, invalidateOnSave: true}
+		err := manager.Create(WithModelValidationCompleted(context.Background()), target)
+		require.ErrorIs(t, err, errValidationFlagTargetInvalid)
+		assert.Equal(t, 1, calls)
+
+		var count int
+		require.NoError(t, database.QueryRow("SELECT COUNT(*) FROM validation_flag_targets").Scan(&count))
+		assert.Zero(t, count)
+	})
+
+	t.Run("update", func(t *testing.T) {
+		_, err := database.Exec("INSERT INTO validation_flag_targets (id, name) VALUES (2, 'original')")
+		require.NoError(t, err)
+		calls := 0
+		target := &validationFlagTarget{ID: 2, Name: "valid", validationCalls: &calls, invalidateOnSave: true}
+		err = manager.Update(WithModelValidationCompleted(context.Background()), target)
+		require.ErrorIs(t, err, errValidationFlagTargetInvalid)
+		assert.Equal(t, 1, calls)
+
+		var name string
+		require.NoError(t, database.QueryRow("SELECT name FROM validation_flag_targets WHERE id = 2").Scan(&name))
+		assert.Equal(t, "original", name)
+	})
 }

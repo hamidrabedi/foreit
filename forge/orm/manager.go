@@ -246,6 +246,9 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 			return errors.NewNotImplementedError("non-integer primary keys")
 		}
 	}
+	if !m.canSetID(instance) {
+		return fmt.Errorf("cannot set primary key %s on %T", m.primaryKeyColumn(), instance)
+	}
 
 	if err := m.runHooks(ctx, instance, "BeforeCreate"); err != nil {
 		return err
@@ -253,10 +256,8 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
 		return err
 	}
-	if !validationCompleted {
-		if err := m.validate(instance); err != nil {
-			return err
-		}
+	if err := m.validateForPersistence(instance, validationCompleted); err != nil {
+		return err
 	}
 
 	// Build and execute INSERT
@@ -385,10 +386,8 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
 		return err
 	}
-	if !validationCompleted {
-		if err := m.validate(instance); err != nil {
-			return err
-		}
+	if err := m.validateForPersistence(instance, validationCompleted); err != nil {
+		return err
 	}
 
 	pkColumn := m.primaryKeyColumn()
@@ -555,6 +554,21 @@ func (m *Manager[T]) setID(instance *T, id int64) error {
 	}
 
 	pkCol := m.primaryKeyColumn()
+	instanceValue := reflect.ValueOf(instance)
+	if !instanceValue.IsValid() || instanceValue.IsNil() {
+		return fmt.Errorf("cannot set primary key %s on %T", pkCol, instance)
+	}
+	instanceValue = instanceValue.Elem()
+	for _, name := range m.primaryKeyFieldCandidates() {
+		if setIntField(instanceValue, name, id) {
+			return nil
+		}
+	}
+	return fmt.Errorf("cannot set primary key %s on %T", pkCol, instance)
+}
+
+func (m *Manager[T]) primaryKeyFieldCandidates() []string {
+	pkCol := m.primaryKeyColumn()
 	candidates := make([]string, 0, 4)
 	if m.schema != nil {
 		if f := m.schema.GetField(pkCol); f != nil {
@@ -566,14 +580,51 @@ func (m *Manager[T]) setID(instance *T, id int64) error {
 		}
 	}
 	candidates = append(candidates, "ID", "Id", "id")
+	return candidates
+}
 
-	instanceValue := reflect.ValueOf(instance).Elem()
-	for _, name := range candidates {
-		if setIntField(instanceValue, name, id) {
-			return nil
+func (m *Manager[T]) canSetID(instance *T) bool {
+	if _, ok := any(instance).(ModelWithID); ok {
+		return true
+	}
+	instanceValue := reflect.ValueOf(instance)
+	if !instanceValue.IsValid() || instanceValue.IsNil() {
+		return false
+	}
+	instanceValue = instanceValue.Elem()
+	for _, name := range m.primaryKeyFieldCandidates() {
+		if canSetIntField(instanceValue, name) {
+			return true
 		}
 	}
-	return fmt.Errorf("cannot set primary key %s on %T", pkCol, instance)
+	return false
+}
+
+func canSetIntField(val reflect.Value, targetName string) bool {
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return false
+		}
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return false
+	}
+	t := val.Type()
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		fieldValue := val.Field(i)
+		if field.Anonymous {
+			if canSetIntField(fieldValue, targetName) {
+				return true
+			}
+			continue
+		}
+		if field.Name == targetName && fieldValue.CanSet() && isIntKind(fieldValue.Kind()) {
+			return true
+		}
+	}
+	return false
 }
 
 func setIntField(val reflect.Value, targetName string, id int64) bool {
@@ -626,7 +677,18 @@ func (m *Manager[T]) validate(instance *T) error {
 		}
 	}
 
-	// 3. Run Validate() if the model implements it (e.g. from generated code)
+	return m.validateConstraints(instance)
+}
+
+func (m *Manager[T]) validateForPersistence(instance *T, validationCompleted bool) error {
+	if validationCompleted {
+		return m.validateConstraints(instance)
+	}
+	return m.validate(instance)
+}
+
+func (m *Manager[T]) validateConstraints(instance *T) error {
+	// Run Validate() if the model implements it (e.g. from generated code).
 	if validatable, ok := any(instance).(interface{ Validate() error }); ok {
 		if err := validatable.Validate(); err != nil {
 			return fmt.Errorf("model validation failed: %w", err)

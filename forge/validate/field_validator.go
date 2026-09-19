@@ -230,10 +230,13 @@ func (fv *FieldValidator) ValidateModel(model interface{}, fields []schema.Field
 
 	rt := rv.Type()
 
-	// Create a map of field names to schema fields
+	// Create a map of schema and database column names to schema fields.
 	fieldMap := make(map[string]schema.Field)
 	for _, field := range fields {
-		fieldMap[field.Name] = field
+		fieldMap[strings.ToLower(field.Name)] = field
+		if field.DBColumn != "" {
+			fieldMap[strings.ToLower(field.DBColumn)] = field
+		}
 	}
 
 	// Validate each struct field
@@ -242,15 +245,25 @@ func (fv *FieldValidator) ValidateModel(model interface{}, fields []schema.Field
 		fieldValue := rv.Field(i)
 
 		// Get field name from struct tag or use field name
-		fieldName := structField.Name
+		fieldNames := []string{structField.Name}
 		if jsonTag := structField.Tag.Get("json"); jsonTag != "" && jsonTag != "-" {
 			// Extract field name from json tag (handle "name,omitempty")
 			parts := strings.Split(jsonTag, ",")
-			fieldName = parts[0]
+			fieldNames = append(fieldNames, parts[0])
+		}
+		if dbTag := structField.Tag.Get("db"); dbTag != "" && dbTag != "-" {
+			fieldNames = append(fieldNames, strings.Split(dbTag, ",")[0])
 		}
 
 		// Find corresponding schema field
-		schemaField, exists := fieldMap[fieldName]
+		var schemaField schema.Field
+		var exists bool
+		for _, fieldName := range fieldNames {
+			schemaField, exists = fieldMap[strings.ToLower(fieldName)]
+			if exists {
+				break
+			}
+		}
 		if !exists {
 			continue // Skip fields not in schema
 		}

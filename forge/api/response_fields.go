@@ -15,7 +15,7 @@ func NonSerializableFields(model interface{}) []string {
 		return nil
 	}
 	if s, ok := model.(schema.Schema); ok {
-		return nonSerializableFromFields(s.Fields())
+		return nonSerializableFromFields(model, s.Fields())
 	}
 	// Handle a non-pointer model whose pointer implements schema.Schema.
 	v := reflect.ValueOf(model)
@@ -23,22 +23,30 @@ func NonSerializableFields(model interface{}) []string {
 		ptr := reflect.New(v.Type())
 		ptr.Elem().Set(v)
 		if s, ok := ptr.Interface().(schema.Schema); ok {
-			return nonSerializableFromFields(s.Fields())
+			return nonSerializableFromFields(ptr.Interface(), s.Fields())
 		}
 	}
 	return nil
 }
 
-func nonSerializableFromFields(fields []schema.Field) []string {
+func nonSerializableFromFields(model interface{}, fields []schema.Field) []string {
 	var out []string
+	seen := make(map[string]bool)
+	appendUnique := func(name string) {
+		if name == "" || name == "-" || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
 	for _, f := range fields {
 		if f.Serialize {
 			continue
 		}
-		out = append(out, f.Name)
-		if f.DBColumn != "" && f.DBColumn != f.Name {
-			out = append(out, f.DBColumn)
-		}
+		appendUnique(f.Name)
+		appendUnique(f.DBColumn)
+		_, jsonName := resolveModelFieldNames(model, f.Name, f.DBColumn)
+		appendUnique(jsonName)
 	}
 	return out
 }

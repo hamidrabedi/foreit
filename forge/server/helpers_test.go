@@ -34,10 +34,18 @@ func TestHelpers(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("GetJSON Preserves Number Precision", func(t *testing.T) {
-		req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"value":9007199254740993}`))
+	t.Run("GetJSON Uses Default Float64 Numbers", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"value":42}`))
 		var data map[string]interface{}
 		err := GetJSON(req, &data)
+		assert.NoError(t, err)
+		assert.Equal(t, float64(42), data["value"])
+	})
+
+	t.Run("GetJSONUseNumber Preserves Number Precision", func(t *testing.T) {
+		req := httptest.NewRequest("POST", "/", bytes.NewBufferString(`{"value":9007199254740993}`))
+		var data map[string]interface{}
+		err := GetJSONUseNumber(req, &data)
 		assert.NoError(t, err)
 		assert.Equal(t, json.Number("9007199254740993"), data["value"])
 	})

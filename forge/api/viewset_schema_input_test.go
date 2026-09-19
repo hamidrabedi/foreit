@@ -31,6 +31,56 @@ type schemaInputModel struct {
 	HookObserved int64     `json:"-" db:"-"`
 }
 
+type typedJSONDetails struct {
+	Enabled bool   `json:"enabled"`
+	Label   string `json:"label"`
+}
+
+type typedJSONModel struct {
+	schema.BaseSchema
+	Tags     []string               `json:"tags" db:"tags"`
+	Details  typedJSONDetails       `json:"details" db:"details"`
+	Settings map[string]interface{} `json:"settings" db:"settings"`
+}
+
+func (typedJSONModel) Fields() []schema.Field {
+	return []schema.Field{
+		schema.JSONField("tags"),
+		schema.JSONField("details"),
+		schema.JSONField("settings"),
+	}
+}
+
+type requiredSchemaModel struct {
+	schema.BaseSchema
+	ID   int64  `json:"id" db:"id"`
+	Name string `json:"display_name" db:"display_name_col"`
+}
+
+func (requiredSchemaModel) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		{Name: "name", DBColumn: "display_name_col", Type: schema.TypeString, Required: true, Editable: true, Serialize: true},
+	}
+}
+
+type requiredSchemaManager struct {
+	createCalled bool
+}
+
+func (m *requiredSchemaManager) Create(_ context.Context, model interface{}) error {
+	m.createCalled = true
+	model.(*requiredSchemaModel).ID = 1
+	return nil
+}
+
+func (*requiredSchemaManager) Get(context.Context, int64) (interface{}, error) {
+	return &requiredSchemaModel{ID: 1}, nil
+}
+
+func (*requiredSchemaManager) Update(context.Context, interface{}) error { return nil }
+func (*requiredSchemaManager) Delete(context.Context, interface{}) error { return nil }
+
 func (schemaInputModel) Fields() []schema.Field {
 	return []schema.Field{
 		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
@@ -154,12 +204,61 @@ func TestPopulateFromMap_UsesSchemaTypeForJSONAndBytes(t *testing.T) {
 	assert.Equal(t, []byte("hello"), model.Payload)
 }
 
+func TestPopulateFromMap_JSONSchemaSupportsConcreteGoTypes(t *testing.T) {
+	model := &typedJSONModel{}
+	err := populateFromMap(model, map[string]interface{}{
+		"tags":     []interface{}{"read", "write"},
+		"details":  map[string]interface{}{"enabled": true, "label": "primary"},
+		"settings": map[string]interface{}{"retries": json.Number("3")},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"read", "write"}, model.Tags)
+	assert.Equal(t, typedJSONDetails{Enabled: true, Label: "primary"}, model.Details)
+	assert.Equal(t, float64(3), model.Settings["retries"])
+}
+
 func TestBaseViewSet_Create_PreservesLargeInteger(t *testing.T) {
 	mgr := &schemaInputManager{}
 	rec := performSchemaInputRequest(t, newSchemaInputHandler(mgr), http.MethodPost, "/api/items/", `{"large_number":9007199254740993}`)
 	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
 	require.NotNil(t, mgr.last)
 	assert.Equal(t, int64(9007199254740993), mgr.last.LargeNumber)
+}
+
+func TestBaseViewSet_Create_ValidatesRequiredSchemaFieldWithoutTags(t *testing.T) {
+	mgr := &requiredSchemaManager{}
+	vs := NewBaseViewSet(newSchemaInputSerializer, mgr, &requiredSchemaModel{})
+	router := NewRouter("/api")
+	router.Register("required-items", vs)
+	handler := forgehttp.NewRouter()
+	router.RegisterRoutes(handler)
+
+	rec := performSchemaInputRequest(t, handler, http.MethodPost, "/api/required-items/", `{}`)
+	require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	assert.Contains(t, rec.Body.String(), `"display_name"`)
+	assert.False(t, mgr.createCalled)
+}
+
+func TestBaseViewSet_Create_RejectsInvalidByteArrays(t *testing.T) {
+	for _, body := range []string{
+		`{"payload":[300]}`,
+		`{"payload":[1,"x"]}`,
+	} {
+		t.Run(body, func(t *testing.T) {
+			mgr := &schemaInputManager{}
+			rec := performSchemaInputRequest(t, newSchemaInputHandler(mgr), http.MethodPost, "/api/items/", body)
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.Nil(t, mgr.last)
+		})
+	}
+}
+
+func TestBaseViewSet_Create_AcceptsIntegralByteArray(t *testing.T) {
+	mgr := &schemaInputManager{}
+	rec := performSchemaInputRequest(t, newSchemaInputHandler(mgr), http.MethodPost, "/api/items/", `{"payload":[0,1.0,255]}`)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	require.NotNil(t, mgr.last)
+	assert.Equal(t, []byte{0, 1, 255}, mgr.last.Payload)
 }
 
 func TestPopulateFromMap_UsesSchemaTemporalFormats(t *testing.T) {

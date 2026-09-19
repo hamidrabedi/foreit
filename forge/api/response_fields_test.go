@@ -21,20 +21,20 @@ type nonSerializableTestModel struct {
 	schema.BaseSchema
 	ID       int64  `json:"id" db:"id"`
 	Username string `json:"username" db:"username"`
-	Password string `json:"password" db:"password"`
+	Password string `json:"token" db:"secret_hash"`
 }
 
 func (nonSerializableTestModel) Fields() []schema.Field {
 	return []schema.Field{
 		schema.Int64Field("id"),
 		schema.StringField("username"),
-		schema.StringField("password", schema.Serialize(false)),
+		{Name: "secret", DBColumn: "secret_hash", Type: schema.TypeString, Editable: true, Serialize: false},
 	}
 }
 
 func TestNonSerializableFields_ReturnsOnlySerializeFalseFields(t *testing.T) {
 	got := NonSerializableFields(&nonSerializableTestModel{})
-	require.Equal(t, []string{"password"}, got)
+	require.Equal(t, []string{"secret", "secret_hash", "token"}, got)
 }
 
 type excludeResponseSerializer struct {
@@ -48,7 +48,7 @@ func newExcludeResponseSerializer() Serializer {
 }
 
 func (s *excludeResponseSerializer) Fields() []string {
-	return []string{"id", "username", "password"}
+	return []string{"id", "username", "token"}
 }
 
 type excludeResponseQuerySet struct {
@@ -194,7 +194,7 @@ func TestBaseViewSet_ExcludeResponseFields_OmitsFieldsInListRetrieveCreateUpdate
 	}
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &listResp))
 	require.Len(t, listResp.Results, 1)
-	assert.NotContains(t, listResp.Results[0], "password")
+	assert.NotContains(t, listResp.Results[0], "token")
 	assert.Contains(t, listResp.Results[0], "username")
 
 	// Retrieve
@@ -203,27 +203,27 @@ func TestBaseViewSet_ExcludeResponseFields_OmitsFieldsInListRetrieveCreateUpdate
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 	m := decodeMap(t, rec)
-	assert.NotContains(t, m, "password")
+	assert.NotContains(t, m, "token")
 	assert.Contains(t, m, "username")
 
 	// Create
-	req = httptest.NewRequest(http.MethodPost, "/api/users/", bytes.NewBufferString(`{"username":"bob","password":"secret2"}`))
+	req = httptest.NewRequest(http.MethodPost, "/api/users/", bytes.NewBufferString(`{"username":"bob","token":"secret2"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusCreated, rec.Code)
 	m = decodeMap(t, rec)
-	assert.NotContains(t, m, "password")
+	assert.NotContains(t, m, "token")
 	assert.Equal(t, "bob", m["username"])
 
 	// Update
-	req = httptest.NewRequest(http.MethodPut, "/api/users/1", bytes.NewBufferString(`{"username":"alice2","password":"newsecret"}`))
+	req = httptest.NewRequest(http.MethodPut, "/api/users/1", bytes.NewBufferString(`{"username":"alice2","token":"newsecret"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	require.Equal(t, http.StatusOK, rec.Code)
 	m = decodeMap(t, rec)
-	assert.NotContains(t, m, "password")
+	assert.NotContains(t, m, "token")
 	assert.Equal(t, "alice2", m["username"])
 }
 

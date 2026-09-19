@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/forgego/forge/api/authentication"
+	"github.com/forgego/forge/api/core"
 	"github.com/forgego/forge/api/docs"
 	apierrors "github.com/forgego/forge/api/errors"
 	"github.com/forgego/forge/api/exceptions"
@@ -85,16 +86,12 @@ type BaseViewSet struct {
 	action   string
 }
 
-type actionContextKeyType struct{}
-
-var actionContextKey = actionContextKeyType{}
-
 // ActionFromContext returns the action name stored in ctx, or an empty string if none is set.
 func ActionFromContext(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if action, ok := ctx.Value(actionContextKey).(string); ok {
+	if action, ok := core.ActionFromContext(ctx); ok {
 		return action
 	}
 	return ""
@@ -112,7 +109,7 @@ func withAction(r *http.Request, action string) *http.Request {
 	if r == nil {
 		return nil
 	}
-	return r.WithContext(context.WithValue(r.Context(), actionContextKey, action))
+	return r.WithContext(core.WithAction(r.Context(), action))
 }
 
 // NewBaseViewSet creates a new base viewset
@@ -409,7 +406,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var data map[string]interface{}
-	if err := forgehttp.GetJSON(r, &data); err != nil {
+	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
@@ -595,7 +592,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 	}
 
 	var data map[string]interface{}
-	if err := forgehttp.GetJSON(r, &data); err != nil {
+	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
@@ -1220,7 +1217,36 @@ func validateModelInstance(instance interface{}) error {
 			return fmt.Errorf("model validation failed: %w", err)
 		}
 	}
+	if s, ok := instance.(schema.Schema); ok {
+		if err := validation.ValidateModelWithSchema(validation.NewValidator(), instance, s.Fields()); err != nil {
+			return schemaModelValidationError(instance, s.Fields(), err)
+		}
+	}
 	return nil
+}
+
+func schemaModelValidationError(instance interface{}, fields []schema.Field, err error) error {
+	message := err.Error()
+	schemaName := ""
+	if idx := strings.Index(message, ":"); idx >= 0 {
+		schemaName = strings.TrimSpace(message[:idx])
+		message = strings.TrimSpace(message[idx+1:])
+	}
+	fieldName := schemaName
+	for _, field := range fields {
+		if field.Name != schemaName && field.DBColumn != schemaName {
+			continue
+		}
+		_, jsonName := resolveModelFieldNames(instance, field.Name, field.DBColumn)
+		if jsonName != "" && jsonName != "-" {
+			fieldName = jsonName
+		}
+		break
+	}
+	if fieldName == "" {
+		fieldName = "non_field_errors"
+	}
+	return forgeerrors.NewInvalidInputError(fieldName, message)
 }
 
 // modelValidationException converts a validateModelInstance failure into a
@@ -1757,14 +1783,19 @@ func setFieldValue(field reflect.Value, value interface{}, schemaField ...*schem
 	}
 
 	if fieldSchema != nil && fieldSchema.Type == schema.TypeJSON {
-		if field.Kind() != reflect.Slice || field.Type().Elem().Kind() != reflect.Uint8 {
-			return fmt.Errorf("schema JSON field must use []byte, got %s", field.Type())
-		}
 		encoded, err := json.Marshal(value)
 		if err != nil {
 			return fmt.Errorf("invalid JSON value: %w", err)
 		}
-		field.SetBytes(encoded)
+		if field.Kind() == reflect.Slice && field.Type().Elem().Kind() == reflect.Uint8 {
+			field.SetBytes(encoded)
+			return nil
+		}
+		decoded := reflect.New(field.Type())
+		if err := json.Unmarshal(encoded, decoded.Interface()); err != nil {
+			return fmt.Errorf("invalid JSON value for %s: %w", field.Type(), err)
+		}
+		field.Set(decoded.Elem())
 		return nil
 	}
 
@@ -1781,7 +1812,8 @@ func setFieldValue(field reflect.Value, value interface{}, schemaField ...*schem
 	// []byte fields (codegen JSON/Bytes): accept a base64 string like
 	// encoding/json does, or an array of byte values.
 	if fieldType.Kind() == reflect.Slice && fieldType.Elem().Kind() == reflect.Uint8 {
-		return setBytesField(field, value)
+		strictByteArray := fieldSchema != nil && fieldSchema.Type == schema.TypeBytes
+		return setBytesField(field, value, strictByteArray)
 	}
 
 	switch field.Kind() {
@@ -2117,7 +2149,7 @@ func integralFloatToUint64(value float64) (uint64, error) {
 
 // setBytesField assigns a base64 string (like encoding/json does for []byte),
 // a byte array, or another []uint8 value to a []byte field.
-func setBytesField(field reflect.Value, value interface{}) error {
+func setBytesField(field reflect.Value, value interface{}, strictByteArray bool) error {
 	switch v := value.(type) {
 	case string:
 		decoded, err := base64.StdEncoding.DecodeString(v)
@@ -2134,12 +2166,15 @@ func setBytesField(field reflect.Value, value interface{}) error {
 		for i, e := range v {
 			n, ok := byteValue(e)
 			if !ok {
-				encoded, err := json.Marshal(v)
-				if err != nil {
-					return fmt.Errorf("invalid JSON array: %w", err)
+				if !strictByteArray {
+					encoded, err := json.Marshal(v)
+					if err != nil {
+						return fmt.Errorf("invalid JSON array: %w", err)
+					}
+					field.SetBytes(encoded)
+					return nil
 				}
-				field.SetBytes(encoded)
-				return nil
+				return fmt.Errorf("element %d must be an integer between 0 and 255", i)
 			}
 			b[i] = n
 		}
@@ -2175,8 +2210,8 @@ func byteValue(value interface{}) (byte, bool) {
 		}
 		return byte(v), true
 	case json.Number:
-		n, err := v.Int64()
-		if err != nil || n < 0 || n > 255 {
+		n, err := parseIntegralUint64(v.String())
+		if err != nil || n > 255 {
 			return 0, false
 		}
 		return byte(n), true

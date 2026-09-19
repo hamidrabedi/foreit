@@ -12,9 +12,21 @@ import (
 
 // GetJSON parses JSON from request body
 func GetJSON(r *http.Request, v interface{}) error {
+	return decodeJSON(r, v, false)
+}
+
+// GetJSONUseNumber parses JSON while preserving numbers as json.Number when
+// decoding into interface values.
+func GetJSONUseNumber(r *http.Request, v interface{}) error {
+	return decodeJSON(r, v, true)
+}
+
+func decodeJSON(r *http.Request, v interface{}, useNumber bool) error {
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
-	decoder.UseNumber()
+	if useNumber {
+		decoder.UseNumber()
+	}
 	if err := decoder.Decode(v); err != nil {
 		return err
 	}

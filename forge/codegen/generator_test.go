@@ -132,6 +132,27 @@ func (Category) Fields() []schema.Field {
 	assert.Equal(t, oldAPI, apiContents)
 }
 
+func TestGeneratorGenerate_APIWritePreparationFailurePreservesGen(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Product struct { schema.BaseSchema }
+func (Product) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+	oldGen := []byte("old models output\n")
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "gen.go"), oldGen, 0644))
+	require.NoError(t, os.Mkdir(filepath.Join(tmpDir, "api_gen.go"), 0755))
+
+	err := NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate()
+	require.Error(t, err)
+	genContents, readErr := os.ReadFile(filepath.Join(tmpDir, "gen.go"))
+	require.NoError(t, readErr)
+	assert.Equal(t, oldGen, genContents)
+}
+
 func TestGeneratorGenerate_PluralizesCategoryRoute(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelSrc := `package testmodels

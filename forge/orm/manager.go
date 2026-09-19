@@ -235,6 +235,9 @@ func (m *Manager[T]) placeholderFunc() func(int) string {
 
 // Create creates a new model instance
 func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
+	validationCompleted := modelValidationCompleted(ctx)
+	ctx = withoutModelValidationCompleted(ctx)
+
 	if !m.hasDB() {
 		return errors.NewConfigurationError("database connection not set", "db")
 	}
@@ -250,8 +253,10 @@ func (m *Manager[T]) Create(ctx context.Context, instance *T) error {
 	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
 		return err
 	}
-	if err := m.validate(instance); err != nil {
-		return err
+	if !validationCompleted {
+		if err := m.validate(instance); err != nil {
+			return err
+		}
 	}
 
 	// Build and execute INSERT
@@ -359,6 +364,9 @@ func (m *Manager[T]) BulkCreate(ctx context.Context, instances []*T) error {
 
 // Update updates an existing model instance
 func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
+	validationCompleted := modelValidationCompleted(ctx)
+	ctx = withoutModelValidationCompleted(ctx)
+
 	if !m.hasDB() {
 		return errors.NewConfigurationError("database connection not set", "db")
 	}
@@ -377,8 +385,10 @@ func (m *Manager[T]) Update(ctx context.Context, instance *T) error {
 	if err := m.runHooks(ctx, instance, "BeforeSave"); err != nil {
 		return err
 	}
-	if err := m.validate(instance); err != nil {
-		return err
+	if !validationCompleted {
+		if err := m.validate(instance); err != nil {
+			return err
+		}
 	}
 
 	pkColumn := m.primaryKeyColumn()

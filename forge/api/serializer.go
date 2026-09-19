@@ -86,6 +86,14 @@ func (s *BaseSerializer) GetInt(key string) int {
 	if val, ok := s.data[key].(float64); ok {
 		return int(val)
 	}
+	if val, ok := s.data[key].(json.Number); ok {
+		if parsed, err := val.Int64(); err == nil {
+			return int(parsed)
+		}
+		if parsed, err := val.Float64(); err == nil {
+			return int(parsed)
+		}
+	}
 	if val, ok := s.data[key].(int); ok {
 		return val
 	}

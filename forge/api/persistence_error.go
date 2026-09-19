@@ -2,11 +2,14 @@ package api
 
 import (
 	"errors"
+	"net/http"
 
 	apierrors "github.com/forgego/forge/api/errors"
 	"github.com/forgego/forge/api/exceptions"
 	forgeerrors "github.com/forgego/forge/errors"
 	"github.com/forgego/forge/validate"
+	"github.com/lib/pq"
+	"github.com/mattn/go-sqlite3"
 )
 
 // persistenceException maps manager persistence failures to API exceptions
@@ -110,5 +113,37 @@ func persistenceException(err error) error {
 		return exceptions.NewValidationError(map[string][]string{field: {validationErr.Message}})
 	}
 
+	if status, ok := constraintViolationStatus(err); ok {
+		if status == http.StatusConflict {
+			return exceptions.NewAPIException(status, "conflict", "Resource conflicts with an existing value", nil)
+		}
+		return exceptions.NewAPIException(status, "invalid_request", "Request violates a database constraint", nil)
+	}
+
 	return err
+}
+
+func constraintViolationStatus(err error) (int, bool) {
+	var postgresErr *pq.Error
+	if errors.As(err, &postgresErr) {
+		switch string(postgresErr.Code) {
+		case "23505":
+			return http.StatusConflict, true
+		case "23502", "23503", "23514":
+			return http.StatusBadRequest, true
+		}
+	}
+
+	var sqliteErr sqlite3.Error
+	if errors.As(err, &sqliteErr) && sqliteErr.Code == sqlite3.ErrConstraint {
+		switch sqliteErr.ExtendedCode {
+		case sqlite3.ErrConstraintPrimaryKey, sqlite3.ErrConstraintUnique:
+			return http.StatusConflict, true
+		case sqlite3.ErrConstraintCheck, sqlite3.ErrConstraintForeignKey, sqlite3.ErrConstraintNotNull:
+			return http.StatusBadRequest, true
+		default:
+			return http.StatusBadRequest, true
+		}
+	}
+	return 0, false
 }

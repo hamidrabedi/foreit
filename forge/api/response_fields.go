@@ -84,11 +84,10 @@ func nonEditableFromFields(fields []schema.Field) []string {
 
 // isRequestReadOnly reports whether a field is owned by the database and must
 // therefore be ignored on requests even when it keeps Editable: true.
-// Mirrors admin/core isAutoManaged for the request path (excluding the
-// primary-key auto-increment case, which the viewset already guards by
-// restoring the URL primary key on update and ignoring body IDs on create).
+// Mirrors admin/core isAutoManaged for the request path and includes an
+// auto-increment primary key, whose value is always owned by the database.
 func isRequestReadOnly(f schema.Field) bool {
-	return f.AutoNow || f.AutoNowAdd || f.Generated
+	return (f.PrimaryKey && f.AutoIncrement) || f.AutoNow || f.AutoNowAdd || f.Generated
 }
 
 // stripExcludedFields removes ExcludeResponseFields keys from a serialized map.

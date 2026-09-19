@@ -385,6 +385,52 @@ func defaultFields() schema.Field { return schema.StringField("name") }
 	}
 }
 
+func TestGenerateApps_InvalidLaterAPIModelPreservesEarlierGeneratedFiles(t *testing.T) {
+	root := t.TempDir()
+	appsDir := filepath.Join(root, "app")
+	firstDir := filepath.Join(appsDir, "a_valid")
+	secondDir := filepath.Join(appsDir, "z_invalid")
+	require.NoError(t, os.MkdirAll(firstDir, 0o755))
+	require.NoError(t, os.MkdirAll(secondDir, 0o755))
+
+	valid := `package valid
+import "github.com/forgego/forge/schema"
+type Product struct { schema.BaseSchema }
+func (Product) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	invalid := `package invalid
+import "github.com/forgego/forge/schema"
+type ManualKey struct { schema.BaseSchema }
+func (ManualKey) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(firstDir, "models.go"), []byte(valid), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(secondDir, "models.go"), []byte(invalid), 0o600))
+
+	oldGen := []byte("previous generated models\n")
+	oldAPI := []byte("previous generated API\n")
+	require.NoError(t, os.WriteFile(filepath.Join(firstDir, "gen.go"), oldGen, 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(firstDir, "api_gen.go"), oldAPI, 0o600))
+
+	command := NewGenerateCommand().Definition()
+	require.NoError(t, command.Flags().Set("models", appsDir))
+	require.NoError(t, command.Flags().Set("output", appsDir))
+	require.NoError(t, command.Flags().Set("api", "true"))
+	err := NewGenerateCommand().Execute(&core.Context{Cmd: command}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ManualKey")
+
+	gotGen, readErr := os.ReadFile(filepath.Join(firstDir, "gen.go"))
+	require.NoError(t, readErr)
+	gotAPI, readErr := os.ReadFile(filepath.Join(firstDir, "api_gen.go"))
+	require.NoError(t, readErr)
+	assert.Equal(t, oldGen, gotGen)
+	assert.Equal(t, oldAPI, gotAPI)
+}
+
 func executeGenerate(t *testing.T, modelsDir string, strict bool) (string, error) {
 	t.Helper()
 	command := NewGenerateCommand().Definition()

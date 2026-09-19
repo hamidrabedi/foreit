@@ -151,6 +151,9 @@ func ValidateAPIModels(definitions []*ModelDefinition) error {
 		if primaryKey.Name != "id" {
 			return fmt.Errorf("model %s has primary key field %q; generated REST APIs require an int64 primary key named \"id\"", def.Name, primaryKey.Name)
 		}
+		if !primaryKey.AutoIncrement {
+			return fmt.Errorf("model %s has a non-auto-increment primary key field \"id\"; the generated API requires an auto-increment id", def.Name)
+		}
 	}
 	return nil
 }

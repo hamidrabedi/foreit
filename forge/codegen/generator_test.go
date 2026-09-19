@@ -82,7 +82,8 @@ func TestValidateAPIModels_AcceptsOnlyInt64IDPrimaryKey(t *testing.T) {
 		model   *ModelDefinition
 		wantErr string
 	}{
-		{name: "int64 id", model: &ModelDefinition{Name: "Product", Fields: []FieldDefinition{{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}},
+		{name: "auto-increment int64 id", model: &ModelDefinition{Name: "Product", Fields: []FieldDefinition{{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true, AutoIncrement: true}}}},
+		{name: "non-auto-increment int64 id", model: &ModelDefinition{Name: "Manual", Fields: []FieldDefinition{{Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}, wantErr: "model Manual"},
 		{name: "no primary key", model: &ModelDefinition{Name: "Log", Fields: []FieldDefinition{{Name: "message", Type: "String", GoType: "string"}}}, wantErr: "has no primary key"},
 		{name: "int32 id", model: &ModelDefinition{Name: "Counter", Fields: []FieldDefinition{{Name: "id", Type: "Int32", GoType: "int32", PrimaryKey: true}}}, wantErr: "require an int64 primary key"},
 		{name: "int64 non id", model: &ModelDefinition{Name: "Product", Fields: []FieldDefinition{{Name: "product_id", Type: "Int64", GoType: "int64", PrimaryKey: true}}}, wantErr: "field \"product_id\""},
@@ -99,6 +100,9 @@ func TestValidateAPIModels_AcceptsOnlyInt64IDPrimaryKey(t *testing.T) {
 			}
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.wantErr)
+			if tt.name == "non-auto-increment int64 id" {
+				assert.Contains(t, err.Error(), "API requires an auto-increment id")
+			}
 		})
 	}
 }

@@ -17,6 +17,13 @@ type Validator struct {
 // NewValidator creates a new validator instance with all custom validators registered
 func NewValidator() *Validator {
 	v := validator.New()
+	v.RegisterTagNameFunc(func(field reflect.StructField) string {
+		name := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
+		if name == "" || name == "-" {
+			return field.Name
+		}
+		return name
+	})
 	val := &Validator{Validate: v}
 
 	// Register all custom validators

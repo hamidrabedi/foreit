@@ -414,6 +414,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 		_ = forgehttp.SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
 	}
+	applySchemaDefaults(vs.Model, data)
 
 	serializer := vs.Serializer()
 	stripReadOnlyInput(serializer, data)
@@ -471,7 +472,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 
 	results := createMethod.Func.Call([]reflect.Value{
 		manager,
-		reflect.ValueOf(ctx),
+		reflect.ValueOf(orm.WithModelValidationCompleted(ctx)),
 		reflect.ValueOf(instance),
 	})
 
@@ -480,6 +481,16 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 			vs.handleException(w, r, persistenceException(err))
 			return
 		}
+	}
+
+	pkGoName, pkDBName, pkJSONName := vs.getSchemaPrimaryKeyField()
+	if id, ok := primaryKeyInt64(instance, pkGoName, pkDBName, pkJSONName); ok && id != 0 {
+		refetched, err := getManagerInstance(manager, managerType, ctx, id)
+		if err != nil {
+			vs.handleException(w, r, lookupException(err))
+			return
+		}
+		instance = refetched
 	}
 
 	// Serialize and return created instance
@@ -685,7 +696,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	updateResults := updateMethod.Func.Call([]reflect.Value{
 		manager,
-		reflect.ValueOf(ctx),
+		reflect.ValueOf(orm.WithModelValidationCompleted(ctx)),
 		reflect.ValueOf(instance),
 	})
 
@@ -695,6 +706,13 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 			return
 		}
 	}
+
+	refetched, err := getManagerInstance(manager, managerType, ctx, id)
+	if err != nil {
+		vs.handleException(w, r, lookupException(err))
+		return
+	}
+	instance = refetched
 
 	serialized := vs.stripExcludedFields(SerializeModel(instance))
 	serialized = filterOutputMap(vs.Serializer(), serialized)
@@ -1252,6 +1270,7 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 	for _, k := range ignoredKeys {
 		ignored[strings.ToLower(k)] = true
 	}
+	schemaFields := schemaFieldsByRequestName(instance)
 
 	var applyToStruct func(target reflect.Value) error
 	applyToStruct = func(target reflect.Value) error {
@@ -1298,7 +1317,8 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 			}
 			if value, ok := data[key]; ok {
 				if fieldValue.CanSet() {
-					if err := setFieldValue(fieldValue, value); err != nil {
+					fieldSchema := schemaFieldForStructField(schemaFields, field, key, dbTag)
+					if err := setFieldValue(fieldValue, value, fieldSchema); err != nil {
 						return &fieldError{Field: key, Message: err.Error()}
 					}
 				}
@@ -1308,6 +1328,72 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 	}
 
 	return applyToStruct(instanceValue)
+}
+
+func schemaFieldsByRequestName(instance interface{}) map[string]*schema.Field {
+	modelSchema, ok := instance.(schema.Schema)
+	if !ok {
+		return nil
+	}
+	fields := modelSchema.Fields()
+	result := make(map[string]*schema.Field, len(fields)*3)
+	for i := range fields {
+		field := &fields[i]
+		for _, name := range []string{field.Name, field.DBColumn} {
+			if name != "" {
+				result[strings.ToLower(name)] = field
+			}
+		}
+		goName, jsonName := resolveModelFieldNames(instance, field.Name, field.DBColumn)
+		for _, name := range []string{goName, jsonName} {
+			if name != "" && name != "-" {
+				result[strings.ToLower(name)] = field
+			}
+		}
+	}
+	return result
+}
+
+func schemaFieldForStructField(fields map[string]*schema.Field, field reflect.StructField, jsonName, dbName string) *schema.Field {
+	for _, name := range []string{jsonName, dbName, field.Name} {
+		if schemaField := fields[strings.ToLower(name)]; schemaField != nil {
+			return schemaField
+		}
+	}
+	return nil
+}
+
+func applySchemaDefaults(model interface{}, data map[string]interface{}) {
+	if data == nil {
+		return
+	}
+	modelSchema, ok := model.(schema.Schema)
+	if !ok {
+		return
+	}
+	for _, field := range modelSchema.Fields() {
+		if field.Default == nil {
+			continue
+		}
+		goName, jsonName := resolveModelFieldNames(model, field.Name, field.DBColumn)
+		requestName := jsonName
+		if requestName == "" || requestName == "-" {
+			requestName = field.Name
+		}
+		present := false
+		for _, name := range []string{requestName, field.Name, field.DBColumn, goName} {
+			if name == "" {
+				continue
+			}
+			if _, exists := data[name]; exists {
+				present = true
+				break
+			}
+		}
+		if !present {
+			data[requestName] = field.Default
+		}
+	}
 }
 
 // getSchemaPrimaryKeyField returns the primary key field from the model's schema if available.
@@ -1447,6 +1533,55 @@ func getPrimaryKeyValue(instance interface{}, pkGoName, pkDBName, pkJSONName str
 		}
 	}
 	return nil
+}
+
+func primaryKeyInt64(instance interface{}, pkGoName, pkDBName, pkJSONName string) (int64, bool) {
+	value := getPrimaryKeyValue(instance, pkGoName, pkDBName, pkJSONName)
+	if value == nil {
+		return 0, false
+	}
+	rv := reflect.ValueOf(value)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return rv.Int(), true
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if rv.Uint() > math.MaxInt64 {
+			return 0, false
+		}
+		return int64(rv.Uint()), true
+	default:
+		return 0, false
+	}
+}
+
+func getManagerInstance(manager reflect.Value, managerType reflect.Type, ctx context.Context, id int64) (interface{}, error) {
+	getMethod, ok := globalCache.GetMethod(managerType, "Get")
+	if !ok {
+		return nil, errors.New("Get method not found")
+	}
+	results := getMethod.Func.Call([]reflect.Value{manager, reflect.ValueOf(ctx), reflect.ValueOf(id)})
+	if len(results) < 2 {
+		return nil, errors.New("invalid Get method")
+	}
+	if !results[1].IsNil() {
+		if err, ok := results[1].Interface().(error); ok {
+			return nil, err
+		}
+		return nil, errors.New("Get returned a non-error failure value")
+	}
+	if isNilReflectValue(results[0]) {
+		return nil, errors.New("Get returned a nil instance")
+	}
+	return results[0].Interface(), nil
+}
+
+func isNilReflectValue(value reflect.Value) bool {
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Ptr, reflect.Slice:
+		return value.IsNil()
+	default:
+		return false
+	}
 }
 
 // restorePrimaryKey restores the primary key value on instance from the original value or urlID.
@@ -1612,8 +1747,24 @@ func isIntKind(k reflect.Kind) bool {
 // arrive as float64 (or json.Number) and numeric strings are accepted for
 // numeric fields. An incompatible value returns an error; it is never dropped
 // silently.
-func setFieldValue(field reflect.Value, value interface{}) error {
+func setFieldValue(field reflect.Value, value interface{}, schemaField ...*schema.Field) error {
 	if !field.CanSet() {
+		return nil
+	}
+	var fieldSchema *schema.Field
+	if len(schemaField) > 0 {
+		fieldSchema = schemaField[0]
+	}
+
+	if fieldSchema != nil && fieldSchema.Type == schema.TypeJSON {
+		if field.Kind() != reflect.Slice || field.Type().Elem().Kind() != reflect.Uint8 {
+			return fmt.Errorf("schema JSON field must use []byte, got %s", field.Type())
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("invalid JSON value: %w", err)
+		}
+		field.SetBytes(encoded)
 		return nil
 	}
 
@@ -1656,7 +1807,7 @@ func setFieldValue(field reflect.Value, value interface{}) error {
 		return nil
 	case reflect.Ptr:
 		elem := reflect.New(fieldType.Elem())
-		if err := setFieldValue(elem.Elem(), value); err != nil {
+		if err := setFieldValue(elem.Elem(), value, fieldSchema); err != nil {
 			return err
 		}
 		field.Set(elem)
@@ -1665,7 +1816,7 @@ func setFieldValue(field reflect.Value, value interface{}) error {
 		return setCompositeField(field, value)
 	case reflect.Struct:
 		if fieldType == reflect.TypeOf(time.Time{}) {
-			return setTimeField(field, value)
+			return setTimeField(field, value, fieldSchema)
 		}
 		return setCompositeField(field, value)
 	case reflect.Interface:
@@ -2065,7 +2216,7 @@ func setCompositeField(field reflect.Value, value interface{}) error {
 }
 
 // setTimeField assigns date/time strings to time.Time fields.
-func setTimeField(field reflect.Value, value interface{}) error {
+func setTimeField(field reflect.Value, value interface{}, schemaField *schema.Field) error {
 	str, ok := value.(string)
 	if !ok {
 		return fmt.Errorf("expected date/time string, got %T", value)
@@ -2074,13 +2225,22 @@ func setTimeField(field reflect.Value, value interface{}) error {
 		field.Set(reflect.ValueOf(time.Time{}))
 		return nil
 	}
-	if parsed, err := time.Parse(time.RFC3339, str); err == nil {
-		field.Set(reflect.ValueOf(parsed))
-		return nil
+	layouts := []string{time.RFC3339, "2006-01-02"}
+	if schemaField != nil {
+		switch schemaField.Type {
+		case schema.TypeTime:
+			layouts = []string{"15:04:05", "15:04", time.RFC3339, "2006-01-02"}
+		case schema.TypeDate:
+			layouts = []string{"2006-01-02"}
+		case schema.TypeDateTime:
+			layouts = []string{time.RFC3339}
+		}
 	}
-	if parsed, err := time.Parse("2006-01-02", str); err == nil {
-		field.Set(reflect.ValueOf(parsed))
-		return nil
+	for _, layout := range layouts {
+		if parsed, err := time.Parse(layout, str); err == nil {
+			field.Set(reflect.ValueOf(parsed))
+			return nil
+		}
 	}
 	return fmt.Errorf("invalid date/time value %q", str)
 }

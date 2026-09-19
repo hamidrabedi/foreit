@@ -111,6 +111,18 @@ func (c *GenerateCommand) Execute(ctx *core.Context, args []string) error {
 					return err
 				}
 			}
+			if generateAPI {
+				for _, app := range pending {
+					parser := codegen.NewASTParser()
+					definitions, parseErr := parser.ParseDirectory(app.appPath)
+					if parseErr != nil {
+						return fmt.Errorf("generation failed for %s: failed to parse schemas: %w", app.name, parseErr)
+					}
+					if validateErr := codegen.ValidateAPIModels(definitions); validateErr != nil {
+						return fmt.Errorf("generation failed for %s: failed to generate API code: %w", app.name, validateErr)
+					}
+				}
+			}
 			var diagnostics []codegen.Diagnostic
 			for _, app := range pending {
 				fmt.Printf("  Generating for %s...\n", app.name)

@@ -122,8 +122,43 @@ func (Product) Fields() []schema.Field {
 	err := NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "model Product")
-	assert.Contains(t, err.Error(), "no writable integer ID or Id field")
+	assert.Contains(t, err.Error(), "no concrete int64 ID or Id field")
 	assert.NoFileExists(t, filepath.Join(tmpDir, "api_gen.go"))
+}
+
+func TestGeneratorGenerate_RejectsConcreteIntID(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Product struct { schema.BaseSchema; ID int }
+func (Product) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+
+	err := NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate()
+	require.ErrorContains(t, err, "no concrete int64 ID or Id field")
+	assert.NoFileExists(t, filepath.Join(tmpDir, "api_gen.go"))
+}
+
+func TestGeneratorGenerate_AcceptsModelWithIDMethods(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Product struct { schema.BaseSchema; key int64 }
+func (Product) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+	methodSrc := `package testmodels
+func (p *Product) GetID() int64 { return p.key }
+func (p *Product) SetID(id int64) { p.key = id }
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "model_id.go"), []byte(methodSrc), 0644))
+	require.NoError(t, NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate())
+	assert.FileExists(t, filepath.Join(tmpDir, "api_gen.go"))
 }
 
 func TestGeneratorGenerate_InvalidAPIModelPreservesGeneratedFiles(t *testing.T) {

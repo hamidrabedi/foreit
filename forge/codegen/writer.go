@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,12 +15,14 @@ import (
 // Writer writes generated code to files
 type Writer struct {
 	templates map[string]*template.Template
+	rename    func(string, string) error
 }
 
 // NewWriter creates a new writer
 func NewWriter() *Writer {
 	return &Writer{
 		templates: make(map[string]*template.Template),
+		rename:    os.Rename,
 	}
 }
 
@@ -142,10 +145,27 @@ func (w *Writer) WriteCombinedAndAPI(definitions []*ModelDefinition, outputDir s
 	}
 	defer apiWrite.cleanup()
 
-	if err := combinedWrite.commit(); err != nil {
+	combinedBackup, err := backupDestination(combinedWrite.destination)
+	if err != nil {
 		return err
 	}
-	return apiWrite.commit()
+	defer combinedBackup.cleanup()
+	apiBackup, err := backupDestination(apiWrite.destination)
+	if err != nil {
+		return err
+	}
+	defer apiBackup.cleanup()
+
+	if err := combinedWrite.commit(w.renameFile()); err != nil {
+		return err
+	}
+	if err := apiWrite.commit(w.renameFile()); err != nil {
+		if restoreErr := restoreDestinations(combinedBackup, apiBackup); restoreErr != nil {
+			return fmt.Errorf("%w; failed to restore generated files: %v", err, restoreErr)
+		}
+		return err
+	}
+	return nil
 }
 
 // writeTemplate writes a template to a file. Replacement is atomic on Unix.
@@ -165,7 +185,7 @@ func (w *Writer) writeBytes(contents []byte, filename string) error {
 		return err
 	}
 	defer prepared.cleanup()
-	return prepared.commit()
+	return prepared.commit(w.renameFile())
 }
 
 type preparedWrite struct {
@@ -234,12 +254,97 @@ func prepareWrite(filename string, contents []byte) (*preparedWrite, error) {
 	return &preparedWrite{destination: writeFilename, tempPath: tmpPath}, nil
 }
 
-func (p *preparedWrite) commit() error {
-	if err := os.Rename(p.tempPath, p.destination); err != nil {
+func (p *preparedWrite) commit(rename func(string, string) error) error {
+	if err := rename(p.tempPath, p.destination); err != nil {
 		return fmt.Errorf("failed to rename temp file to %s: %w", p.destination, err)
 	}
 	p.tempPath = ""
 	return nil
+}
+
+func (w *Writer) renameFile() func(string, string) error {
+	if w != nil && w.rename != nil {
+		return w.rename
+	}
+	return os.Rename
+}
+
+type destinationBackup struct {
+	destination string
+	backupPath  string
+	existed     bool
+}
+
+func backupDestination(destination string) (*destinationBackup, error) {
+	backup := &destinationBackup{destination: destination}
+	info, err := os.Stat(destination)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return backup, nil
+		}
+		return nil, fmt.Errorf("failed to inspect destination %s: %w", destination, err)
+	}
+	backup.existed = true
+
+	source, err := os.Open(destination)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open destination %s for backup: %w", destination, err)
+	}
+	defer source.Close()
+
+	file, err := os.CreateTemp(filepath.Dir(destination), "."+filepath.Base(destination)+".bak-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create backup for %s: %w", destination, err)
+	}
+	backup.backupPath = file.Name()
+	failed := true
+	defer func() {
+		_ = file.Close()
+		if failed {
+			_ = os.Remove(backup.backupPath)
+		}
+	}()
+	if err := file.Chmod(info.Mode().Perm()); err != nil {
+		return nil, fmt.Errorf("failed to preserve permissions for %s backup: %w", destination, err)
+	}
+	if _, err := io.Copy(file, source); err != nil {
+		return nil, fmt.Errorf("failed to back up destination %s: %w", destination, err)
+	}
+	if err := file.Sync(); err != nil {
+		return nil, fmt.Errorf("failed to sync backup for %s: %w", destination, err)
+	}
+	if err := file.Close(); err != nil {
+		return nil, fmt.Errorf("failed to close backup for %s: %w", destination, err)
+	}
+	failed = false
+	return backup, nil
+}
+
+func restoreDestinations(backups ...*destinationBackup) error {
+	var restoreErr error
+	for _, backup := range backups {
+		if backup == nil {
+			continue
+		}
+		if !backup.existed {
+			if err := os.Remove(backup.destination); err != nil && !os.IsNotExist(err) {
+				restoreErr = fmt.Errorf("remove new destination %s: %w", backup.destination, err)
+			}
+			continue
+		}
+		if err := os.Rename(backup.backupPath, backup.destination); err != nil {
+			restoreErr = fmt.Errorf("restore destination %s: %w", backup.destination, err)
+			continue
+		}
+		backup.backupPath = ""
+	}
+	return restoreErr
+}
+
+func (b *destinationBackup) cleanup() {
+	if b != nil && b.backupPath != "" {
+		_ = os.Remove(b.backupPath)
+	}
 }
 
 func (p *preparedWrite) cleanup() {

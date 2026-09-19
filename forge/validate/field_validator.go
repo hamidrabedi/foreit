@@ -3,7 +3,6 @@ package validation
 import (
 	"fmt"
 	"reflect"
-	"strings"
 
 	"github.com/forgego/forge/schema"
 )
@@ -228,59 +227,35 @@ func (fv *FieldValidator) ValidateModel(model interface{}, fields []schema.Field
 		return fmt.Errorf("model must be a struct")
 	}
 
-	rt := rv.Type()
-
-	// Create a map of schema and database column names to schema fields.
-	fieldMap := make(map[string]schema.Field)
-	for _, field := range fields {
-		fieldMap[strings.ToLower(field.Name)] = field
-		if field.DBColumn != "" {
-			fieldMap[strings.ToLower(field.DBColumn)] = field
-		}
-	}
-
-	// Validate each struct field
-	for i := 0; i < rv.NumField(); i++ {
-		structField := rt.Field(i)
-		fieldValue := rv.Field(i)
-
-		// Get field name from struct tag or use field name
-		fieldNames := []string{structField.Name}
-		if jsonTag := structField.Tag.Get("json"); jsonTag != "" && jsonTag != "-" {
-			// Extract field name from json tag (handle "name,omitempty")
-			parts := strings.Split(jsonTag, ",")
-			fieldNames = append(fieldNames, parts[0])
-		}
-		if dbTag := structField.Tag.Get("db"); dbTag != "" && dbTag != "-" {
-			fieldNames = append(fieldNames, strings.Split(dbTag, ",")[0])
-		}
-
-		// Find corresponding schema field
-		var schemaField schema.Field
-		var exists bool
-		for _, fieldName := range fieldNames {
-			schemaField, exists = fieldMap[strings.ToLower(fieldName)]
-			if exists {
-				break
-			}
-		}
-		if !exists {
-			continue // Skip fields not in schema
-		}
-
-		// Get field value
-		var value interface{}
-		if fieldValue.CanInterface() {
-			value = fieldValue.Interface()
-		} else {
+	for _, schemaField := range fields {
+		resolved, ok := schema.ResolveField(model, schemaField)
+		if !ok {
 			continue
 		}
-
-		// Validate the field
-		if err := fv.ValidateField(schemaField, value); err != nil {
+		fieldValue, ok := valueByIndex(rv, resolved.StructField.Index)
+		if !ok || !fieldValue.CanInterface() {
+			continue
+		}
+		if err := fv.ValidateField(schemaField, fieldValue.Interface()); err != nil {
 			return err
 		}
 	}
 
 	return nil
+}
+
+func valueByIndex(value reflect.Value, index []int) (reflect.Value, bool) {
+	for _, fieldIndex := range index {
+		for value.Kind() == reflect.Ptr {
+			if value.IsNil() {
+				return reflect.Value{}, false
+			}
+			value = value.Elem()
+		}
+		if value.Kind() != reflect.Struct {
+			return reflect.Value{}, false
+		}
+		value = value.Field(fieldIndex)
+	}
+	return value, value.IsValid()
 }

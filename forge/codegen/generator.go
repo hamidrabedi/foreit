@@ -158,7 +158,7 @@ func ValidateAPIModels(definitions []*ModelDefinition) error {
 			return fmt.Errorf("model %s has a non-auto-increment primary key field \"id\"; the generated API requires an auto-increment id", def.Name)
 		}
 		if def.structFieldsKnown && !def.hasWritableIntegerID {
-			return fmt.Errorf("model %s declares an auto-increment id in Fields() but its concrete struct has no writable integer ID or Id field", def.Name)
+			return fmt.Errorf("model %s declares an auto-increment id in Fields() but has no concrete int64 ID or Id field and does not implement orm.ModelWithID", def.Name)
 		}
 	}
 	return nil

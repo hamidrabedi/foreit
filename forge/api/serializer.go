@@ -290,12 +290,14 @@ func schemaFieldTypes(model interface{}) map[string]schema.FieldType {
 		if field.Type != schema.TypeJSON && field.Type != schema.TypeTime && field.Type != schema.TypeDate {
 			continue
 		}
-		goName, jsonName := resolveModelFieldNames(model, field.Name, field.DBColumn)
-		if jsonName == "" {
-			jsonName = goName
-		}
-		if jsonName != "" && jsonName != "-" {
-			out[jsonName] = field.Type
+		if resolved, ok := schema.ResolveField(model, field); ok {
+			name := resolved.JSONName
+			if name == "" {
+				name = resolved.GoName
+			}
+			if name != "" && name != "-" {
+				out[name] = field.Type
+			}
 		}
 	}
 	return out

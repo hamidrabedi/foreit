@@ -27,6 +27,8 @@ func NewASTParser() *ASTParser {
 func (p *ASTParser) ParseDirectory(dir string) ([]*ModelDefinition, error) {
 	p.diagnostics = nil
 	var definitions []*ModelDefinition
+	type idMethods struct{ get, set bool }
+	methodsByModel := make(map[string]idMethods)
 
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -41,6 +43,33 @@ func (p *ASTParser) ParseDirectory(dir string) ([]*ModelDefinition, error) {
 		if strings.HasSuffix(path, ".gen.go") || strings.HasSuffix(path, "gen.go") {
 			return nil
 		}
+		node, parseErr := parser.ParseFile(p.fset, path, nil, 0)
+		if parseErr != nil {
+			return parseErr
+		}
+		for _, decl := range node.Decls {
+			method, ok := decl.(*ast.FuncDecl)
+			if !ok || method.Recv == nil || len(method.Recv.List) != 1 {
+				continue
+			}
+			receiver := method.Recv.List[0].Type
+			if pointer, ok := receiver.(*ast.StarExpr); ok {
+				receiver = pointer.X
+			}
+			receiverName, ok := receiver.(*ast.Ident)
+			if !ok {
+				continue
+			}
+			key := node.Name.Name + "." + receiverName.Name
+			found := methodsByModel[key]
+			switch method.Name.Name {
+			case "GetID":
+				found.get = fieldListHasTypes(method.Type.Params, nil) && fieldListHasTypes(method.Type.Results, []string{"int64"})
+			case "SetID":
+				found.set = fieldListHasTypes(method.Type.Params, []string{"int64"}) && fieldListHasTypes(method.Type.Results, nil)
+			}
+			methodsByModel[key] = found
+		}
 
 		defs, err := p.ParseFile(path)
 		if err != nil {
@@ -51,6 +80,12 @@ func (p *ASTParser) ParseDirectory(dir string) ([]*ModelDefinition, error) {
 		return nil
 	})
 
+	if err == nil {
+		for _, definition := range definitions {
+			methods := methodsByModel[definition.Package+"."+definition.Name]
+			definition.hasWritableIntegerID = definition.hasWritableIntegerID || (methods.get && methods.set)
+		}
+	}
 	return definitions, err
 }
 
@@ -137,7 +172,7 @@ func (p *ASTParser) extractModelDefinition(packageName string, typeSpec *ast.Typ
 		Meta:                 MetaDefinition{},
 		Hooks:                HooksDefinition{},
 		structFieldsKnown:    true,
-		hasWritableIntegerID: hasWritableIntegerID(modelName, structType),
+		hasWritableIntegerID: hasAPICompatibleID(modelName, structType, file),
 	}
 
 	// Find Fields() method
@@ -186,7 +221,7 @@ func (p *ASTParser) extractModelDefinition(packageName string, typeSpec *ast.Typ
 	return def, nil
 }
 
-func hasWritableIntegerID(modelName string, structType *ast.StructType) bool {
+func hasAPICompatibleID(modelName string, structType *ast.StructType, file *ast.File) bool {
 	for _, field := range structType.Fields.List {
 		if len(field.Names) == 0 {
 			if ident, ok := field.Type.(*ast.Ident); ok && ident.Name == modelName+"Generated" {
@@ -194,7 +229,8 @@ func hasWritableIntegerID(modelName string, structType *ast.StructType) bool {
 			}
 			continue
 		}
-		if !isBuiltinIntegerType(field.Type) {
+		ident, ok := field.Type.(*ast.Ident)
+		if !ok || ident.Name != "int64" {
 			continue
 		}
 		for _, name := range field.Names {
@@ -203,20 +239,61 @@ func hasWritableIntegerID(modelName string, structType *ast.StructType) bool {
 			}
 		}
 	}
-	return false
+	return implementsModelWithID(modelName, file)
 }
 
-func isBuiltinIntegerType(expr ast.Expr) bool {
-	ident, ok := expr.(*ast.Ident)
-	if !ok {
+func implementsModelWithID(modelName string, file *ast.File) bool {
+	getID := findModelMethod(file, modelName, "GetID")
+	setID := findModelMethod(file, modelName, "SetID")
+	return getID != nil && setID != nil &&
+		fieldListHasTypes(getID.Type.Params, nil) && fieldListHasTypes(getID.Type.Results, []string{"int64"}) &&
+		fieldListHasTypes(setID.Type.Params, []string{"int64"}) && fieldListHasTypes(setID.Type.Results, nil)
+}
+
+func findModelMethod(file *ast.File, modelName, methodName string) *ast.FuncDecl {
+	for _, decl := range file.Decls {
+		method, ok := decl.(*ast.FuncDecl)
+		if !ok || method.Name.Name != methodName || method.Recv == nil || len(method.Recv.List) != 1 {
+			continue
+		}
+		receiver := method.Recv.List[0].Type
+		if pointer, ok := receiver.(*ast.StarExpr); ok {
+			receiver = pointer.X
+		}
+		if ident, ok := receiver.(*ast.Ident); ok && ident.Name == modelName {
+			return method
+		}
+	}
+	return nil
+}
+
+func fieldListHasTypes(fields *ast.FieldList, types []string) bool {
+	if fields == nil {
+		return len(types) == 0
+	}
+	actual := make([]string, 0, fields.NumFields())
+	for _, field := range fields.List {
+		ident, ok := field.Type.(*ast.Ident)
+		if !ok {
+			return false
+		}
+		count := len(field.Names)
+		if count == 0 {
+			count = 1
+		}
+		for range count {
+			actual = append(actual, ident.Name)
+		}
+	}
+	if len(actual) != len(types) {
 		return false
 	}
-	switch ident.Name {
-	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
-		return true
-	default:
-		return false
+	for i := range actual {
+		if actual[i] != types[i] {
+			return false
+		}
 	}
+	return true
 }
 
 // findMethod finds a method by name

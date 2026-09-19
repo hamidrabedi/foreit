@@ -69,6 +69,16 @@ type requiredSchemaManager struct {
 	createCalled bool
 }
 
+func TestPopulateFromMap_ResolvesSchemaAndDatabaseAliases(t *testing.T) {
+	for _, alias := range []string{"name", "display_name_col", "display_name", "Name"} {
+		t.Run(alias, func(t *testing.T) {
+			model := &requiredSchemaModel{}
+			require.NoError(t, populateFromMap(model, map[string]interface{}{alias: "resolved"}))
+			assert.Equal(t, "resolved", model.Name)
+		})
+	}
+}
+
 func (m *requiredSchemaManager) Create(_ context.Context, model interface{}) error {
 	m.createCalled = true
 	model.(*requiredSchemaModel).ID = 1

@@ -8,8 +8,8 @@ import (
 
 // NonSerializableFields returns the names of fields on model whose Serialize
 // flag is false (write-only values such as passwords). Both the field Name
-// and its DB column name are returned when they differ. It returns nil when
-// model does not implement schema.Schema.
+// and every concrete Go, JSON, and database alias are returned. It returns
+// nil when model does not implement schema.Schema.
 func NonSerializableFields(model interface{}) []string {
 	if model == nil {
 		return nil
@@ -43,10 +43,9 @@ func nonSerializableFromFields(model interface{}, fields []schema.Field) []strin
 		if f.Serialize {
 			continue
 		}
-		appendUnique(f.Name)
-		appendUnique(f.DBColumn)
-		_, jsonName := resolveModelFieldNames(model, f.Name, f.DBColumn)
-		appendUnique(jsonName)
+		for _, name := range resolvedFieldNames(model, f) {
+			appendUnique(name)
+		}
 	}
 	return out
 }
@@ -54,15 +53,15 @@ func nonSerializableFromFields(model interface{}, fields []schema.Field) []strin
 // NonEditableFields returns the names of fields on model that must not be
 // written through create or update: fields whose Editable flag is false as
 // well as database-owned auto-managed fields (AutoNow, AutoNowAdd and
-// generated columns), which normally keep Editable: true. Both the field
-// Name and its DB column name are returned when they differ. It returns nil
-// when model does not implement schema.Schema.
+// generated columns), which normally keep Editable: true. Every schema,
+// concrete Go, JSON, and database alias is returned. It returns nil when model
+// does not implement schema.Schema.
 func NonEditableFields(model interface{}) []string {
 	if model == nil {
 		return nil
 	}
 	if s, ok := model.(schema.Schema); ok {
-		return nonEditableFromFields(s.Fields())
+		return nonEditableFromFields(model, s.Fields())
 	}
 	// Handle a non-pointer model whose pointer implements schema.Schema.
 	v := reflect.ValueOf(model)
@@ -70,24 +69,38 @@ func NonEditableFields(model interface{}) []string {
 		ptr := reflect.New(v.Type())
 		ptr.Elem().Set(v)
 		if s, ok := ptr.Interface().(schema.Schema); ok {
-			return nonEditableFromFields(s.Fields())
+			return nonEditableFromFields(ptr.Interface(), s.Fields())
 		}
 	}
 	return nil
 }
 
-func nonEditableFromFields(fields []schema.Field) []string {
+func nonEditableFromFields(model interface{}, fields []schema.Field) []string {
 	var out []string
+	seen := make(map[string]bool)
+	appendUnique := func(name string) {
+		if name == "" || name == "-" || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
 	for _, f := range fields {
 		if f.Editable && !isRequestReadOnly(f) {
 			continue
 		}
-		out = append(out, f.Name)
-		if f.DBColumn != "" && f.DBColumn != f.Name {
-			out = append(out, f.DBColumn)
+		for _, name := range resolvedFieldNames(model, f) {
+			appendUnique(name)
 		}
 	}
 	return out
+}
+
+func resolvedFieldNames(model interface{}, field schema.Field) []string {
+	if resolved, ok := schema.ResolveField(model, field); ok {
+		return resolved.Names()
+	}
+	return schema.ResolvedField{SchemaName: field.Name, DBColumn: field.DBColumn}.Names()
 }
 
 // isRequestReadOnly reports whether a field is owned by the database and must

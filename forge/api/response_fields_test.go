@@ -34,7 +34,7 @@ func (nonSerializableTestModel) Fields() []schema.Field {
 
 func TestNonSerializableFields_ReturnsOnlySerializeFalseFields(t *testing.T) {
 	got := NonSerializableFields(&nonSerializableTestModel{})
-	require.Equal(t, []string{"secret", "secret_hash", "token"}, got)
+	require.Equal(t, []string{"secret", "secret_hash", "token", "Password"}, got)
 }
 
 type excludeResponseSerializer struct {
@@ -250,4 +250,77 @@ func TestNonEditableFields_ReturnsOnlyEditableFalseFields(t *testing.T) {
 	assert.NotContains(t, got, "id")
 	assert.Nil(t, NonEditableFields(struct{}{}))
 	assert.Nil(t, NonEditableFields(nil))
+}
+
+type camelReadOnlyModel struct {
+	schema.BaseSchema
+	ID        int64  `json:"id" db:"id"`
+	Title     string `json:"title" db:"title"`
+	CreatedAt string `json:"createdAt" db:"created_at"`
+}
+
+func (camelReadOnlyModel) Fields() []schema.Field {
+	return []schema.Field{
+		schema.Int64Field("id", schema.Primary(), schema.AutoIncrement()),
+		schema.StringField("title"),
+		{Name: "created_at", DBColumn: "created_at", Type: schema.TypeString, Editable: false, Serialize: true},
+	}
+}
+
+type camelReadOnlyManager struct {
+	item *camelReadOnlyModel
+}
+
+func (m *camelReadOnlyManager) Create(_ context.Context, model interface{}) error {
+	item := model.(*camelReadOnlyModel)
+	item.ID = 1
+	copy := *item
+	m.item = &copy
+	return nil
+}
+
+func (m *camelReadOnlyManager) Get(_ context.Context, id int64) (interface{}, error) {
+	if m.item == nil || m.item.ID != id {
+		return nil, forgeerrors.NewNotFoundErrorWithMessage("not found")
+	}
+	copy := *m.item
+	return &copy, nil
+}
+
+func (m *camelReadOnlyManager) Update(_ context.Context, model interface{}) error {
+	copy := *model.(*camelReadOnlyModel)
+	m.item = &copy
+	return nil
+}
+
+func (*camelReadOnlyManager) Delete(context.Context, interface{}) error { return nil }
+
+func TestBaseViewSet_ReadOnlyJSONAliasIgnoredOnCreateUpdateAndPatch(t *testing.T) {
+	mgr := &camelReadOnlyManager{}
+	vs := NewBaseViewSet(newExcludeResponseSerializer, mgr, &camelReadOnlyModel{})
+	vs.ReadOnlyRequestFields = NonEditableFields(&camelReadOnlyModel{})
+	assert.Contains(t, vs.ReadOnlyRequestFields, "createdAt")
+
+	router := NewRouter("/api")
+	router.Register("items", vs)
+	handler := forgehttp.NewRouter()
+	router.RegisterRoutes(handler)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/items/", bytes.NewBufferString(`{"title":"created","createdAt":"attacker"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusCreated, rec.Code, rec.Body.String())
+	require.NotNil(t, mgr.item)
+	assert.Empty(t, mgr.item.CreatedAt)
+
+	mgr.item.CreatedAt = "database-owned"
+	for _, method := range []string{http.MethodPut, http.MethodPatch} {
+		req = httptest.NewRequest(method, "/api/items/1", bytes.NewBufferString(`{"title":"updated","createdAt":"attacker"}`))
+		req.Header.Set("Content-Type", "application/json")
+		rec = httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		assert.Equal(t, "database-owned", mgr.item.CreatedAt)
+	}
 }

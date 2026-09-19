@@ -532,7 +532,19 @@ func (m *Manager[T]) getID(instance *T) (int64, error) {
 		return modelWithID.GetID(), nil
 	}
 
-	idValue, err := GetIDValue(instance, "id")
+	var idValue interface{}
+	var err error
+	if modelSchema, ok := any(instance).(schema.Schema); ok {
+		for _, field := range modelSchema.Fields() {
+			if field.PrimaryKey {
+				idValue, err = getSchemaFieldValue(instance, field)
+				break
+			}
+		}
+	}
+	if idValue == nil && err == nil {
+		idValue, err = GetIDValue(instance, "id")
+	}
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ID: %w", err)
 	}

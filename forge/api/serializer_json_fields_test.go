@@ -31,6 +31,19 @@ type jsonDBTagModel struct {
 	Payload []byte `json:"data" db:"metadata_json"`
 }
 
+type JSONEmbeddedGenerated struct {
+	Payload []byte `json:"data" db:"metadata_json"`
+}
+
+type jsonEmbeddedModel struct {
+	schema.BaseSchema
+	JSONEmbeddedGenerated
+}
+
+func (jsonEmbeddedModel) Fields() []schema.Field {
+	return []schema.Field{{Name: "metadata", DBColumn: "metadata_json", Type: schema.TypeJSON}}
+}
+
 func (jsonDBTagModel) Fields() []schema.Field {
 	return []schema.Field{{Name: "metadata", DBColumn: "metadata_json", Type: schema.TypeJSON}}
 }
@@ -156,6 +169,14 @@ func TestSerializeModel_InvalidStoredJSONFallsBackWithoutPanic(t *testing.T) {
 
 func TestSerializeModel_JSONFieldMatchesConcreteDBTag(t *testing.T) {
 	serialized, err := json.Marshal(SerializeModel(&jsonDBTagModel{Payload: []byte(`{"enabled":true}`)}))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"data":{"enabled":true}}`, string(serialized))
+}
+
+func TestSerializeModel_JSONFieldResolvesAnonymousEmbedding(t *testing.T) {
+	serialized, err := json.Marshal(SerializeModel(&jsonEmbeddedModel{
+		JSONEmbeddedGenerated: JSONEmbeddedGenerated{Payload: []byte(`{"enabled":true}`)},
+	}))
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"data":{"enabled":true}}`, string(serialized))
 }

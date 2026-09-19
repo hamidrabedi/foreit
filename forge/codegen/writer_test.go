@@ -172,3 +172,68 @@ func TestWriteTemplate_UpdatesSymlinkTargetWithoutReplacingLink(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, info.Mode()&os.ModeSymlink)
 }
+
+func TestWriteCombinedAndAPI_SecondRenameFailureRestoresBothDestinations(t *testing.T) {
+	tmpDir := t.TempDir()
+	genPath := filepath.Join(tmpDir, "gen.go")
+	apiPath := filepath.Join(tmpDir, "api_gen.go")
+	oldGen := []byte("old generated models\n")
+	oldAPI := []byte("old generated API\n")
+	require.NoError(t, os.WriteFile(genPath, oldGen, 0640))
+	require.NoError(t, os.WriteFile(apiPath, oldAPI, 0600))
+
+	writer := NewWriter()
+	writer.rename = func(oldPath, newPath string) error {
+		if newPath == apiPath {
+			return errors.New("injected second rename failure")
+		}
+		return os.Rename(oldPath, newPath)
+	}
+	definitions := []*ModelDefinition{{
+		Package: "models",
+		Name:    "Product",
+		Fields: []FieldDefinition{{
+			Name:          "id",
+			Type:          "Int64",
+			GoType:        "int64",
+			PrimaryKey:    true,
+			AutoIncrement: true,
+		}},
+	}}
+
+	err := writer.WriteCombinedAndAPI(definitions, tmpDir)
+	require.ErrorContains(t, err, "injected second rename failure")
+	genContents, readErr := os.ReadFile(genPath)
+	require.NoError(t, readErr)
+	apiContents, readErr := os.ReadFile(apiPath)
+	require.NoError(t, readErr)
+	assert.Equal(t, oldGen, genContents)
+	assert.Equal(t, oldAPI, apiContents)
+	genInfo, statErr := os.Stat(genPath)
+	require.NoError(t, statErr)
+	apiInfo, statErr := os.Stat(apiPath)
+	require.NoError(t, statErr)
+	assert.Equal(t, os.FileMode(0640), genInfo.Mode().Perm())
+	assert.Equal(t, os.FileMode(0600), apiInfo.Mode().Perm())
+	matches, globErr := filepath.Glob(filepath.Join(tmpDir, ".*.*-*"))
+	require.NoError(t, globErr)
+	assert.Empty(t, matches)
+}
+
+func TestWriteCombinedAndAPI_SuccessRemovesDestinationBackups(t *testing.T) {
+	tmpDir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "gen.go"), []byte("old gen\n"), 0644))
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "api_gen.go"), []byte("old api\n"), 0644))
+	definitions := []*ModelDefinition{{
+		Package: "models",
+		Name:    "Product",
+		Fields: []FieldDefinition{{
+			Name: "id", Type: "Int64", GoType: "int64", PrimaryKey: true, AutoIncrement: true,
+		}},
+	}}
+
+	require.NoError(t, NewWriter().WriteCombinedAndAPI(definitions, tmpDir))
+	backups, err := filepath.Glob(filepath.Join(tmpDir, ".*.bak-*"))
+	require.NoError(t, err)
+	assert.Empty(t, backups)
+}

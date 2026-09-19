@@ -28,6 +28,7 @@ import (
 	"github.com/forgego/forge/schema"
 	forgehttp "github.com/forgego/forge/server"
 	"github.com/forgego/forge/validate"
+	"go.uber.org/zap"
 )
 
 // ViewSet is the base interface for all viewsets
@@ -304,10 +305,10 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	querysetValue = paginatableQueryset(querysetValue)
 
 	// Apply filtering from query params
-	qs := applyFilters(querysetValue, r)
+	qs := applyFilters(querysetValue, r, vs.Model)
 
 	// Apply explicit ordering, model Meta ordering, or a stable primary-key fallback.
-	qs = applyOrdering(qs, r, defaultOrdering(vs.Model)...)
+	qs = applyOrdering(qs, r, vs.Model, defaultOrdering(vs.Model)...)
 
 	// Get total count using cached method lookup
 	qsType := qs.Type()
@@ -484,10 +485,10 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	if id, ok := primaryKeyInt64(instance, pkGoName, pkDBName, pkJSONName); ok && id != 0 {
 		refetched, err := getManagerInstance(manager, managerType, ctx, id)
 		if err != nil {
-			vs.handleException(w, r, lookupException(err))
-			return
+			logRefetchFailure(r, "create", id, err)
+		} else {
+			instance = refetched
 		}
-		instance = refetched
 	}
 
 	// Serialize and return created instance
@@ -706,14 +707,28 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 
 	refetched, err := getManagerInstance(manager, managerType, ctx, id)
 	if err != nil {
-		vs.handleException(w, r, lookupException(err))
-		return
+		logRefetchFailure(r, action, id, err)
+	} else {
+		instance = refetched
 	}
-	instance = refetched
 
 	serialized := vs.stripExcludedFields(SerializeModel(instance))
 	serialized = filterOutputMap(vs.Serializer(), serialized)
 	forgehttp.SendJSON(w, http.StatusOK, serialized)
+}
+
+func logRefetchFailure(r *http.Request, action string, id int64, err error) {
+	logger, ok := forgehttp.GetLogger(r).(interface {
+		Warn(string, ...zap.Field)
+	})
+	if !ok {
+		logger = zap.L()
+	}
+	logger.Warn("failed to refetch model after committed write",
+		zap.String("action", action),
+		zap.Int64("id", id),
+		zap.Error(err),
+	)
 }
 
 // PartialUpdate handles PATCH /resource/{id}/
@@ -1041,7 +1056,7 @@ func maybeConvertToQueryset(qs reflect.Value) reflect.Value {
 }
 
 // applyFilters applies query parameter filters to queryset
-func applyFilters(qs reflect.Value, r *http.Request) reflect.Value {
+func applyFilters(qs reflect.Value, r *http.Request, model interface{}) reflect.Value {
 	// Get filter parameters from query string
 	query := r.URL.Query()
 	qsType := qs.Type()
@@ -1056,8 +1071,15 @@ func applyFilters(qs reflect.Value, r *http.Request) reflect.Value {
 
 		if hasFilter {
 			value := values[0]
+			fieldName, lookup := parseLookup(key)
+			if resolvedName, field, ok := resolveQueryField(model, fieldName); ok {
+				if !field.Serialize {
+					continue
+				}
+				fieldName = resolvedName
+			}
 
-			expr := buildFilterExpr(key, value)
+			expr := buildFilterExpr(strings.Join([]string{fieldName, lookup}, "__"), value)
 			if expr != nil {
 				results := filterMethod.Func.Call([]reflect.Value{qs, reflect.ValueOf(expr)})
 				if len(results) > 0 {
@@ -1151,7 +1173,7 @@ func parseFilterValue(raw string) interface{} {
 }
 
 // applyOrdering applies request ordering or the supplied model defaults.
-func applyOrdering(qs reflect.Value, r *http.Request, defaults ...string) reflect.Value {
+func applyOrdering(qs reflect.Value, r *http.Request, model interface{}, defaults ...string) reflect.Value {
 	ordering := r.URL.Query().Get("ordering")
 	if ordering == "" {
 		ordering = strings.Join(defaults, ",")
@@ -1173,6 +1195,17 @@ func applyOrdering(qs reflect.Value, r *http.Request, defaults ...string) reflec
 		field = strings.TrimSpace(field)
 		if field == "" {
 			continue
+		}
+		descending := strings.HasPrefix(field, "-")
+		fieldName := strings.TrimLeft(field, "-")
+		if resolvedName, schemaField, ok := resolveQueryField(model, fieldName); ok {
+			if !schemaField.Serialize {
+				continue
+			}
+			field = resolvedName
+			if descending {
+				field = "-" + field
+			}
 		}
 		args = append(args, reflect.ValueOf(field))
 	}
@@ -1199,15 +1232,43 @@ func defaultOrdering(model interface{}) []string {
 	}
 	for _, field := range s.Fields() {
 		if field.PrimaryKey {
-			if field.Name != "" {
-				return []string{field.Name}
-			}
 			if field.DBColumn != "" {
 				return []string{field.DBColumn}
+			}
+			if resolved, ok := schema.ResolveField(model, field); ok && resolved.DBTag != "" && resolved.DBTag != "-" {
+				return []string{resolved.DBTag}
+			}
+			if field.Name != "" {
+				return []string{field.Name}
 			}
 		}
 	}
 	return []string{"id"}
+}
+
+func resolveQueryField(model interface{}, name string) (string, schema.Field, bool) {
+	s, ok := model.(schema.Schema)
+	if !ok {
+		return "", schema.Field{}, false
+	}
+	for _, field := range s.Fields() {
+		for _, alias := range resolvedFieldNames(model, field) {
+			if !strings.EqualFold(alias, name) {
+				continue
+			}
+			column := field.DBColumn
+			if column == "" {
+				if resolved, found := schema.ResolveField(model, field); found && resolved.DBTag != "" && resolved.DBTag != "-" {
+					column = resolved.DBTag
+				}
+			}
+			if column == "" {
+				column = field.Name
+			}
+			return column, field, true
+		}
+	}
+	return "", schema.Field{}, false
 }
 
 // fieldError describes a single request-field conversion failure.
@@ -1261,9 +1322,8 @@ func schemaModelValidationError(instance interface{}, fields []schema.Field, err
 		if field.Name != schemaName && field.DBColumn != schemaName {
 			continue
 		}
-		_, jsonName := resolveModelFieldNames(instance, field.Name, field.DBColumn)
-		if jsonName != "" && jsonName != "-" {
-			fieldName = jsonName
+		if resolved, ok := schema.ResolveField(instance, field); ok && resolved.JSONName != "" && resolved.JSONName != "-" {
+			fieldName = resolved.JSONName
 		}
 		break
 	}
@@ -1361,15 +1421,37 @@ func populateFromMap(instance interface{}, data map[string]interface{}, ignoredK
 				continue
 			}
 			dbTag := strings.Split(field.Tag.Get("db"), ",")[0]
-			if ignored[strings.ToLower(key)] || ignored[strings.ToLower(field.Name)] ||
-				(dbTag != "" && dbTag != "-" && ignored[strings.ToLower(dbTag)]) {
+			fieldSchema := schemaFieldForStructField(schemaFields, field, key, dbTag)
+			fieldNames := []string{key, field.Name, dbTag}
+			if fieldSchema != nil {
+				fieldNames = append(fieldNames, resolvedFieldNames(instance, *fieldSchema)...)
+			}
+			isIgnored := false
+			for _, name := range fieldNames {
+				if ignored[strings.ToLower(name)] {
+					isIgnored = true
+					break
+				}
+			}
+			if isIgnored {
 				continue
 			}
-			if value, ok := data[key]; ok {
+			requestKey := key
+			value, valueExists := data[requestKey]
+			if !valueExists && fieldSchema != nil {
+				for _, alias := range resolvedFieldNames(instance, *fieldSchema) {
+					if candidate, exists := data[alias]; exists {
+						requestKey = alias
+						value = candidate
+						valueExists = true
+						break
+					}
+				}
+			}
+			if valueExists {
 				if fieldValue.CanSet() {
-					fieldSchema := schemaFieldForStructField(schemaFields, field, key, dbTag)
 					if err := setFieldValue(fieldValue, value, fieldSchema); err != nil {
-						return &fieldError{Field: key, Message: err.Error()}
+						return &fieldError{Field: requestKey, Message: err.Error()}
 					}
 				}
 			}
@@ -1389,16 +1471,8 @@ func schemaFieldsByRequestName(instance interface{}) map[string]*schema.Field {
 	result := make(map[string]*schema.Field, len(fields)*3)
 	for i := range fields {
 		field := &fields[i]
-		for _, name := range []string{field.Name, field.DBColumn} {
-			if name != "" {
-				result[strings.ToLower(name)] = field
-			}
-		}
-		goName, jsonName := resolveModelFieldNames(instance, field.Name, field.DBColumn)
-		for _, name := range []string{goName, jsonName} {
-			if name != "" && name != "-" {
-				result[strings.ToLower(name)] = field
-			}
+		for _, name := range resolvedFieldNames(instance, *field) {
+			result[strings.ToLower(name)] = field
 		}
 	}
 	return result
@@ -1425,13 +1499,13 @@ func applySchemaDefaults(model interface{}, data map[string]interface{}) {
 		if field.Default == nil {
 			continue
 		}
-		goName, jsonName := resolveModelFieldNames(model, field.Name, field.DBColumn)
-		requestName := jsonName
+		resolved, _ := schema.ResolveField(model, field)
+		requestName := resolved.JSONName
 		if requestName == "" || requestName == "-" {
 			requestName = field.Name
 		}
 		present := false
-		for _, name := range []string{requestName, field.Name, field.DBColumn, goName} {
+		for _, name := range resolvedFieldNames(model, field) {
 			if name == "" {
 				continue
 			}
@@ -1459,111 +1533,58 @@ func (vs *BaseViewSet) getSchemaPrimaryKeyField() (goName, dbName, jsonName stri
 	if !ok {
 		return "", "", ""
 	}
-	var pkName, pkDB string
+	var primaryKey *schema.Field
 	for _, f := range modelSchema.Fields() {
 		if f.PrimaryKey {
-			pkName = f.Name
-			pkDB = f.DBColumn
+			field := f
+			primaryKey = &field
 			break
 		}
 	}
-	if pkName == "" && pkDB == "" {
+	if primaryKey == nil {
 		return "", "", ""
 	}
-	if pkDB == "" {
-		pkDB = pkName
-	}
-	goResolved, jsonResolved := resolveModelFieldNames(vs.Model, pkName, pkDB)
-	if goResolved == "" {
-		// No matching Go struct field found; still return db/json names so the
-		// body value for the primary key is ignored.
-		if jsonResolved == "" {
-			jsonResolved = pkName
+	resolved, found := schema.ResolveField(vs.Model, *primaryKey)
+	if !found {
+		dbName := primaryKey.DBColumn
+		if dbName == "" {
+			dbName = primaryKey.Name
 		}
-		return "", pkDB, jsonResolved
+		return "", dbName, primaryKey.Name
 	}
-	if jsonResolved == "" {
-		jsonResolved = pkName
+	dbName = resolved.DBColumn
+	if dbName == "" || dbName == "-" {
+		dbName = resolved.DBTag
 	}
-	return goResolved, pkDB, jsonResolved
-}
-
-// resolveModelFieldNames finds the Go struct field name and json tag name matching
-// any of the given schema/db names (case-insensitive on Go name, exact on tags).
-func resolveModelFieldNames(model interface{}, names ...string) (goName, jsonName string) {
-	v := reflect.ValueOf(model)
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			t := v.Type().Elem()
-			if t.Kind() == reflect.Struct {
-				return resolveFieldNamesInType(t, names...)
-			}
-			return "", ""
-		}
-		v = v.Elem()
+	if dbName == "" || dbName == "-" {
+		dbName = resolved.SchemaName
 	}
-	if v.Kind() != reflect.Struct {
-		return "", ""
+	jsonName = resolved.JSONName
+	if jsonName == "" || jsonName == "-" {
+		jsonName = resolved.SchemaName
 	}
-	return resolveFieldNamesInType(v.Type(), names...)
-}
-
-func resolveFieldNamesInType(t reflect.Type, names ...string) (goName, jsonName string) {
-	lowered := make(map[string]bool, len(names))
-	for _, n := range names {
-		if n != "" {
-			lowered[strings.ToLower(n)] = true
-		}
-	}
-	var search func(rt reflect.Type) (string, string, bool)
-	search = func(rt reflect.Type) (string, string, bool) {
-		for i := 0; i < rt.NumField(); i++ {
-			field := rt.Field(i)
-			if !field.IsExported() {
-				continue
-			}
-			if field.Anonymous {
-				ft := field.Type
-				if ft.Kind() == reflect.Ptr {
-					ft = ft.Elem()
-				}
-				if ft.Kind() == reflect.Struct {
-					if gn, jn, ok := search(ft); ok {
-						return gn, jn, true
-					}
-				}
-				continue
-			}
-			jsonTag := strings.Split(field.Tag.Get("json"), ",")[0]
-			dbTag := strings.Split(field.Tag.Get("db"), ",")[0]
-			matched := lowered[strings.ToLower(field.Name)]
-			for _, n := range names {
-				if n == "" {
-					continue
-				}
-				if jsonTag != "" && jsonTag != "-" && n == jsonTag {
-					matched = true
-				}
-				if dbTag != "" && n == dbTag {
-					matched = true
-				}
-			}
-			if matched {
-				return field.Name, jsonTag, true
-			}
-		}
-		return "", "", false
-	}
-	gn, jn, ok := search(t)
-	if !ok {
-		return "", ""
-	}
-	return gn, jn
+	return resolved.GoName, dbName, jsonName
 }
 
 // getPrimaryKeyValue reads the current primary key value from instance, preferring
 // the schema primary key field names and falling back to "ID"/"Id"/"id".
 func getPrimaryKeyValue(instance interface{}, pkGoName, pkDBName, pkJSONName string) interface{} {
+	if modelSchema, ok := instance.(schema.Schema); ok {
+		for _, field := range modelSchema.Fields() {
+			if !field.PrimaryKey {
+				continue
+			}
+			if resolved, found := schema.ResolveField(instance, field); found {
+				if value, exists := concreteFieldValue(reflect.ValueOf(instance), resolved.StructField.Index); exists && value.CanInterface() {
+					return value.Interface()
+				}
+			}
+			break
+		}
+	}
+	if modelWithID, ok := instance.(interface{ GetID() int64 }); ok {
+		return modelWithID.GetID()
+	}
 	v := reflect.ValueOf(instance)
 	if v.Kind() == reflect.Ptr {
 		if v.IsNil() {
@@ -1685,6 +1706,27 @@ func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64, pk
 		}
 		return false
 	}
+	if modelSchema, ok := instance.(schema.Schema); ok {
+		for _, field := range modelSchema.Fields() {
+			if !field.PrimaryKey {
+				continue
+			}
+			if resolved, found := schema.ResolveField(instance, field); found {
+				if value, exists := concreteFieldValue(reflect.ValueOf(instance), resolved.StructField.Index); exists && setField(value) {
+					return
+				}
+			}
+			break
+		}
+	}
+	if modelWithID, ok := instance.(interface{ SetID(int64) }); ok {
+		if original, ok := origPK.(int64); ok && original != 0 {
+			modelWithID.SetID(original)
+		} else {
+			modelWithID.SetID(urlID)
+		}
+		return
+	}
 
 	// Prefer the schema primary key when known.
 	if pkGoName != "" || pkDBName != "" || pkJSONName != "" {
@@ -1718,6 +1760,28 @@ func restorePrimaryKey(instance interface{}, origPK interface{}, urlID int64, pk
 			}
 		}
 	}
+}
+
+func concreteFieldValue(value reflect.Value, index []int) (reflect.Value, bool) {
+	for value.IsValid() && value.Kind() == reflect.Ptr {
+		if value.IsNil() {
+			return reflect.Value{}, false
+		}
+		value = value.Elem()
+	}
+	for _, fieldIndex := range index {
+		for value.IsValid() && value.Kind() == reflect.Ptr {
+			if value.IsNil() {
+				return reflect.Value{}, false
+			}
+			value = value.Elem()
+		}
+		if !value.IsValid() || value.Kind() != reflect.Struct {
+			return reflect.Value{}, false
+		}
+		value = value.Field(fieldIndex)
+	}
+	return value, value.IsValid()
 }
 
 // findPrimaryKeyField locates the settable struct field matching any of the given

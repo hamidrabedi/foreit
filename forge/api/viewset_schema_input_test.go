@@ -25,6 +25,7 @@ type schemaInputModel struct {
 	Metadata     []byte    `json:"metadata" db:"metadata"`
 	Payload      []byte    `json:"payload" db:"payload"`
 	StartsAt     time.Time `json:"starts_at" db:"starts_at"`
+	DateOnly     time.Time `json:"date_only" db:"date_only"`
 	OccurredAt   time.Time `json:"occurred_at" db:"occurred_at"`
 	Status       string    `json:"status" db:"status"`
 	Title        string    `json:"title" db:"title"`
@@ -88,6 +89,7 @@ func (schemaInputModel) Fields() []schema.Field {
 		schema.JSONField("metadata"),
 		schema.BytesField("payload"),
 		schema.TimeField("starts_at"),
+		schema.DateField("date_only"),
 		schema.DateTimeField("occurred_at"),
 		schema.StringField("status", schema.Required(), schema.Default("draft")),
 		schema.StringField("title"),
@@ -225,6 +227,27 @@ func TestBaseViewSet_Create_PreservesLargeInteger(t *testing.T) {
 	assert.Equal(t, int64(9007199254740993), mgr.last.LargeNumber)
 }
 
+func TestBaseViewSet_RejectsJSONNullBodies(t *testing.T) {
+	t.Run("create", func(t *testing.T) {
+		mgr := &schemaInputManager{}
+		rec := performSchemaInputRequest(t, newSchemaInputHandler(mgr), http.MethodPost, "/api/items/", `null`)
+		require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+		assert.Empty(t, mgr.items)
+		assert.Nil(t, mgr.last)
+	})
+
+	for _, method := range []string{http.MethodPut, http.MethodPatch} {
+		t.Run(method, func(t *testing.T) {
+			original := &schemaInputModel{ID: 1, Status: "published", Title: "unchanged"}
+			mgr := &schemaInputManager{items: map[int64]*schemaInputModel{1: original}, nextID: 1}
+			rec := performSchemaInputRequest(t, newSchemaInputHandler(mgr), method, "/api/items/1", `null`)
+			require.Equal(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+			assert.Equal(t, "unchanged", mgr.items[1].Title)
+			assert.Nil(t, mgr.last)
+		})
+	}
+}
+
 func TestBaseViewSet_Create_ValidatesRequiredSchemaFieldWithoutTags(t *testing.T) {
 	mgr := &requiredSchemaManager{}
 	vs := NewBaseViewSet(newSchemaInputSerializer, mgr, &requiredSchemaModel{})
@@ -274,6 +297,27 @@ func TestPopulateFromMap_UsesSchemaTemporalFormats(t *testing.T) {
 	model := &schemaInputModel{}
 	require.NoError(t, populateFromMap(model, map[string]interface{}{"occurred_at": "2026-09-17T14:30:00Z"}))
 	assert.Equal(t, 2026, model.OccurredAt.Year())
+}
+
+func TestBaseViewSet_TemporalFieldsRoundTripThroughCreateAndUpdate(t *testing.T) {
+	mgr := &schemaInputManager{}
+	handler := newSchemaInputHandler(mgr)
+	body := `{"starts_at":"14:30:05","date_only":"2026-09-19","occurred_at":"2026-09-19T14:30:05Z"}`
+
+	created := performSchemaInputRequest(t, handler, http.MethodPost, "/api/items/", body)
+	require.Equal(t, http.StatusCreated, created.Code, created.Body.String())
+	var response map[string]interface{}
+	require.NoError(t, json.Unmarshal(created.Body.Bytes(), &response))
+	assert.Equal(t, "14:30:05", response["starts_at"])
+	assert.Equal(t, "2026-09-19", response["date_only"])
+
+	updateBody, err := json.Marshal(response)
+	require.NoError(t, err)
+	updated := performSchemaInputRequest(t, handler, http.MethodPut, "/api/items/1", string(updateBody))
+	require.Equal(t, http.StatusOK, updated.Code, updated.Body.String())
+	require.NoError(t, json.Unmarshal(updated.Body.Bytes(), &response))
+	assert.Equal(t, "14:30:05", response["starts_at"])
+	assert.Equal(t, "2026-09-19", response["date_only"])
 }
 
 func TestBaseViewSet_Create_IgnoresAutoIncrementIDBeforeHooks(t *testing.T) {

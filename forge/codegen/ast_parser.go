@@ -130,12 +130,14 @@ func (p *ASTParser) extractModelDefinition(packageName string, typeSpec *ast.Typ
 	modelName := typeSpec.Name.Name
 
 	def := &ModelDefinition{
-		Package:   packageName,
-		Name:      modelName,
-		Fields:    []FieldDefinition{},
-		Relations: []RelationDefinition{},
-		Meta:      MetaDefinition{},
-		Hooks:     HooksDefinition{},
+		Package:              packageName,
+		Name:                 modelName,
+		Fields:               []FieldDefinition{},
+		Relations:            []RelationDefinition{},
+		Meta:                 MetaDefinition{},
+		Hooks:                HooksDefinition{},
+		structFieldsKnown:    true,
+		hasWritableIntegerID: hasWritableIntegerID(modelName, structType),
 	}
 
 	// Find Fields() method
@@ -182,6 +184,39 @@ func (p *ASTParser) extractModelDefinition(packageName string, typeSpec *ast.Typ
 	}
 
 	return def, nil
+}
+
+func hasWritableIntegerID(modelName string, structType *ast.StructType) bool {
+	for _, field := range structType.Fields.List {
+		if len(field.Names) == 0 {
+			if ident, ok := field.Type.(*ast.Ident); ok && ident.Name == modelName+"Generated" {
+				return true
+			}
+			continue
+		}
+		if !isBuiltinIntegerType(field.Type) {
+			continue
+		}
+		for _, name := range field.Names {
+			if name.Name == "ID" || name.Name == "Id" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func isBuiltinIntegerType(expr ast.Expr) bool {
+	ident, ok := expr.(*ast.Ident)
+	if !ok {
+		return false
+	}
+	switch ident.Name {
+	case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
+		return true
+	default:
+		return false
+	}
 }
 
 // findMethod finds a method by name

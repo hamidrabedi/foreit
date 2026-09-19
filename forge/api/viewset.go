@@ -306,8 +306,8 @@ func (vs *BaseViewSet) List(w http.ResponseWriter, r *http.Request) {
 	// Apply filtering from query params
 	qs := applyFilters(querysetValue, r)
 
-	// Apply ordering
-	qs = applyOrdering(qs, r)
+	// Apply explicit ordering, model Meta ordering, or a stable primary-key fallback.
+	qs = applyOrdering(qs, r, defaultOrdering(vs.Model)...)
 
 	// Get total count using cached method lookup
 	qsType := qs.Type()
@@ -406,7 +406,7 @@ func (vs *BaseViewSet) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var data map[string]interface{}
-	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil {
+	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil || data == nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
@@ -592,7 +592,7 @@ func (vs *BaseViewSet) update(w http.ResponseWriter, r *http.Request, action str
 	}
 
 	var data map[string]interface{}
-	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil {
+	if err := forgehttp.GetJSONUseNumber(r, &data); err != nil || data == nil {
 		// nolint:errcheck // HTTP response errors can't be handled meaningfully
 		_ = forgehttp.SendError(w, http.StatusBadRequest, "Invalid JSON")
 		return
@@ -1150,11 +1150,14 @@ func parseFilterValue(raw string) interface{} {
 	return raw
 }
 
-// applyOrdering applies ordering from query parameters
-func applyOrdering(qs reflect.Value, r *http.Request) reflect.Value {
+// applyOrdering applies request ordering or the supplied model defaults.
+func applyOrdering(qs reflect.Value, r *http.Request, defaults ...string) reflect.Value {
 	ordering := r.URL.Query().Get("ordering")
 	if ordering == "" {
-		return qs
+		ordering = strings.Join(defaults, ",")
+		if ordering == "" {
+			return qs
+		}
 	}
 
 	qsType := qs.Type()
@@ -1184,6 +1187,27 @@ func applyOrdering(qs reflect.Value, r *http.Request) reflect.Value {
 	}
 
 	return qs
+}
+
+func defaultOrdering(model interface{}) []string {
+	s, ok := model.(schema.Schema)
+	if !ok {
+		return []string{"id"}
+	}
+	if ordering := s.Meta().OrderBy; len(ordering) > 0 {
+		return append([]string(nil), ordering...)
+	}
+	for _, field := range s.Fields() {
+		if field.PrimaryKey {
+			if field.Name != "" {
+				return []string{field.Name}
+			}
+			if field.DBColumn != "" {
+				return []string{field.DBColumn}
+			}
+		}
+	}
+	return []string{"id"}
 }
 
 // fieldError describes a single request-field conversion failure.

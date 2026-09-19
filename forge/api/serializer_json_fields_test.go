@@ -26,6 +26,15 @@ type jsonRoundTripModel struct {
 	Blob     []byte `json:"blob" db:"blob"`
 }
 
+type jsonDBTagModel struct {
+	schema.BaseSchema
+	Payload []byte `json:"data" db:"metadata_json"`
+}
+
+func (jsonDBTagModel) Fields() []schema.Field {
+	return []schema.Field{{Name: "metadata", DBColumn: "metadata_json", Type: schema.TypeJSON}}
+}
+
 func (jsonRoundTripModel) Fields() []schema.Field {
 	return []schema.Field{
 		schema.Int64Field("id"),
@@ -143,4 +152,10 @@ func TestSerializeModel_InvalidStoredJSONFallsBackWithoutPanic(t *testing.T) {
 	require.True(t, ok, "invalid JSON bytes must fall back to the current []byte representation")
 	assert.Equal(t, []byte("not-json{{{"), raw)
 	assert.Equal(t, []byte("hello"), got["blob"])
+}
+
+func TestSerializeModel_JSONFieldMatchesConcreteDBTag(t *testing.T) {
+	serialized, err := json.Marshal(SerializeModel(&jsonDBTagModel{Payload: []byte(`{"enabled":true}`)}))
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"data":{"enabled":true}}`, string(serialized))
 }

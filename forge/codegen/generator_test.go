@@ -20,6 +20,7 @@ import (
 
 type Product struct {
 	schema.BaseSchema
+	ID int64
 }
 
 func (Product) Fields() []schema.Field {
@@ -107,6 +108,24 @@ func TestValidateAPIModels_AcceptsOnlyInt64IDPrimaryKey(t *testing.T) {
 	}
 }
 
+func TestGeneratorGenerate_APIModelRequiresConcreteWritableIntegerID(t *testing.T) {
+	tmpDir := t.TempDir()
+	modelSrc := `package testmodels
+import "github.com/forgego/forge/schema"
+type Product struct { schema.BaseSchema }
+func (Product) Fields() []schema.Field {
+	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
+}
+`
+	require.NoError(t, os.WriteFile(filepath.Join(tmpDir, "models.go"), []byte(modelSrc), 0644))
+
+	err := NewGenerator(tmpDir, tmpDir).SetGenerateAPI(true).Generate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "model Product")
+	assert.Contains(t, err.Error(), "no writable integer ID or Id field")
+	assert.NoFileExists(t, filepath.Join(tmpDir, "api_gen.go"))
+}
+
 func TestGeneratorGenerate_InvalidAPIModelPreservesGeneratedFiles(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelSrc := `package testmodels
@@ -136,7 +155,7 @@ func TestGeneratorGenerate_APIWritePreparationFailurePreservesGen(t *testing.T) 
 	tmpDir := t.TempDir()
 	modelSrc := `package testmodels
 import "github.com/forgego/forge/schema"
-type Product struct { schema.BaseSchema }
+type Product struct { schema.BaseSchema; ID int64 }
 func (Product) Fields() []schema.Field {
 	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
 }
@@ -157,7 +176,7 @@ func TestGeneratorGenerate_PluralizesCategoryRoute(t *testing.T) {
 	tmpDir := t.TempDir()
 	modelSrc := `package testmodels
 import "github.com/forgego/forge/schema"
-type Category struct { schema.BaseSchema }
+type Category struct { schema.BaseSchema; ID int64 }
 func (Category) Fields() []schema.Field {
 	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
 }
@@ -174,7 +193,7 @@ func TestGeneratorGenerate_UsesKebabCasePluralRouteForCompoundModel(t *testing.T
 	tmpDir := t.TempDir()
 	modelSrc := `package testmodels
 import "github.com/forgego/forge/schema"
-type ProductVariant struct { schema.BaseSchema }
+type ProductVariant struct { schema.BaseSchema; ID int64 }
 func (ProductVariant) Fields() []schema.Field {
 	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
 }

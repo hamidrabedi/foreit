@@ -85,6 +85,9 @@ func (g *Generator) GenerateAPI() error {
 	if len(definitions) == 0 {
 		return nil
 	}
+	if err := ValidateAPIModels(definitions); err != nil {
+		return fmt.Errorf("failed to generate API code: %w", err)
+	}
 
 	return g.writer.WriteAPI(definitions, g.outputDir)
 }
@@ -154,6 +157,9 @@ func ValidateAPIModels(definitions []*ModelDefinition) error {
 		if !primaryKey.AutoIncrement {
 			return fmt.Errorf("model %s has a non-auto-increment primary key field \"id\"; the generated API requires an auto-increment id", def.Name)
 		}
+		if def.structFieldsKnown && !def.hasWritableIntegerID {
+			return fmt.Errorf("model %s declares an auto-increment id in Fields() but its concrete struct has no writable integer ID or Id field", def.Name)
+		}
 	}
 	return nil
 }
@@ -173,12 +179,14 @@ func isIntegerGoType(goType string) bool {
 
 // ModelDefinition represents a parsed model definition
 type ModelDefinition struct {
-	Hooks     HooksDefinition
-	Package   string
-	Name      string
-	Meta      MetaDefinition
-	Fields    []FieldDefinition
-	Relations []RelationDefinition
+	Hooks                HooksDefinition
+	Package              string
+	Name                 string
+	Meta                 MetaDefinition
+	Fields               []FieldDefinition
+	Relations            []RelationDefinition
+	structFieldsKnown    bool
+	hasWritableIntegerID bool
 }
 
 // FieldDefinition represents a field definition

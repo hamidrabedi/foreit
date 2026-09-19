@@ -145,6 +145,7 @@ import (
 
 type Product struct {
 	schema.BaseSchema
+	ID int64
 }
 
 func (Product) Fields() []schema.Field {
@@ -395,7 +396,7 @@ func TestGenerateApps_InvalidLaterAPIModelPreservesEarlierGeneratedFiles(t *test
 
 	valid := `package valid
 import "github.com/forgego/forge/schema"
-type Product struct { schema.BaseSchema }
+type Product struct { schema.BaseSchema; ID int64 }
 func (Product) Fields() []schema.Field {
 	return []schema.Field{schema.Int64("id").Primary().AutoIncrement().Build()}
 }

@@ -156,11 +156,9 @@ func modelToMap(model interface{}) map[string]interface{} {
 	return modelToMapWithTypes(model, schemaFieldTypes(model))
 }
 
-// modelToMapWithTypes converts a model struct to a map, decoding []byte
-// values of schema-declared JSON fields (jsonKey -> true) into structured
-// JSON so responses round-trip. Bytes fields and unknown fields keep the
-// default encoding/json []byte representation (base64).
-func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string]interface{} {
+// modelToMapWithTypes converts a model struct to a map using schema field
+// types where their wire representation differs from Go's default encoding.
+func modelToMapWithTypes(model interface{}, fieldTypes map[string]schema.FieldType) map[string]interface{} {
 	result := make(map[string]interface{})
 	v := reflect.ValueOf(model)
 	if v.Kind() == reflect.Ptr {
@@ -187,7 +185,7 @@ func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string
 				anonVal = anonVal.Elem()
 			}
 			if anonVal.Kind() == reflect.Struct {
-				embeddedMap := modelToMap(anonVal.Interface())
+				embeddedMap := modelToMapWithTypes(anonVal.Interface(), fieldTypes)
 				for k, v := range embeddedMap {
 					result[k] = v
 				}
@@ -222,7 +220,7 @@ func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string
 		case reflect.Struct:
 			if value.Type() == reflect.TypeOf(time.Time{}) {
 				if timeVal, ok := value.Interface().(time.Time); ok {
-					result[key] = timeVal.Format(time.RFC3339)
+					result[key] = formatSchemaTime(timeVal, fieldTypes[key])
 				}
 			} else {
 				result[key] = modelToMap(value.Interface())
@@ -231,14 +229,14 @@ func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string
 			if !value.IsNil() {
 				if value.Type().Elem() == reflect.TypeOf(time.Time{}) {
 					if timeVal, ok := value.Interface().(*time.Time); ok && timeVal != nil {
-						result[key] = timeVal.Format(time.RFC3339)
+						result[key] = formatSchemaTime(*timeVal, fieldTypes[key])
 					}
 				} else {
 					result[key] = modelToMap(value.Elem().Interface())
 				}
 			}
 		default:
-			if raw, ok := value.Interface().([]byte); ok && jsonKeys[key] {
+			if raw, ok := value.Interface().([]byte); ok && fieldTypes[key] == schema.TypeJSON {
 				if json.Valid(raw) {
 					result[key] = json.RawMessage(raw)
 				} else {
@@ -255,10 +253,20 @@ func modelToMapWithTypes(model interface{}, jsonKeys map[string]bool) map[string
 	return result
 }
 
-// schemaFieldTypes maps response keys (json tag names) of schema-declared
-// JSON fields on model to true. It returns nil when model does not implement
-// schema.Schema, in which case serialization keeps its legacy behavior.
-func schemaFieldTypes(model interface{}) map[string]bool {
+func formatSchemaTime(value time.Time, fieldType schema.FieldType) string {
+	switch fieldType {
+	case schema.TypeTime:
+		return value.Format("15:04:05")
+	case schema.TypeDate:
+		return value.Format("2006-01-02")
+	default:
+		return value.Format(time.RFC3339)
+	}
+}
+
+// schemaFieldTypes maps response keys to schema types. Field resolution also
+// considers db tags so renamed concrete fields retain their schema semantics.
+func schemaFieldTypes(model interface{}) map[string]schema.FieldType {
 	var s schema.Schema
 	if v, ok := model.(schema.Schema); ok {
 		s = v
@@ -277,64 +285,18 @@ func schemaFieldTypes(model interface{}) map[string]bool {
 		return nil
 	}
 
-	byName := make(map[string]schema.FieldType, len(s.Fields()))
-	for _, f := range s.Fields() {
-		if f.Type != schema.TypeJSON {
+	out := make(map[string]schema.FieldType)
+	for _, field := range s.Fields() {
+		if field.Type != schema.TypeJSON && field.Type != schema.TypeTime && field.Type != schema.TypeDate {
 			continue
 		}
-		byName[strings.ToLower(f.Name)] = f.Type
-		if f.DBColumn != "" {
-			byName[strings.ToLower(f.DBColumn)] = f.Type
+		goName, jsonName := resolveModelFieldNames(model, field.Name, field.DBColumn)
+		if jsonName == "" {
+			jsonName = goName
 		}
-	}
-	if len(byName) == 0 {
-		return nil
-	}
-
-	out := make(map[string]bool)
-	var walk func(t reflect.Type)
-	walk = func(t reflect.Type) {
-		for i := 0; i < t.NumField(); i++ {
-			field := t.Field(i)
-			if field.Anonymous {
-				ft := field.Type
-				if ft.Kind() == reflect.Ptr {
-					ft = ft.Elem()
-				}
-				if ft.Kind() == reflect.Struct {
-					walk(ft)
-				}
-				continue
-			}
-			if !field.IsExported() {
-				continue
-			}
-			tagParts := strings.Split(field.Tag.Get("json"), ",")
-			key := tagParts[0]
-			if key == "" || key == "-" {
-				continue
-			}
-			if _, ok := byName[strings.ToLower(field.Name)]; ok {
-				out[key] = true
-				continue
-			}
-			if _, ok := byName[strings.ToLower(key)]; ok {
-				out[key] = true
-			}
+		if jsonName != "" && jsonName != "-" {
+			out[jsonName] = field.Type
 		}
-	}
-	v := reflect.ValueOf(model)
-	if v.Kind() == reflect.Ptr {
-		if v.IsNil() {
-			if t := v.Type().Elem(); t.Kind() == reflect.Struct {
-				walk(t)
-			}
-			return out
-		}
-		v = v.Elem()
-	}
-	if v.Kind() == reflect.Struct {
-		walk(v.Type())
 	}
 	return out
 }

@@ -694,6 +694,11 @@ func (m *Manager[T]) validateConstraints(instance *T) error {
 			return fmt.Errorf("model validation failed: %w", err)
 		}
 	}
+	if s, ok := any(instance).(schema.Schema); ok && schemaConstraintValidator != nil {
+		if err := schemaConstraintValidator(instance, s.Fields()); err != nil {
+			return fmt.Errorf("schema model validation failed: %w", err)
+		}
+	}
 
 	return nil
 }

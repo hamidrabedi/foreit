@@ -262,12 +262,37 @@ Generation reads direct schema constructor calls in a returned slice, a `var` sl
 forge generate --api
 ```
 
-With `--api`, generation also writes `api_gen.go` next to `gen.go`. For each model it contains a serializer, a ViewSet, and a `Register<Model>Routes` function, plus `RegisterAPIRoutes` for the whole package. Routes are mounted under `/api/v1/<kebab-case plural>`. Without the flag, no API code is produced.
+With `--api`, generation also writes `api_gen.go` next to `gen.go`. For each model it contains a serializer, a ViewSet, and a `Register<Model>Routes` function, plus `RegisterAPIRoutes` for the whole package.
+
+Nothing is served until you register the routes yourself, during server setup:
+
+```go
+import blog "myapp/app/blog"
+
+blog.RegisterAPIRoutes(router) // serves /api/v1/posts, /api/v1/categories, ...
+```
+
+Each model is served under `/api/v1/<kebab-case plural of the model name>`.
+
+:::warning Secure the generated endpoints before registering them
+Generated ViewSets declare no authentication or permission classes, and
+`api.DefaultSettings()` starts with both lists empty, which permits anonymous
+requests. Registering them as-is exposes unauthenticated list, create, update, and
+delete for every model. Call `api.SetDefaultAuthentication(...)` and
+`api.SetDefaultPermissions(...)` at startup, or set `Authentication` and `Permissions`
+on each ViewSet, before mounting the routes.
+:::
+
+Running without `--api` does not undo anything: a previously generated `api_gen.go` is
+left untouched, so it keeps compiling and keeps serving wherever it is registered.
+Delete the file to remove the generated API.
 
 Each model with API generation needs:
 
 - exactly one primary key, named `id`, declared as an auto-increment `int64` field in `Fields()`;
-- a concrete `int64` `ID` (or `Id`) struct field, or an implementation of `orm.ModelWithID`.
+- a writable `int64` ID: a declared `ID`/`Id` field, an embedded `<Model>Generated`, or
+  `GetID`/`SetID` methods declared on the model itself. Methods promoted from another
+  embedded helper type are not detected today, even though they satisfy `orm.ModelWithID`.
 
 Generation stops with an error naming the model when either is missing.
 
@@ -279,7 +304,10 @@ Generated endpoints follow the schema:
 - The request body must be a JSON object; `null` or any other value returns 400.
 - `Time` fields are returned as `15:04:05` and `Date` fields as `2006-01-02`, the layouts requests accept.
 
-`gen.go` and `api_gen.go` are written together: if either write fails, both files keep their previous contents.
+Both files are rendered and staged before either is replaced, and the previous contents are
+backed up first. If replacing `api_gen.go` fails, the generator restores `gen.go` on a
+best-effort basis. A failure during that restore, or a crash between the two renames, can
+still leave one file new and the other old; rerun the generator after such a failure.
 
 ---
 

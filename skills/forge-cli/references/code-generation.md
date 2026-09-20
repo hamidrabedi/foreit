@@ -15,99 +15,55 @@ forge uses AST-based code generation to create type-safe code from your schema d
 
 ## Generated Files
 
-### Model Struct
+### Generated struct
 
-In `models/gen.go`:
+Generation does not write your model struct — you author it. `gen.go` holds a
+`<Model>Generated` struct carrying the schema fields and their tags:
 
 ```go
-type Post struct {
-    ID          int64
-    Title       string
-    Content     string
-    Published   bool
-    CreatedAt   time.Time
-    UpdatedAt   time.Time
-    AuthorID    int64
-    Author      *User
-    Categories  []*Category
+type PostGenerated struct {
+    schema.BaseSchema
+    ID        int64     `json:"id" db:"id" validate:""`
+    Title     string    `json:"title" db:"title" validate:"required,max=200"`
+    Published bool      `json:"published" db:"published" validate:""`
+    CreatedAt time.Time `json:"created_at" db:"created_at" validate:""`
 }
 ```
 
-### Field Expressions
-
-In `models/gen.go`:
-
-```go
-type PostFields struct {
-    ID        query.FieldExpr[int64]
-    Title     query.FieldExpr[string]
-    Content   query.FieldExpr[string]
-    Published query.FieldExpr[bool]
-    CreatedAt query.FieldExpr[time.Time]
-    UpdatedAt query.FieldExpr[time.Time]
-}
-
-var PostFields = PostFields{
-    ID:        query.NewFieldExpr[int64]("id"),
-    Title:     query.NewFieldExpr[string]("title"),
-    Content:   query.NewFieldExpr[string]("content"),
-    Published: query.NewFieldExpr[bool]("published"),
-    CreatedAt: query.NewFieldExpr[time.Time]("created_at"),
-    UpdatedAt: query.NewFieldExpr[time.Time]("updated_at"),
-}
-```
+It also emits a `Validate()` method on your `Post` type.
 
 ### Manager
 
-In `models/gen.go`:
+`<Model>Objects` is a package-level `orm.Manager[Model]`, bound to the table from
+`Meta().TableName` (or the snake_case plural of the model name):
 
 ```go
-type PostManagerType struct {
-    db *db.DB
+var PostObjects = orm.MustNewManager[Post]("posts")
+```
+
+Use it directly: `PostObjects.Filter(...)`, `.Get(ctx, id)`, `.Create(ctx, &post)`.
+
+### Field expressions
+
+```go
+type PostFields struct {
+    ID        orm.Field[int64]
+    Title     orm.Field[string]
+    Published orm.Field[bool]
 }
 
-var Post = PostManagerType{}
-
-func (m *PostManagerType) Create(ctx context.Context, instance *Post) error {
-    // Create implementation
-}
-
-func (m *PostManagerType) Get(ctx context.Context, id int64) (*Post, error) {
-    // Get implementation
-}
-
-func (m *PostManagerType) Update(ctx context.Context, instance *Post) error {
-    // Update implementation
-}
-
-func (m *PostManagerType) Delete(ctx context.Context, instance *Post) error {
-    // Delete implementation
-}
-
-func (m *PostManagerType) Filter(conditions ...query.QueryExpr) *PostQuerySet {
-    // Filter implementation
+var PostFieldsInstance = PostFields{
+    ID:        orm.NewField[int64]("id", "posts"),
+    Title:     orm.NewField[string]("title", "posts"),
+    Published: orm.NewField[bool]("published", "posts"),
 }
 ```
 
-### QuerySet
+### Relations
 
-In `models/gen.go`:
-
-```go
-type PostQuerySet struct {
-    *query.BaseQuerySet[Post]
-}
-
-func (qs *PostQuerySet) All(ctx context.Context) ([]*Post, error) {
-    return qs.BaseQuerySet.All(ctx)
-}
-
-func (qs *PostQuerySet) Get(ctx context.Context, id int64) (*Post, error) {
-    return qs.BaseQuerySet.Get(ctx, id)
-}
-
-// ... other methods
-```
+For each model with relations, generation adds `<Model>RelationExpr` (typed accessors
+returning `*orm.RelationField[...]`) and `<Model>RelationHelper` with `Load<Relation>`
+methods for ForeignKey, OneToOne, and ManyToMany.
 
 ## Running Code Generation
 

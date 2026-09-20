@@ -269,10 +269,17 @@ Nothing is served until you register the routes yourself, during server setup:
 ```go
 import blog "myapp/app/blog"
 
-blog.RegisterAPIRoutes(router) // serves /api/v1/posts, /api/v1/categories, ...
+// Generated managers are created without a database connection, so bind them first.
+blog.PostObjects.SetDB(database)
+blog.CategoryObjects.SetDB(database)
+
+blog.RegisterAPIRoutes(router) // serves /api/v1/posts/, /api/v1/categories/, ...
 ```
 
-Each model is served under `/api/v1/<kebab-case plural of the model name>`.
+Each model is served under `/api/v1/<kebab-case plural of the model name>/`. The collection
+routes are registered with a trailing slash, so `/api/v1/posts/` is the list and create URL;
+`/api/v1/posts` returns 404 unless you add `server.StripSlashes` to the router. Detail routes
+are `/api/v1/posts/{id}`.
 
 :::warning Secure the generated endpoints before registering them
 Generated ViewSets declare no authentication or permission classes, and
@@ -300,7 +307,10 @@ Generated endpoints follow the schema:
 
 - Fields marked `Serialize(false)` never appear in responses under any of their names (schema name, column, or JSON tag), and cannot be used to filter, order, or search.
 - Non-editable fields are ignored in create and update bodies.
-- A list request without `ordering` uses the model's `Meta().OrderBy`, or the primary key when none is set, so pages are stable.
+- A list request without `ordering` uses the model's `Meta().OrderBy`, or the primary key when
+  none is set. Ordering fields that are hidden (`Serialize(false)`) are dropped, so a
+  `Meta().OrderBy` built only from hidden fields currently leaves the list unordered, and paging
+  through it can repeat or skip rows; keep at least one visible field in `Meta().OrderBy`.
 - The request body must be a JSON object; `null` or any other value returns 400.
 - `Time` fields are returned as `15:04:05` and `Date` fields as `2006-01-02`, the layouts requests accept.
 

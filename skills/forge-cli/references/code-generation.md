@@ -9,7 +9,10 @@ forge uses AST-based code generation to create type-safe code from your schema d
 ## How It Works
 
 1. **Parse Models** - AST parser reads your Go model files
-2. **Extract Schema** - Extracts field definitions, relations, meta, hooks
+2. **Extract Schema** - Extracts field definitions, relations, meta, hooks. Each file is
+   parsed on its own, so `Fields()`, `Meta()`, `Relations()`, and `Hooks()` must live in the
+   same file as the model struct; a `Meta()` in another file of the package is silently
+   ignored and the default table name is used
 3. **Generate Code** - Creates type-safe managers, querysets, and field expressions
 4. **Write Files** - Writes all generated code for a package to one `gen.go` in the output directory (plus `api_gen.go` with `--api`)
 
@@ -40,6 +43,10 @@ It also emits a `Validate()` method on your `Post` type.
 ```go
 var PostObjects = orm.MustNewManager[Post]("posts")
 ```
+
+The manager is created without a database connection. Bind it during application start
+(`PostObjects.SetDB(database)`) before serving requests, as
+`examples/ecommerce/app/commerce/init.go` does.
 
 Use it directly: `PostObjects.Filter(...)`, `.Get(ctx, id)`, `.Create(ctx, &post)`.
 
@@ -100,9 +107,15 @@ forge generate --strict
 ```
 
 `--api` requires each model to have one auto-increment `int64` primary key named `id`,
-and a concrete `int64` `ID`/`Id` field or an `orm.ModelWithID` implementation.
-`gen.go` and `api_gen.go` are replaced together; if a write fails, both keep their
-previous contents.
+plus a writable `int64` ID in one of the forms the generator detects: a declared `ID`/`Id`
+field, an embedded `<Model>Generated`, or `GetID`/`SetID` declared on the model itself.
+Methods promoted from another embedded helper satisfy `orm.ModelWithID` but are not
+detected today.
+
+Both files are staged before either is replaced, and the previous contents are backed up.
+If replacing `api_gen.go` fails, `gen.go` is restored on a best-effort basis; a failed
+restore or a crash between the two renames can still leave a mixed pair, so rerun the
+generator after a failure.
 
 ## Best Practices
 

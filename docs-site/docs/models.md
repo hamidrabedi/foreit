@@ -277,9 +277,9 @@ blog.RegisterAPIRoutes(router) // serves /api/v1/posts/, /api/v1/categories/, ..
 ```
 
 Each model is served under `/api/v1/<kebab-case plural of the model name>/`. The collection
-routes are registered with a trailing slash, so `/api/v1/posts/` is the list and create URL;
-`/api/v1/posts` returns 404 unless you add `server.StripSlashes` to the router. Detail routes
-are `/api/v1/posts/{id}`.
+routes are registered with a trailing slash, so the list and create URL is `/api/v1/posts/`,
+and the slashless `/api/v1/posts` returns 404. Detail routes are `/api/v1/posts/{id}`, without
+a trailing slash. Use the exact forms above in clients.
 
 :::warning Secure the generated endpoints before registering them
 Generated ViewSets declare no authentication or permission classes, and

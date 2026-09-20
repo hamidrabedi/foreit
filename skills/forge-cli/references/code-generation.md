@@ -69,8 +69,16 @@ var PostFieldsInstance = PostFields{
 ### Relations
 
 For each model with relations, generation adds `<Model>RelationExpr` (typed accessors
-returning `*orm.RelationField[...]`) and `<Model>RelationHelper` with `Load<Relation>`
-methods for ForeignKey, OneToOne, and ManyToMany.
+returning `*orm.RelationField[...]`) and `<Model>RelationHelper`.
+
+:::caution
+The generated ForeignKey loader calls `instance.Get<RelationName>ID()`, built from the raw
+relation name (a relation named `author_id` produces `Getauthor_idID()`), and nothing
+generates that accessor — so a package with ForeignKey relations does not compile unless you
+declare the method yourself. Relations declared with functional constructors such as
+`ForeignKeyField` get no loader at all. Load related rows through the ORM instead until this
+is fixed.
+:::
 
 ## Running Code Generation
 
@@ -93,8 +101,10 @@ You can customize generation templates, though this is advanced and not recommen
 ### Generation Options
 
 ```bash
-# Read schemas from another directory (default ./models)
-forge generate --models ./app/blog
+# Read schemas from another directory (default ./models).
+# Pass --output too: it stays at ./models otherwise, which writes the generated
+# code into the wrong package.
+forge generate --models ./app/blog --output ./app/blog
 
 # Output to different directory (default ./models)
 forge generate --output ./generated
